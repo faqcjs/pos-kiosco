@@ -149,20 +149,27 @@ export default function Venta() {
     setVisibleCount(12)
   }, [buscarProducto, categoriaSeleccionada])
 
-  // Filtrado de productos por búsqueda y categoría
-  const listadoFiltrado = productos.filter((p) => {
-    const coincideBusqueda = !buscarProducto.trim() || 
-      p.nombre.toLowerCase().includes(buscarProducto.trim().toLowerCase()) ||
-      p.id.toLowerCase().includes(buscarProducto.trim().toLowerCase())
-    
-    const coincideCategoria = !categoriaSeleccionada || p.categoria === categoriaSeleccionada
-    
-    return coincideBusqueda && coincideCategoria
-  })
+  const esVistaMasVendidos = !buscarProducto.trim() && !categoriaSeleccionada
 
-  const listadoProductosGrid = listadoFiltrado.slice(0, visibleCount)
+  // Filtrado de productos por búsqueda y categoría
+  const listadoFiltrado = esVistaMasVendidos
+    ? productos.filter((p) => p.stock > 0).slice(0, 10)
+    : productos.filter((p) => {
+        const coincideBusqueda = !buscarProducto.trim() || 
+          p.nombre.toLowerCase().includes(buscarProducto.trim().toLowerCase()) ||
+          p.id.toLowerCase().includes(buscarProducto.trim().toLowerCase())
+        
+        const coincideCategoria = !categoriaSeleccionada || p.categoria === categoriaSeleccionada
+        
+        return coincideBusqueda && coincideCategoria
+      })
+
+  const listadoProductosGrid = esVistaMasVendidos 
+    ? listadoFiltrado
+    : listadoFiltrado.slice(0, visibleCount)
 
   const handleLeftScroll = (e) => {
+    if (esVistaMasVendidos) return
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
     if (scrollHeight - scrollTop - clientHeight < 150) {
       setVisibleCount((prev) => Math.min(prev + 12, listadoFiltrado.length))
@@ -175,13 +182,13 @@ export default function Venta() {
       {carrito.map((item) => (
         <div
           key={item.id}
-          className="bg-slate-800/40 border border-slate-700/30 rounded-2xl p-3 flex items-center justify-between shadow-sm animate-fade-in"
+          className="bg-slate-50 dark:bg-slate-800/40 border border-slate-205 dark:border-slate-700/30 rounded-2xl p-3 flex items-center justify-between shadow-sm animate-fade-in"
         >
           <div className="min-w-0 pr-3">
-            <p className="font-bold text-slate-200 text-sm leading-snug truncate">
+            <p className="font-bold text-slate-800 dark:text-slate-200 text-sm leading-snug truncate">
               {item.nombre}
             </p>
-            <span className="text-[11px] font-black text-indigo-400 block mt-0.5">
+            <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 block mt-0.5">
               ${item.precio.toLocaleString('es-AR')} c/u
             </span>
           </div>
@@ -189,22 +196,22 @@ export default function Venta() {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => actualizarCantidadCarrito(item.id, item.cantidad - 1)}
-              className="w-7 h-7 rounded-full border border-slate-700 bg-slate-800 font-bold active:bg-slate-750 flex items-center justify-center text-slate-300 btn-interactive"
+              className="w-7 h-7 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold hover:bg-slate-100 dark:active:bg-slate-750 flex items-center justify-center text-slate-600 dark:text-slate-300 btn-interactive"
             >
               -
             </button>
-            <span className="text-sm font-black text-slate-100 min-w-[20px] text-center">
+            <span className="text-sm font-black text-slate-800 dark:text-slate-100 min-w-[20px] text-center">
               {item.cantidad}
             </span>
             <button
               onClick={() => actualizarCantidadCarrito(item.id, item.cantidad + 1)}
-              className="w-7 h-7 rounded-full border border-slate-700 bg-slate-800 font-bold active:bg-slate-750 flex items-center justify-center text-slate-300 btn-interactive"
+              className="w-7 h-7 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold hover:bg-slate-100 dark:active:bg-slate-750 flex items-center justify-center text-slate-600 dark:text-slate-300 btn-interactive"
             >
               +
             </button>
             <button
               onClick={() => eliminarDelCarrito(item.id)}
-              className="text-slate-500 hover:text-rose-400 p-1 text-sm font-bold ml-1 transition-colors"
+              className="text-slate-400 hover:text-rose-500 p-1 text-sm font-bold ml-1 transition-colors"
             >
               🗑️
             </button>
@@ -215,12 +222,12 @@ export default function Venta() {
   )
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full pb-16 md:pb-0 bg-[#090b11]">
+    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full pb-16 md:pb-0 bg-[#f8fafc] dark:bg-[#090b11]">
       {/* SECCIÓN 1: LADO IZQUIERDO (Buscador, rápidos, monto) */}
       <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-5" onScroll={handleLeftScroll}>
         {/* Warning caja cerrada */}
         {!cajaActiva && (
-          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-xs rounded-2xl py-3 px-4 flex items-center gap-2 shadow-inner">
+          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-xs rounded-2xl py-3 px-4 flex items-center gap-2 shadow-inner">
             <span>⚠️</span>
             <span>La caja está cerrada. Debés abrirla en la pestaña "Caja" antes de poder vender.</span>
           </div>
@@ -229,18 +236,18 @@ export default function Venta() {
         {/* Buscador & Scanner */}
         <section className="flex gap-3 shrink-0">
           <div className="relative flex-1">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-slate-500">🔍</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-slate-400 dark:text-slate-500">🔍</span>
             <input
               type="text"
               placeholder="Buscar producto o escanear..."
               value={buscarProducto}
               onChange={(e) => setBuscarProducto(e.target.value)}
-              className="w-full bg-[#10141f] border border-slate-800/80 rounded-2xl py-3.5 pl-11 pr-10 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 font-medium text-slate-200"
+              className="w-full bg-white border border-slate-205 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#10141f] dark:border-slate-800/80 dark:text-slate-200 rounded-2xl py-3.5 pl-11 pr-10 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 font-medium"
             />
             {buscarProducto && (
               <button
                 onClick={() => setBuscarProducto('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm active:text-white"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:text-slate-500 text-sm dark:active:text-white"
               >
                 ✕
               </button>
@@ -248,7 +255,7 @@ export default function Venta() {
           </div>
           <button
             onClick={() => setScannerAbierto(true)}
-            className="bg-indigo-600/10 border border-indigo-500/25 hover:bg-indigo-600/20 text-indigo-400 rounded-2xl px-5 flex items-center justify-center text-xl shadow-md btn-interactive"
+            className="bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-600/10 dark:border-indigo-500/25 dark:hover:bg-indigo-600/20 dark:text-indigo-400 rounded-2xl px-5 flex items-center justify-center text-xl shadow-md btn-interactive"
           >
             📷
           </button>
@@ -276,8 +283,8 @@ export default function Venta() {
                 onClick={() => setCategoriaSeleccionada(cat)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-black border transition-all btn-interactive whitespace-nowrap ${
                   activo
-                    ? 'bg-indigo-650 border-indigo-500 text-white shadow-md shadow-indigo-600/10'
-                    : 'bg-[#10141f] border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/10'
+                    : 'bg-white border-slate-200 dark:bg-[#10141f] dark:border-slate-800 text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-205'
                 }`}
               >
                 <span>{getCatEmoji(cat)}</span>
@@ -289,7 +296,7 @@ export default function Venta() {
 
         {/* Grid de Productos Rápidos y Búsqueda */}
         <section className="space-y-3">
-          <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest block pl-1">
+          <h2 className="text-xs font-black text-slate-455 dark:text-slate-500 uppercase tracking-widest block pl-1">
             {buscarProducto.trim() 
               ? `🔎 Resultados de Búsqueda (${listadoFiltrado.length})` 
               : categoriaSeleccionada 
@@ -297,7 +304,7 @@ export default function Venta() {
                 : `🔥 Los Más Vendidos (${listadoFiltrado.length})`}
           </h2>
           {listadoProductosGrid.length === 0 ? (
-            <div className="bg-[#10141f] border border-slate-800/80 rounded-2xl p-6 text-center text-slate-400 text-xs font-medium">
+            <div className="bg-white border border-slate-200 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-6 text-center text-slate-500 dark:text-slate-400 text-xs font-medium shadow-sm">
               ⚠️ No se encontraron productos coincidentes.
             </div>
           ) : (
@@ -317,20 +324,20 @@ export default function Venta() {
                   <button
                     key={p.id}
                     onClick={() => agregarAlCarrito(p.id)}
-                    className="relative flex flex-col items-center justify-center bg-gradient-to-b from-slate-900/60 to-[#10141f]/80 border border-slate-800 rounded-3xl p-5 hover:border-indigo-500/50 hover:bg-[#10141f] active:scale-95 duration-100 hover:shadow-xl hover:shadow-indigo-500/5 text-center min-h-[140px] gap-2 btn-interactive"
+                    className="relative flex flex-col items-center justify-center bg-white dark:bg-[#10141f] border border-slate-200 dark:border-slate-800 rounded-3xl p-5 hover:border-indigo-500 hover:bg-indigo-50/20 dark:hover:border-indigo-500/50 dark:hover:bg-slate-800 active:scale-95 duration-100 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 text-center min-h-[140px] gap-2 btn-interactive"
                   >
                     <span className="text-2xl filter drop-shadow">{getEmoji(p.categoria)}</span>
-                    <span className="text-xs font-black text-slate-200 leading-snug line-clamp-2 max-w-[95%]">
+                    <span className="text-xs font-black text-slate-800 dark:text-slate-200 leading-snug line-clamp-2 max-w-[95%]">
                       {p.nombre}
                     </span>
                     <div className="flex flex-col items-center gap-1.5 w-full mt-1">
-                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-black shadow-sm">
+                      <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-black shadow-sm">
                         ${p.precioVenta.toLocaleString('es-AR')}
                       </span>
                       <span className={`text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded-md ${
                         p.stock <= p.stockMinimo 
-                          ? 'bg-rose-500/15 text-rose-400 border border-rose-500/10 animate-pulse' 
-                          : 'bg-slate-800/40 text-slate-450'
+                          ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/10 animate-pulse' 
+                          : 'bg-slate-100 dark:bg-slate-800/40 text-slate-500 dark:text-slate-450'
                       }`}>
                         Stock: {p.stock}
                       </span>
@@ -343,13 +350,13 @@ export default function Venta() {
         </section>
 
         {/* Monto Rápido */}
-        <section className="bg-[#10141f] rounded-2xl p-4 border border-slate-800/80 shadow-md flex gap-3 items-center">
+        <section className="bg-white dark:bg-[#10141f] rounded-2xl p-4 border border-slate-200 dark:border-slate-800/80 shadow-sm flex gap-3 items-center">
           <div className="flex-grow">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1 pl-0.5">
+            <span className="text-[10px] font-black text-slate-400 dark:text-slate-550 uppercase tracking-widest block mb-1 pl-0.5">
               Ingreso de Importe Rápido (Sin código)
             </span>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-slate-500">
                 $
               </span>
               <input
@@ -359,7 +366,7 @@ export default function Venta() {
                 value={montoRapidoInput}
                 onChange={(e) => setMontoRapidoInput(e.target.value)}
                 onKeyDown={handleKeyDownMonto}
-                className="w-full bg-[#090b11] border border-slate-800/80 rounded-xl py-2.5 pl-8 pr-3 text-sm font-black text-slate-200 outline-none focus:border-indigo-500"
+                className="w-full bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800/80 dark:text-slate-200 rounded-xl py-2.5 pl-8 pr-3 text-sm font-black outline-none"
               />
             </div>
           </div>
@@ -375,18 +382,18 @@ export default function Venta() {
         {/* Carrito Móvil (Oculto en desktop para evitar doble carrito) */}
         {carrito.length > 0 && (
           <section className="md:hidden flex-1 flex flex-col overflow-hidden min-h-[200px]">
-            <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 pl-1">
+            <h2 className="text-xs font-black text-slate-400 dark:text-slate-550 uppercase tracking-widest mb-2 pl-1">
               Detalle del Carrito
             </h2>
             <div className="flex-grow overflow-y-auto pr-1">
               <CartItemsList />
             </div>
             {/* Checkout móvil */}
-            <div className="pt-4 bg-gradient-to-t from-[#090b11] via-[#090b11] to-transparent sticky bottom-0">
+            <div className="pt-4 bg-gradient-to-t from-slate-50 via-slate-50 dark:from-[#090b11] dark:via-[#090b11] to-transparent sticky bottom-0">
               <button
                 onClick={handleCobrar}
                 disabled={total === 0}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-800 disabled:to-slate-800 text-white font-black text-base py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-lg shadow-emerald-500/15 btn-interactive"
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 dark:disabled:from-slate-800 dark:disabled:to-slate-800 text-white font-black text-base py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-lg shadow-emerald-500/15 btn-interactive"
               >
                 <span>Cobrar Carrito</span>
                 <span className="text-lg font-black border-l border-white/20 pl-2">
@@ -399,13 +406,13 @@ export default function Venta() {
       </div>
 
       {/* SECCIÓN 2: LADO DERECHO - CARRO DE ESCRITORIO (Visible sólo en PC) */}
-      <div className="hidden md:flex w-96 bg-[#10141f] border-l border-slate-800/80 flex-col justify-between shrink-0 overflow-hidden">
+      <div className="hidden md:flex w-96 bg-white dark:bg-[#10141f] border-l border-slate-200 dark:border-slate-800/80 flex-col justify-between shrink-0 overflow-hidden shadow-sm">
         {/* Encabezado Carrito */}
-        <div className="p-4 border-b border-slate-800/80 flex justify-between items-center bg-[#141926]">
-          <span className="font-extrabold text-sm text-slate-300 uppercase tracking-wider flex items-center gap-2">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800/80 flex justify-between items-center bg-slate-100 dark:bg-[#141926]">
+          <span className="font-extrabold text-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
             🛒 Carrito Activo
           </span>
-          <span className="bg-indigo-500/15 text-indigo-400 text-xs font-black px-2.5 py-1 rounded-full">
+          <span className="bg-indigo-500/15 text-indigo-655 dark:text-indigo-400 text-xs font-black px-2.5 py-1 rounded-full">
             {carrito.length} Items
           </span>
         </div>
@@ -413,7 +420,7 @@ export default function Venta() {
         {/* Lista del Carrito con auto-scroll */}
         <div className="flex-grow overflow-y-auto p-4 space-y-4" ref={scrollRef}>
           {carrito.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-3 text-slate-500">
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-3 text-slate-400 dark:text-slate-500">
               <span className="text-4xl animate-pulse">🛒</span>
               <p className="text-sm font-semibold">El carrito está vacío</p>
               <p className="text-xs max-w-[200px]">Hace click en los productos rápidos o escanealos para agregarlos.</p>
@@ -424,16 +431,16 @@ export default function Venta() {
         </div>
 
         {/* Resumen & Checkout de Escritorio */}
-        <div className="p-4 border-t border-slate-800/80 bg-[#141926] space-y-4">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 bg-slate-100 dark:bg-[#141926] space-y-4">
           <div className="flex justify-between items-end">
-            <span className="text-xs font-bold text-slate-400 uppercase">Subtotal</span>
-            <span className="text-2xl font-black text-slate-100">${total.toLocaleString('es-AR')}</span>
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Subtotal</span>
+            <span className="text-2xl font-black text-slate-800 dark:text-slate-100">${total.toLocaleString('es-AR')}</span>
           </div>
 
           <button
             onClick={handleCobrar}
             disabled={total === 0}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-800 disabled:to-slate-800 text-white font-black text-lg py-4 rounded-2xl shadow-lg shadow-emerald-500/15 flex items-center justify-center gap-2 btn-interactive"
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-slate-800 dark:disabled:to-slate-800 text-white font-black text-lg py-4 rounded-2xl shadow-lg shadow-emerald-500/15 flex items-center justify-center gap-2 btn-interactive"
           >
             <span>Cobrar</span>
             <span className="text-xl font-black border-l border-white/20 pl-2">
@@ -442,11 +449,12 @@ export default function Venta() {
           </button>
         </div>
       </div>
+
       {/* Modal de Cobro */}
       {modalCobroAbierto && (
         <>
           <div
-            className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm animate-fade-in"
+            className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 z-40 backdrop-blur-sm animate-fade-in"
             onClick={() => {
               setModalCobroAbierto(false)
               setMetodoSeleccionado('')
@@ -457,13 +465,13 @@ export default function Venta() {
               setNuevoClienteTelefono('')
             }}
           />
-          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#10141f] border border-slate-800 rounded-t-3xl z-50 px-5 pb-8 pt-5 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-5" />
+          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white dark:bg-[#10141f] border border-slate-205 dark:border-slate-800 rounded-t-3xl z-50 px-5 pb-8 pt-5 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-5" />
 
-            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+            <h3 className="text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">
               Total a cobrar
             </h3>
-            <p className="text-center text-3xl font-black text-emerald-400 mb-5">
+            <p className="text-center text-3xl font-black text-emerald-600 dark:text-emerald-400 mb-5">
               ${total.toLocaleString('es-AR')}
             </p>
 
@@ -476,8 +484,8 @@ export default function Venta() {
                 }}
                 className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 font-bold text-xs gap-2 transition-all btn-interactive ${
                   metodoSeleccionado === 'Efectivo'
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-md shadow-emerald-500/5'
-                    : 'bg-[#151926] border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-650 dark:text-emerald-400 shadow-md shadow-emerald-500/5'
+                    : 'bg-slate-105 border-slate-200 text-slate-500 hover:text-slate-800 dark:bg-[#151926] dark:border-slate-800 dark:text-slate-400 dark:hover:text-slate-205'
                 }`}
               >
                 <span className="text-2xl">💵</span>
@@ -493,8 +501,8 @@ export default function Venta() {
                 }}
                 className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 font-bold text-xs gap-2 transition-all btn-interactive ${
                   metodoSeleccionado === 'QR / Transferencia'
-                    ? 'bg-blue-500/10 border-blue-500 text-blue-400 shadow-md shadow-blue-500/5'
-                    : 'bg-[#151926] border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-blue-500/10 border-blue-500 text-blue-650 dark:text-blue-400 shadow-md shadow-blue-500/5'
+                    : 'bg-slate-105 border-slate-200 text-slate-500 hover:text-slate-800 dark:bg-[#151926] dark:border-slate-800 dark:text-slate-400 dark:hover:text-slate-205'
                 }`}
               >
                 <span className="text-2xl">📱</span>
@@ -509,8 +517,8 @@ export default function Venta() {
                 }}
                 className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 font-bold text-xs gap-2 transition-all btn-interactive ${
                   metodoSeleccionado === 'Fiado'
-                    ? 'bg-rose-500/10 border-rose-500 text-rose-400 shadow-md shadow-rose-500/5'
-                    : 'bg-[#151926] border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-rose-500/10 border-rose-500 text-rose-600 dark:text-rose-400 shadow-md shadow-rose-500/5'
+                    : 'bg-slate-105 border-slate-200 text-slate-500 hover:text-slate-800 dark:bg-[#151926] dark:border-slate-800 dark:text-slate-400 dark:hover:text-slate-205'
                 }`}
               >
                 <span className="text-2xl">📓</span>
@@ -520,28 +528,52 @@ export default function Venta() {
 
             {/* A. OPCIONES EFECTIVO (Paga con / Vuelto) */}
             {metodoSeleccionado === 'Efectivo' && (
-              <div className="space-y-4 mb-5 bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-2xl animate-fade-in">
+              <div className="space-y-4 mb-5 bg-emerald-500/5 border border-emerald-555/10 p-4 rounded-2xl animate-fade-in">
                 <div className="space-y-1.5">
-                  <label className="text-xxs font-black text-emerald-400 uppercase tracking-wide block pl-0.5">
+                  <label className="text-xxs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wide block pl-0.5">
                     ¿Con cuánto paga el cliente?
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">$</span>
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-405 dark:text-slate-500 font-bold text-sm">$</span>
                     <input
                       type="number"
                       placeholder="Ej. 2000, 5000"
                       value={pagaCon}
                       onChange={(e) => setPagaCon(e.target.value)}
-                      className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 pl-7 pr-3 text-xs outline-none focus:border-emerald-500 text-slate-200 font-bold"
+                      className="w-full bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-emerald-505 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-202 rounded-xl py-2.5 pl-7 pr-3 text-xs outline-none font-bold"
                     />
+                  </div>
+
+                  {/* Atajos de billetes rápidos */}
+                  <div className="flex gap-2 pt-1 select-none">
+                    {[2000, 10000, 20000].map((valor) => (
+                      <button
+                        key={valor}
+                        type="button"
+                        onClick={() => {
+                          const actual = Number(pagaCon) || 0
+                          setPagaCon(String(actual + valor))
+                        }}
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-750 dark:text-slate-350 dark:border-slate-700/50 active:scale-95 font-black text-[10px] py-2 rounded-xl shadow-sm transition-all btn-interactive"
+                      >
+                        +${valor.toLocaleString('es-AR')}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setPagaCon('')}
+                      className="bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-600 dark:text-rose-400 font-black text-[10px] px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-500/20 shadow-sm transition-all btn-interactive"
+                    >
+                      Limpiar
+                    </button>
                   </div>
                 </div>
 
                 {/* Vuelto a dar */}
                 {pagaCon && Number(pagaCon) >= total && (
                   <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex justify-between items-center animate-fade-in">
-                    <span className="text-xs font-bold text-emerald-400 uppercase">Vuelto a dar:</span>
-                    <span className="text-lg font-black text-emerald-300">
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase">Vuelto a dar:</span>
+                    <span className="text-lg font-black text-emerald-700 dark:text-emerald-300">
                       ${(Number(pagaCon) - total).toLocaleString('es-AR')}
                     </span>
                   </div>
@@ -555,27 +587,27 @@ export default function Venta() {
                 {!creandoClienteInline ? (
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <label className="text-xxs font-black text-rose-450 uppercase tracking-wide block pl-0.5">
+                      <label className="text-xxs font-black text-rose-650 dark:text-rose-450 uppercase tracking-wide block pl-0.5">
                         ¿A quién le cargamos el fiado? *
                       </label>
                       <button
                         type="button"
                         onClick={() => setCreandoClienteInline(true)}
-                        className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-wider"
+                        className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 uppercase tracking-wider"
                       >
                         + Crear Cliente
                       </button>
                     </div>
 
                     {clientes.length === 0 ? (
-                      <p className="text-xs text-rose-400/80 py-2 text-center bg-[#090b11] border border-slate-800 rounded-xl">
+                      <p className="text-xs text-rose-600 dark:text-rose-400/80 py-2 text-center bg-slate-100/70 border border-slate-202 dark:bg-[#090b11] dark:border-slate-800 rounded-xl">
                         ⚠️ No hay deudores cargados. Creá uno tocando "+ Crear Cliente".
                       </p>
                     ) : (
                       <select
                         value={clienteSeleccionadoId}
                         onChange={(e) => setClienteSeleccionadoId(e.target.value)}
-                        className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none focus:border-rose-500 text-slate-200"
+                        className="w-full bg-slate-105 border border-slate-200 text-slate-900 focus:bg-white focus:border-rose-505 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-202 rounded-xl py-2.5 px-3 text-xs outline-none"
                         required
                       >
                         <option value="">Seleccionar cliente</option>
@@ -590,7 +622,7 @@ export default function Venta() {
                 ) : (
                   // Formulario de creación inline
                   <div className="space-y-3 animate-fade-in">
-                    <h4 className="text-xxs font-black text-indigo-400 uppercase tracking-wide">
+                    <h4 className="text-xxs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">
                       Registrar Nuevo Cliente Inline
                     </h4>
                     
@@ -600,7 +632,7 @@ export default function Venta() {
                         placeholder="Nombre completo *"
                         value={nuevoClienteNombre}
                         onChange={(e) => setNuevoClienteNombre(e.target.value)}
-                        className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 text-slate-200"
+                        className="w-full bg-slate-105/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-202 rounded-xl py-2 px-3 text-xs outline-none"
                       />
                     </div>
                     
@@ -610,7 +642,7 @@ export default function Venta() {
                         placeholder="Teléfono (opcional)"
                         value={nuevoClienteTelefono}
                         onChange={(e) => setNuevoClienteTelefono(e.target.value)}
-                        className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2 px-3 text-xs outline-none focus:border-indigo-500 text-slate-200"
+                        className="w-full bg-slate-105/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-202 rounded-xl py-2 px-3 text-xs outline-none"
                       />
                     </div>
 
@@ -622,7 +654,7 @@ export default function Venta() {
                           setNuevoClienteNombre('')
                           setNuevoClienteTelefono('')
                         }}
-                        className="px-3 py-1.5 bg-slate-800 text-slate-400 hover:text-slate-200 text-[10px] font-bold rounded-lg"
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-202 text-[10px] font-bold rounded-lg"
                       >
                         Cancelar
                       </button>
@@ -666,7 +698,7 @@ export default function Venta() {
                   setNuevoClienteNombre('')
                   setNuevoClienteTelefono('')
                 }}
-                className="py-3.5 bg-slate-800 active:bg-slate-750 hover:bg-slate-700/80 text-slate-300 font-bold rounded-2xl text-center btn-interactive"
+                className="py-3.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-200/80 dark:bg-slate-800 dark:active:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold rounded-2xl text-center btn-interactive"
               >
                 Cancelar
               </button>
@@ -685,7 +717,9 @@ export default function Venta() {
             </div>
           </div>
         </>
-      )}      {/* Escáner de Cámara */}
+      )}
+
+      {/* Escáner de Cámara */}
       <ScannerModal
         isOpen={scannerAbierto}
         onClose={() => setScannerAbierto(false)}

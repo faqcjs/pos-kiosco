@@ -71,21 +71,21 @@ export default function Clientes() {
   }
 
   // Componente que contiene el estado de cuenta y formulario de pago del cliente
-  const ClientLedgerDetails = ({ client, onClose }) => {
+  const renderClientLedgerDetails = (client, onClose) => {
     if (!client) return null
     return (
-      <div className="space-y-5 animate-fade-in text-slate-350">
-        <div className="flex justify-between items-start border-b border-slate-800 pb-4 bg-[#141926] p-4 rounded-t-2xl">
+      <div className="space-y-5 animate-fade-in text-slate-600 dark:text-slate-350">
+        <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-4 bg-slate-100 dark:bg-[#141926] p-4 rounded-t-2xl">
           <div>
-            <h3 className="text-lg font-black text-slate-100">{client.nombre}</h3>
+            <h3 className="text-lg font-black text-slate-800 dark:text-slate-100">{client.nombre}</h3>
             {client.telefono && (
-              <p className="text-xs text-slate-500 mt-1">📞 {client.telefono}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">📞 {client.telefono}</p>
             )}
           </div>
           {onClose && (
             <button
               onClick={onClose}
-              className="text-slate-500 hover:text-slate-200 text-sm font-bold active:scale-90 md:hidden"
+              className="text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200 text-sm font-bold active:scale-90 md:hidden"
             >
               ✕
             </button>
@@ -93,27 +93,27 @@ export default function Clientes() {
         </div>
 
         <div className="px-4 pb-4 space-y-5">
-          <div className="bg-rose-500/10 border-2 border-rose-500/25 rounded-2xl p-4 text-center max-w-[220px] mx-auto">
-            <span className="text-[10px] text-rose-400 font-black block uppercase tracking-wider">
+          <div className="bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 rounded-2xl p-4 text-center max-w-[220px] mx-auto">
+            <span className="text-[10px] text-rose-650 dark:text-rose-400 font-black block uppercase tracking-wider">
               Saldo Deudor Acumulado
             </span>
-            <span className="text-3xl font-black text-rose-450 mt-1 block">
+            <span className="text-3xl font-black text-rose-600 dark:text-rose-450 mt-1 block">
               ${client.deuda.toLocaleString('es-AR')}
             </span>
           </div>
 
           {/* Registrar un Pago */}
           {client.deuda > 0 && (
-            <div className="border-t border-slate-800/80 pt-4">
-              <h4 className="font-extrabold text-slate-200 text-xs uppercase tracking-wider mb-3">Registrar Entrega de Efectivo</h4>
+            <div className="border-t border-slate-200 dark:border-slate-800/80 pt-4">
+              <h4 className="font-extrabold text-slate-750 dark:text-slate-200 text-xs uppercase tracking-wider mb-3">Registrar Entrega de Efectivo</h4>
               {!cajaActiva ? (
-                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-xl p-3.5 text-center">
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs rounded-xl p-3.5 text-center">
                   ⚠️ Abrí la caja en la pestaña de Caja para registrar pagos.
                 </div>
               ) : (
                 <form onSubmit={handlePago} className="flex gap-2">
                   <div className="relative flex-grow">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-bold">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-bold">
                       $
                     </span>
                     <input
@@ -121,13 +121,13 @@ export default function Clientes() {
                       placeholder="Monto entregado"
                       value={montoPago}
                       onChange={(e) => setMontoPago(e.target.value)}
-                      className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 pl-6.5 pr-2 text-xs font-bold text-slate-200 outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 rounded-xl py-2.5 pl-8 pr-2 text-xs font-bold dark:text-slate-200 outline-none"
                       required
                     />
                   </div>
                   <button
                     type="submit"
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-950/20 transition-all btn-interactive"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-md transition-all btn-interactive"
                   >
                     Ingresar Pago
                   </button>
@@ -137,30 +137,30 @@ export default function Clientes() {
           )}
 
           {/* Historial */}
-          <div className="border-t border-slate-800/80 pt-4">
-            <h4 className="font-extrabold text-slate-200 text-xs uppercase tracking-wider mb-3">Historial de Cuentas</h4>
+          <div className="border-t border-slate-200 dark:border-slate-800/80 pt-4">
+            <h4 className="font-extrabold text-slate-750 dark:text-slate-200 text-xs uppercase tracking-wider mb-3">Historial de Cuentas</h4>
             <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
               {client.historial.length === 0 ? (
-                <p className="text-center text-slate-500 py-8 text-xs">
+                <p className="text-center text-slate-400 dark:text-slate-500 py-8 text-xs">
                   No hay transacciones registradas todavía.
                 </p>
               ) : (
                 client.historial.map((h) => (
                   <div
                     key={h.id}
-                    className="flex items-start justify-between border-b border-slate-800/40 pb-2.5 text-xs animate-fade-in"
+                    className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800/40 pb-2.5 text-xs animate-fade-in"
                   >
                     <div className="pr-3">
-                      <p className="font-bold text-slate-350 leading-tight">
+                      <p className="font-bold text-slate-700 dark:text-slate-350 leading-tight">
                         {h.type === 'pago' ? 'Pago recibido' : h.detalle}
                       </p>
-                      <span className="text-[10px] text-slate-500">
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">
                         {formatFecha(h.timestamp)}
                       </span>
                     </div>
                     <span
                       className={`font-black shrink-0 ml-3 text-sm ${
-                        h.tipo === 'deuda' ? 'text-rose-450' : 'text-emerald-450'
+                        h.tipo === 'deuda' ? 'text-rose-600 dark:text-rose-455' : 'text-emerald-600 dark:text-emerald-450'
                       }`}
                     >
                       {h.tipo === 'deuda' ? '+' : '-'}${h.monto}
@@ -176,16 +176,16 @@ export default function Clientes() {
   }
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full pb-16 md:pb-0 bg-[#090b11]">
+    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full pb-16 md:pb-0 bg-slate-50 dark:bg-[#090b11]">
       {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (1/3 en PC) */}
-      <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-4 md:border-r md:border-slate-850">
+      <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-4 md:border-r border-slate-200 dark:border-slate-800/80">
         <section className="flex gap-2 shrink-0">
           <input
             type="text"
             placeholder="Buscar deudor..."
             value={buscar}
             onChange={(e) => setBuscar(e.target.value)}
-            className="flex-grow bg-[#10141f] border border-slate-800/80 rounded-2xl px-4 py-3.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 text-slate-200"
+            className="flex-grow bg-white border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#10141f] dark:border-slate-800/80 dark:text-slate-200 rounded-2xl px-4 py-3.5 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10"
           />
           <button
             onClick={() => setModalNuevoAbierto(true)}
@@ -198,7 +198,7 @@ export default function Clientes() {
 
         <section className="space-y-2 flex-grow overflow-y-auto pr-1">
           {clientesFiltrados.length === 0 ? (
-            <div className="text-center text-slate-500 py-16">
+            <div className="text-center text-slate-400 dark:text-slate-500 py-16">
               <span className="text-3xl">📓</span>
               <p className="font-semibold mt-2">No hay clientes registrados.</p>
             </div>
@@ -209,25 +209,25 @@ export default function Clientes() {
                 <div
                   key={c.id}
                   onClick={() => setClienteSeleccionado(c)}
-                  className={`bg-[#10141f] border rounded-2xl p-4 shadow-sm flex items-center justify-between cursor-pointer transition-all ${
+                  className={`bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between cursor-pointer transition-all ${
                     seleccionado
-                      ? 'border-indigo-500 bg-[#161a29]'
-                      : 'border-slate-800/85 hover:border-slate-700/80'
+                      ? 'border-indigo-500 bg-indigo-50/40 dark:bg-[#161a29]'
+                      : 'border-slate-200 dark:border-slate-800/85 hover:border-slate-300 dark:hover:border-slate-700/80'
                   }`}
                 >
                   <div className="min-w-0 pr-3">
-                    <p className="font-bold text-slate-200 leading-tight truncate">{c.nombre}</p>
-                    {c.telefono && <p className="text-[10px] text-slate-500 mt-1">📞 {c.telefono}</p>}
+                    <p className="font-bold text-slate-800 dark:text-slate-200 leading-tight truncate">{c.nombre}</p>
+                    {c.telefono && <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">📞 {c.telefono}</p>}
                   </div>
                   <div className="text-right shrink-0">
                     <span
                       className={`text-base font-black block leading-none ${
-                        c.deuda > 0 ? 'text-rose-400' : 'text-slate-500'
+                        c.deuda > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500'
                       }`}
                     >
                       ${c.deuda.toLocaleString('es-AR')}
                     </span>
-                    <span className="text-[9px] text-slate-500 block uppercase font-black tracking-widest mt-1">
+                    <span className="text-[9px] text-slate-405 dark:text-slate-500 block uppercase font-black tracking-widest mt-1">
                       Debe
                     </span>
                   </div>
@@ -239,11 +239,11 @@ export default function Clientes() {
       </div>
 
       {/* COLUMNA DERECHA: DETALLES DE CUENTA FIADO (PC ONLY - visible al lado de la lista) */}
-      <div className="hidden md:flex w-[480px] bg-[#10141f] flex-col overflow-y-auto">
+      <div className="hidden md:flex w-[480px] bg-white dark:bg-[#10141f] border-l border-slate-200 dark:border-slate-800/80 flex-col overflow-y-auto">
         {clienteSeleccionado ? (
-          <ClientLedgerDetails client={clienteSeleccionado} />
+          renderClientLedgerDetails(clienteSeleccionado)
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-slate-500 p-8 text-center space-y-3">
+          <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-8 text-center space-y-3">
             <span className="text-4xl">📓</span>
             <p className="font-semibold text-sm">Cuentas Corrientes (Fiados)</p>
             <p className="text-xs max-w-xs leading-relaxed">Seleccioná un cliente de la lista para ver el estado de su cuenta, registrar entregas de dinero o consultar su historial.</p>
@@ -256,19 +256,19 @@ export default function Clientes() {
         {clienteSeleccionado && (
           <>
             <div
-              className="fixed inset-0 bg-black/60 z-40 backdrop-blur-xs"
+              className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 z-40 backdrop-blur-xs"
               onClick={() => setClienteSeleccionado(null)}
             />
-            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#10141f] border border-slate-800 rounded-t-3xl z-50 py-5 animate-slide-up shadow-2xl max-h-[85vh] overflow-y-auto">
-              <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-5" />
-              <ClientLedgerDetails
-                client={clienteSeleccionado}
-                onClose={() => setClienteSeleccionado(null)}
-              />
+            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white dark:bg-[#10141f] border border-slate-200 dark:border-slate-800 rounded-t-3xl z-50 py-5 animate-slide-up shadow-2xl max-h-[85vh] overflow-y-auto">
+              <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-5" />
+              {renderClientLedgerDetails(
+                clienteSeleccionado,
+                () => setClienteSeleccionado(null)
+              )}
               <div className="px-5 mt-2">
                 <button
                   onClick={() => setClienteSeleccionado(null)}
-                  className="w-full bg-slate-800 active:bg-slate-750 py-3.5 rounded-2xl text-slate-300 font-extrabold text-xs uppercase tracking-wider btn-interactive"
+                  className="w-full bg-slate-100 hover:bg-slate-200 active:bg-slate-200/85 dark:bg-slate-800 dark:active:bg-slate-750 py-3.5 rounded-2xl text-slate-600 dark:text-slate-300 font-extrabold text-xs uppercase tracking-wider btn-interactive"
                 >
                   Cerrar
                 </button>
@@ -281,16 +281,16 @@ export default function Clientes() {
       {/* Modal Crear Nuevo Cliente */}
       {modalNuevoAbierto && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setModalNuevoAbierto(false)} />
-          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#10141f] border border-slate-800 rounded-t-3xl z-50 px-5 pb-8 pt-5 animate-slide-up shadow-2xl">
-            <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-5" />
-            <h3 className="text-center text-base font-black text-slate-300 uppercase tracking-widest mb-4">
+          <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 z-40 backdrop-blur-sm" onClick={() => setModalNuevoAbierto(false)} />
+          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white dark:bg-[#10141f] border border-slate-200 dark:border-slate-800 rounded-t-3xl z-50 px-5 pb-8 pt-5 animate-slide-up shadow-2xl">
+            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-5" />
+            <h3 className="text-center text-base font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4">
               Registrar Cliente
             </h3>
 
-            <form onSubmit={handleCrear} className="space-y-4 text-slate-300">
+            <form onSubmit={handleCrear} className="space-y-4 text-slate-700 dark:text-slate-300">
               <div className="space-y-1.5">
-                <label className="text-xxs font-black text-slate-500 uppercase tracking-wide block pl-0.5">
+                <label className="text-xxs font-black text-slate-450 dark:text-slate-500 uppercase tracking-wide block pl-0.5">
                   Nombre Completo *
                 </label>
                 <input
@@ -298,13 +298,13 @@ export default function Clientes() {
                   placeholder="Ej. Juan Pérez"
                   value={nombreNuevo}
                   onChange={(e) => setNombreNuevo(e.target.value)}
-                  className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none focus:border-indigo-500 text-slate-200"
+                  className="w-full bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xxs font-black text-slate-500 uppercase tracking-wide block pl-0.5">
+                <label className="text-xxs font-black text-slate-450 dark:text-slate-500 uppercase tracking-wide block pl-0.5">
                   Teléfono / Celular
                 </label>
                 <input
@@ -312,7 +312,7 @@ export default function Clientes() {
                   placeholder="Ej. 11 1234 5678"
                   value={telefonoNuevo}
                   onChange={(e) => setTelefonoNuevo(e.target.value)}
-                  className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none focus:border-indigo-500 text-slate-200"
+                  className="w-full bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none"
                 />
               </div>
 
@@ -320,7 +320,7 @@ export default function Clientes() {
                 <button
                   type="button"
                   onClick={() => setModalNuevoAbierto(false)}
-                  className="py-3.5 bg-slate-800 active:bg-slate-755 text-slate-300 font-bold rounded-2xl text-center btn-interactive"
+                  className="py-3.5 bg-slate-105 hover:bg-slate-200 active:bg-slate-200/80 dark:bg-slate-800 dark:active:bg-slate-755 text-slate-600 dark:text-slate-300 font-bold rounded-2xl text-center btn-interactive"
                 >
                   Cancelar
                 </button>

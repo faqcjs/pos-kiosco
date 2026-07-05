@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useKioskoStore from '../store/kioskoStore'
 import ScannerModal from './ScannerModal'
 
@@ -11,6 +11,7 @@ export default function Stock() {
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('')
   const [modalAbierto, setModalAbierto] = useState(false)
   const [scannerAbierto, setScannerAbierto] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(12)
 
   // State para formulario (Agregar / Editar)
   const [formId, setFormId] = useState('')
@@ -24,8 +25,13 @@ export default function Stock() {
 
   const categorias = Array.from(new Set(productos.map((p) => p.categoria).filter(Boolean)))
 
+  // Resetear paginado al cambiar filtros
+  useEffect(() => {
+    setVisibleCount(12)
+  }, [buscar, filtroStockMinimo, categoriaSeleccionada])
+
   // Filtrado de productos
-  const productosFiltrados = productos.filter((p) => {
+  const matchFiltro = productos.filter((p) => {
     const matchesBuscar =
       p.nombre.toLowerCase().includes(buscar.toLowerCase()) ||
       p.id.toLowerCase().includes(buscar.toLowerCase())
@@ -33,6 +39,15 @@ export default function Stock() {
     const matchesStockMin = filtroStockMinimo ? p.stock <= p.stockMinimo : true
     return matchesBuscar && matchesCategoria && matchesStockMin
   })
+
+  const productosFiltrados = matchFiltro.slice(0, visibleCount)
+
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    if (scrollHeight - scrollTop - clientHeight < 150) {
+      setVisibleCount((prev) => Math.min(prev + 12, matchFiltro.length))
+    }
+  }
 
   const abrirFormularioNuevo = () => {
     setFormId('')
@@ -88,18 +103,18 @@ export default function Stock() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 bg-[#090b11] pb-20 md:pb-6">
+    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-5 bg-slate-50 dark:bg-[#090b11] pb-20 md:pb-6" onScroll={handleScroll}>
       {/* Cabecera / Buscador */}
       <section className="flex flex-col gap-3 shrink-0">
         <div className="flex gap-3">
           <div className="relative flex-grow">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">🔍</span>
             <input
               type="text"
               placeholder="Buscar por nombre o código de barra..."
               value={buscar}
               onChange={(e) => setBuscar(e.target.value)}
-              className="w-full bg-[#10141f] border border-slate-800/80 rounded-2xl py-3.5 pl-11 pr-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 font-medium text-slate-200"
+              className="w-full bg-white border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#10141f] dark:border-slate-800/80 dark:text-slate-200 rounded-2xl py-3.5 pl-11 pr-4 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 font-medium"
             />
           </div>
           <button
@@ -112,37 +127,57 @@ export default function Stock() {
         </div>
 
         {/* Filtros rápidos */}
-        <div className="flex gap-2 items-center overflow-x-auto pb-1 text-xs no-scrollbar">
+        <div className="flex gap-2 items-center overflow-x-auto pb-1.5 text-xs scrollbar-none select-none shrink-0">
           <button
+            type="button"
             onClick={() => setFiltroStockMinimo(!filtroStockMinimo)}
-            className={`px-3.5 py-2.5 rounded-xl font-bold border shrink-0 transition-colors btn-interactive ${
+            className={`px-3.5 py-2.5 rounded-full font-bold border shrink-0 transition-all btn-interactive ${
               filtroStockMinimo
-                ? 'bg-amber-500/10 border-amber-500 text-amber-400'
-                : 'bg-[#10141f] border-slate-850 text-slate-400 hover:text-slate-200'
+                ? 'bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-400 shadow-md shadow-amber-500/5'
+                : 'bg-white border-slate-200 dark:bg-[#10141f] dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             ⚠️ Stock Crítico
           </button>
 
-          <select
-            value={categoriaSeleccionada}
-            onChange={(e) => setCategoriaSeleccionada(e.target.value)}
-            className="bg-[#10141f] border border-slate-850 rounded-xl px-3 py-2.5 text-slate-400 font-semibold outline-none focus:border-indigo-500"
-          >
-            <option value="">Todas las categorías</option>
-            {categorias.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+          <div className="h-5 w-[1px] bg-slate-200 dark:bg-slate-800 shrink-0 mx-1" />
+
+          {['', 'Bebidas', 'Golosinas', 'Snacks', 'Tabaquería', 'Helados', 'Varios'].map((cat) => {
+            const activo = categoriaSeleccionada === cat
+            const getCatEmoji = (c) => {
+              switch (c) {
+                case 'Bebidas': return '🥤'
+                case 'Golosinas': return '🍬'
+                case 'Snacks': return '🍿'
+                case 'Tabaquería': return '🚬'
+                case 'Helados': return '🍦'
+                case 'Varios': return '📦'
+                default: return '🛍️'
+              }
+            }
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategoriaSeleccionada(cat)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full font-black border transition-all btn-interactive whitespace-nowrap ${
+                  activo
+                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/10'
+                    : 'bg-white border-slate-200 dark:bg-[#10141f] dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <span>{getCatEmoji(cat)}</span>
+                <span>{cat || 'Todos'}</span>
+              </button>
+            )
+          })}
         </div>
       </section>
 
       {/* Lista de productos (Grid de 1 col en mobile, 2 en tablet, 3 en desktop) */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {productosFiltrados.length === 0 ? (
-          <div className="col-span-full flex flex-col items-center justify-center text-center text-slate-500 py-16">
+          <div className="col-span-full flex flex-col items-center justify-center text-center text-slate-400 dark:text-slate-500 py-16">
             <span className="text-4xl">📦</span>
             <p className="font-semibold mt-2">No se encontraron productos.</p>
           </div>
@@ -152,33 +187,33 @@ export default function Stock() {
             return (
               <div
                 key={p.id}
-                className="bg-[#10141f] border border-slate-800/80 rounded-2xl p-4 shadow-sm flex items-center justify-between hover:border-slate-700/80 transition-colors"
+                className="bg-white border border-slate-200/80 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-4 shadow-sm flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700/80 transition-colors"
               >
                 <div className="space-y-1.5 pr-3 min-w-0 flex-1 cursor-pointer" onClick={() => abrirFormularioEditar(p)}>
-                  <p className="font-bold text-slate-200 leading-tight truncate">{p.nombre}</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-200 leading-tight truncate">{p.nombre}</p>
                   <div className="flex items-center gap-2 text-xxs">
-                    <span className="text-slate-500 font-mono truncate max-w-[120px]">
+                    <span className="text-slate-400 dark:text-slate-500 font-mono truncate max-w-[120px]">
                       {p.id}
                     </span>
-                    <span className="bg-slate-800/80 text-slate-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider scale-90">
+                    <span className="bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider scale-90">
                       {p.categoria || 'General'}
                     </span>
                   </div>
                   <div className="flex gap-3.5 text-xxs pt-1">
-                    <span className="text-slate-500">
+                    <span className="text-slate-400 dark:text-slate-500">
                       Compra: <b>${p.precioCompra}</b>
                     </span>
-                    <span className="text-indigo-400 font-extrabold">
+                    <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">
                       Venta: <b>${p.precioVenta}</b>
                     </span>
                   </div>
                 </div>
 
                 {/* Stock Controls */}
-                <div className="flex items-center gap-2 shrink-0 bg-[#090b11]/80 rounded-2xl p-1.5 border border-slate-800/40">
+                <div className="flex items-center gap-2 shrink-0 bg-slate-50 dark:bg-[#090b11]/80 rounded-2xl p-1.5 border border-slate-200 dark:border-slate-800/40">
                   <button
                     onClick={() => actualizarStock(p.id, -1)}
-                    className="w-8 h-8 rounded-xl border border-slate-800 bg-[#10141f] hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-300 transition-all btn-interactive"
+                    className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-all btn-interactive"
                   >
                     -
                   </button>
@@ -186,19 +221,19 @@ export default function Stock() {
                   <div className="text-center min-w-[36px] px-1">
                     <span
                       className={`text-sm font-black block leading-none ${
-                        stockBajo ? 'text-amber-400 animate-pulse' : 'text-slate-200'
+                        stockBajo ? 'text-amber-600 dark:text-amber-400 animate-pulse font-extrabold' : 'text-slate-800 dark:text-slate-200'
                       }`}
                     >
                       {p.stock}
                     </span>
-                    <span className="text-[8px] text-slate-500 block uppercase font-black tracking-widest mt-1">
+                    <span className="text-[8px] text-slate-400 dark:text-slate-500 block uppercase font-black tracking-widest mt-1">
                       Cant
                     </span>
                   </div>
 
                   <button
                     onClick={() => actualizarStock(p.id, 1)}
-                    className="w-8 h-8 rounded-xl border border-slate-800 bg-[#10141f] hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-300 transition-all btn-interactive"
+                    className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-all btn-interactive"
                   >
                     +
                   </button>
@@ -212,17 +247,17 @@ export default function Stock() {
       {/* Modal Agregar / Editar */}
       {modalAbierto && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setModalAbierto(false)} />
-          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#10141f] border border-slate-800 rounded-t-3xl z-50 px-5 pb-8 pt-5 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-5" />
-            <h3 className="text-center text-base font-black text-slate-300 uppercase tracking-widest mb-5">
+          <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 z-40 backdrop-blur-sm" onClick={() => setModalAbierto(false)} />
+          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white dark:bg-[#10141f] border border-slate-200 dark:border-slate-800 rounded-t-3xl z-50 px-5 pb-8 pt-5 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-5" />
+            <h3 className="text-center text-base font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-5">
               {editando ? 'Editar Producto' : 'Cargar Producto'}
             </h3>
 
-            <form onSubmit={guardarProducto} className="space-y-4 text-slate-300">
+            <form onSubmit={guardarProducto} className="space-y-4 text-slate-705 dark:text-slate-300">
               {/* ID / Barcode */}
               <div className="space-y-1.5">
-                <label className="text-xxs font-black text-slate-500 uppercase tracking-wider block pl-0.5">
+                <label className="text-xxs font-black text-slate-455 dark:text-slate-500 uppercase tracking-wider block pl-0.5">
                   Código de Barra *
                 </label>
                 <div className="flex gap-2">
@@ -232,14 +267,14 @@ export default function Stock() {
                     value={formId}
                     onChange={(e) => setFormId(e.target.value)}
                     disabled={editando}
-                    className="flex-grow bg-[#090b11] disabled:bg-slate-900 border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none font-mono text-slate-200"
+                    className="flex-grow bg-slate-100/70 disabled:bg-slate-200/80 border border-slate-200 text-slate-950 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:disabled:bg-slate-900 dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none font-mono"
                     required
                   />
                   {!editando && (
                     <button
                       type="button"
                       onClick={() => setScannerAbierto(true)}
-                      className="bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold px-3.5 rounded-xl text-lg flex items-center justify-center active:bg-indigo-600/30 btn-interactive"
+                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-600/20 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 font-bold px-3.5 rounded-xl text-lg flex items-center justify-center transition-colors btn-interactive"
                     >
                       📷
                     </button>
@@ -249,7 +284,7 @@ export default function Stock() {
 
               {/* Nombre */}
               <div className="space-y-1.5">
-                <label className="text-xxs font-black text-slate-500 uppercase tracking-wider block pl-0.5">
+                <label className="text-xxs font-black text-slate-455 dark:text-slate-500 uppercase tracking-wider block pl-0.5">
                   Nombre del Producto *
                 </label>
                 <input
@@ -257,7 +292,7 @@ export default function Stock() {
                   placeholder="Ej. Coca-Cola 500ml"
                   value={formNombre}
                   onChange={(e) => setFormNombre(e.target.value)}
-                  className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-200 focus:border-indigo-500"
+                  className="w-full bg-slate-105/70 border border-slate-200 text-slate-950 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none"
                   required
                 />
               </div>
@@ -265,7 +300,7 @@ export default function Stock() {
               {/* Precios */}
               <div className="grid grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">
-                  <label className="text-xxs font-black text-slate-500 uppercase tracking-wider block pl-0.5">
+                  <label className="text-xxs font-black text-slate-455 dark:text-slate-500 uppercase tracking-wider block pl-0.5">
                     Precio Compra ($)
                   </label>
                   <input
@@ -273,11 +308,11 @@ export default function Stock() {
                     placeholder="Compra"
                     value={formPrecioCompra}
                     onChange={(e) => setFormPrecioCompra(e.target.value)}
-                    className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-250 focus:border-indigo-500"
+                    className="w-full bg-slate-105/70 border border-slate-200 text-slate-950 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xxs font-black text-slate-500 uppercase tracking-wider block pl-0.5">
+                  <label className="text-xxs font-black text-slate-455 dark:text-slate-500 uppercase tracking-wider block pl-0.5">
                     Precio Venta ($) *
                   </label>
                   <input
@@ -285,7 +320,7 @@ export default function Stock() {
                     placeholder="Venta"
                     value={formPrecioVenta}
                     onChange={(e) => setFormPrecioVenta(e.target.value)}
-                    className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none font-bold text-emerald-400 focus:border-indigo-500"
+                    className="w-full bg-slate-105/70 border border-slate-200 text-emerald-600 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-emerald-400 rounded-xl py-2.5 px-3 text-xs outline-none font-bold"
                     required
                   />
                 </div>
@@ -294,7 +329,7 @@ export default function Stock() {
               {/* Stocks */}
               <div className="grid grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">
-                  <label className="text-xxs font-black text-slate-500 uppercase tracking-wider block pl-0.5">
+                  <label className="text-xxs font-black text-slate-455 dark:text-slate-500 uppercase tracking-wider block pl-0.5">
                     Stock Actual *
                   </label>
                   <input
@@ -302,12 +337,12 @@ export default function Stock() {
                     placeholder="Cantidad"
                     value={formStock}
                     onChange={(e) => setFormStock(e.target.value)}
-                    className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-250 focus:border-indigo-500 font-bold"
+                    className="w-full bg-slate-105/70 border border-slate-200 text-slate-950 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none font-bold"
                     required
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xxs font-black text-slate-500 uppercase tracking-wider block pl-0.5">
+                  <label className="text-xxs font-black text-slate-455 dark:text-slate-500 uppercase tracking-wider block pl-0.5">
                     Stock Mínimo
                   </label>
                   <input
@@ -315,14 +350,14 @@ export default function Stock() {
                     placeholder="Alerta de falta"
                     value={formStockMinimo}
                     onChange={(e) => setFormStockMinimo(e.target.value)}
-                    className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-250 focus:border-indigo-500"
+                    className="w-full bg-slate-105/70 border border-slate-200 text-slate-950 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none"
                   />
                 </div>
               </div>
 
               {/* Categoría */}
               <div className="space-y-1.5">
-                <label className="text-xxs font-black text-slate-500 uppercase tracking-wider block pl-0.5">
+                <label className="text-xxs font-black text-slate-455 dark:text-slate-500 uppercase tracking-wider block pl-0.5">
                   Categoría
                 </label>
                 <input
@@ -330,7 +365,7 @@ export default function Stock() {
                   placeholder="Ej. Bebidas, Golosinas, Almacén"
                   value={formCategoria}
                   onChange={(e) => setFormCategoria(e.target.value)}
-                  className="w-full bg-[#090b11] border border-slate-800 rounded-xl py-2.5 px-3 text-xs outline-none text-slate-200 focus:border-indigo-500"
+                  className="w-full bg-slate-105/70 border border-slate-200 text-slate-955 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none"
                 />
               </div>
 
@@ -351,7 +386,7 @@ export default function Stock() {
                         alCancelar: () => {}
                       })
                     }}
-                    className="py-3.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-2xl text-center border border-rose-500/20 btn-interactive"
+                    className="py-3.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-2xl text-center border border-rose-200 dark:border-rose-500/20 btn-interactive"
                   >
                     Eliminar
                   </button>
@@ -359,7 +394,7 @@ export default function Stock() {
                   <button
                     type="button"
                     onClick={() => setModalAbierto(false)}
-                    className="py-3.5 bg-slate-800 active:bg-slate-750 text-slate-300 font-bold rounded-2xl text-center btn-interactive"
+                    className="py-3.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-200/80 dark:bg-slate-800 dark:active:bg-slate-750 text-slate-600 dark:text-slate-300 font-bold rounded-2xl text-center btn-interactive"
                   >
                     Cancelar
                   </button>

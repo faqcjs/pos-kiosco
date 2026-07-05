@@ -222,19 +222,15 @@ const useKioskoStore = create(
         set((state) => {
           if (!state.cajaActiva) return {}
           
-          const totalVendido = state.cajaActiva.movimientos
-            .filter((m) => m.tipo === 'venta')
+          const totalVentasEfectivo = state.cajaActiva.movimientos
+            .filter((m) => m.tipo === 'venta' && m.motivo.includes('Efectivo'))
             .reduce((acc, m) => acc + m.monto, 0)
           
-          const totalIngresos = state.cajaActiva.movimientos
-            .filter((m) => m.tipo === 'ingreso')
-            .reduce((acc, m) => acc + m.monto, 0)
-
           const totalEgresos = state.cajaActiva.movimientos
             .filter((m) => m.tipo === 'egreso')
             .reduce((acc, m) => acc + m.monto, 0)
 
-          const saldoTeorico = state.cajaActiva.montoApertura + totalVendido + totalIngresos - totalEgresos
+          const saldoTeorico = state.cajaActiva.montoApertura + totalVentasEfectivo - totalEgresos
           const diferencia = Number(montoFisico) - saldoTeorico
 
           const cajaCerrada = {

@@ -57,22 +57,22 @@ export default function ScannerModal({ isOpen, onClose, onScanSuccess }) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/80 z-50 flex flex-col justify-between">
-        <header className="flex justify-between items-center px-4 py-4 bg-slate-900 text-white shrink-0">
-          <span className="font-bold text-lg">📷 Escanear Código de Barra</span>
+      <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-sm z-50 flex flex-col justify-between">
+        <header className="flex justify-between items-center px-4 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white shrink-0 shadow-sm">
+          <span className="font-bold text-base md:text-lg">📷 Escanear Código de Barra</span>
           <button
             onClick={() => {
               detenerScanner()
               onClose()
             }}
-            className="text-slate-400 active:text-white px-3 py-1 font-bold rounded-lg border border-slate-700 bg-slate-800"
+            className="text-slate-600 dark:text-slate-400 active:text-slate-900 dark:active:text-white px-3.5 py-1.5 font-bold text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
           >
             Cerrar
           </button>
         </header>
 
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-sm aspect-square bg-slate-950 rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-2xl flex items-center justify-center">
+          <div className="relative w-full max-w-sm aspect-square bg-slate-900 dark:bg-slate-950 rounded-3xl overflow-hidden border-2 border-emerald-500 shadow-2xl flex items-center justify-center">
             {/* Contenedor del lector html5-qrcode */}
             <div id="reader" className="w-full h-full object-cover"></div>
 
@@ -85,7 +85,7 @@ export default function ScannerModal({ isOpen, onClose, onScanSuccess }) {
           </div>
         </div>
 
-        <footer className="bg-slate-900 p-6 text-center text-slate-400 text-sm shrink-0">
+        <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-6 text-center text-slate-500 dark:text-slate-400 text-sm shrink-0">
           Apuntá con la cámara trasera al código de barra del producto
         </footer>
       </div>
