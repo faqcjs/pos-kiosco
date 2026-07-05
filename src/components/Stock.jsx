@@ -103,7 +103,7 @@ export default function Stock() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-5 bg-slate-50 dark:bg-[#090b11] pb-20 md:pb-6" onScroll={handleScroll}>
+    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-5 bg-slate-50 dark:bg-[#090b11] pb-6" onScroll={handleScroll}>
       {/* Cabecera / Buscador */}
       <section className="flex flex-col gap-3 shrink-0">
         <div className="flex gap-3">

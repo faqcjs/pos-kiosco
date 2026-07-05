@@ -101,7 +101,7 @@ export default function Caja() {
 
   if (!cajaActiva) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 dark:bg-[#090b11] flex flex-col md:flex-row gap-6 justify-center items-start pb-20 md:pb-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 dark:bg-[#090b11] flex flex-col md:flex-row gap-6 justify-center items-start pb-6">
         {/* Formulario Apertura */}
         <div className="bg-white border border-slate-200 dark:bg-[#10141f] dark:border-slate-800 rounded-3xl p-6 shadow-xl max-w-md w-full text-center space-y-5 mx-auto md:mx-0 self-center">
           <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/25 rounded-full flex items-center justify-center mx-auto text-3xl animate-pulse">
@@ -170,7 +170,7 @@ export default function Caja() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50 dark:bg-[#090b11] pb-20 md:pb-6">
+    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50 dark:bg-[#090b11] pb-6">
       {/* 1. Header con Estado y Botón de Cierre */}
       <div className="flex justify-between items-center bg-white border border-slate-200 dark:bg-[#10141f] dark:border-slate-800 rounded-3xl p-5 shadow-sm">
         <div className="space-y-1">

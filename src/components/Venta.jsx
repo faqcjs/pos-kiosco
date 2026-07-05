@@ -30,6 +30,7 @@ export default function Venta() {
   const [nuevoClienteTelefono, setNuevoClienteTelefono] = useState('')
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('')
   const [visibleCount, setVisibleCount] = useState(12)
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
 
   const inputMontoRef = useRef(null)
   const scrollRef = useRef(null)
@@ -222,7 +223,7 @@ export default function Venta() {
   )
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full pb-16 md:pb-0 bg-[#f8fafc] dark:bg-[#090b11]">
+    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full bg-[#f8fafc] dark:bg-[#090b11]">
       {/* SECCIÓN 1: LADO IZQUIERDO (Buscador, rápidos, monto) */}
       <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-5" onScroll={handleLeftScroll}>
         {/* Warning caja cerrada */}
@@ -379,30 +380,7 @@ export default function Venta() {
           </button>
         </section>
 
-        {/* Carrito Móvil (Oculto en desktop para evitar doble carrito) */}
-        {carrito.length > 0 && (
-          <section className="md:hidden flex-1 flex flex-col overflow-hidden min-h-[200px]">
-            <h2 className="text-xs font-black text-slate-400 dark:text-slate-550 uppercase tracking-widest mb-2 pl-1">
-              Detalle del Carrito
-            </h2>
-            <div className="flex-grow overflow-y-auto pr-1">
-              <CartItemsList />
-            </div>
-            {/* Checkout móvil */}
-            <div className="pt-4 bg-gradient-to-t from-slate-50 via-slate-50 dark:from-[#090b11] dark:via-[#090b11] to-transparent sticky bottom-0">
-              <button
-                onClick={handleCobrar}
-                disabled={total === 0}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 dark:disabled:from-slate-800 dark:disabled:to-slate-800 text-white font-black text-base py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-lg shadow-emerald-500/15 btn-interactive"
-              >
-                <span>Cobrar Carrito</span>
-                <span className="text-lg font-black border-l border-white/20 pl-2">
-                  ${total.toLocaleString('es-AR')}
-                </span>
-              </button>
-            </div>
-          </section>
-        )}
+        {/* Carrito Móvil (Oculto en desktop - ahora se muestra en el FAB flotante) */}
       </div>
 
       {/* SECCIÓN 2: LADO DERECHO - CARRO DE ESCRITORIO (Visible sólo en PC) */}
@@ -725,6 +703,72 @@ export default function Venta() {
         onClose={() => setScannerAbierto(false)}
         onScanSuccess={handleScanSuccess}
       />
+
+      {/* Botón Flotante de Carrito para Móvil */}
+      {carrito.length > 0 && (
+        <button
+          onClick={() => setCartDrawerOpen(true)}
+          className="fixed bottom-20 right-4 z-30 md:hidden bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3.5 rounded-full shadow-2xl flex items-center justify-center gap-2 border border-indigo-400/20 active:scale-95 transition-all btn-interactive animate-fade-in"
+        >
+          <span className="text-xl">🛒</span>
+          <span className="bg-white text-indigo-600 dark:text-indigo-800 font-black text-xs px-2 py-0.5 rounded-full shadow-sm">
+            {carrito.reduce((acc, item) => acc + item.cantidad, 0)}
+          </span>
+          <span className="font-black text-xs">${total.toLocaleString('es-AR')}</span>
+        </button>
+      )}
+
+      {/* Drawer de Carrito para Móvil */}
+      {cartDrawerOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 z-40 backdrop-blur-sm animate-fade-in md:hidden"
+            onClick={() => setCartDrawerOpen(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-[#10141f] border-t border-slate-200 dark:border-slate-800 rounded-t-3xl z-50 px-5 pb-8 pt-5 animate-slide-up shadow-2xl max-h-[85vh] flex flex-col md:hidden">
+            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-4" />
+            
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-extrabold text-sm text-slate-750 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                🛒 Carrito de Compras
+              </h3>
+              <button
+                onClick={() => setCartDrawerOpen(false)}
+                className="text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200 text-sm font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-grow overflow-y-auto pr-1 mb-5">
+              <CartItemsList />
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-4">
+              <div className="flex justify-between items-end">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Total a pagar</span>
+                <span className="text-2xl font-black text-slate-850 dark:text-slate-100">
+                  ${total.toLocaleString('es-AR')}
+                </span>
+              </div>
+
+              <button
+                onClick={() => {
+                  setCartDrawerOpen(false)
+                  handleCobrar()
+                }}
+                disabled={total === 0}
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-slate-800 dark:disabled:to-slate-800 text-white font-black text-lg py-4 rounded-2xl shadow-lg shadow-emerald-500/15 flex items-center justify-center gap-2 btn-interactive"
+              >
+                <span>Cobrar</span>
+                <span className="text-xl font-black border-l border-white/20 pl-2">
+                  ${total.toLocaleString('es-AR')}
+                </span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

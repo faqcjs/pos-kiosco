@@ -176,7 +176,7 @@ export default function Clientes() {
   }
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full pb-16 md:pb-0 bg-slate-50 dark:bg-[#090b11]">
+    <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full bg-slate-50 dark:bg-[#090b11]">
       {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (1/3 en PC) */}
       <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-4 md:border-r border-slate-200 dark:border-slate-800/80">
         <section className="flex gap-2 shrink-0">
