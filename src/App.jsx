@@ -55,7 +55,7 @@ export default function App() {
   ]
 
   return (
-    <div className="h-screen w-full flex bg-slate-50 dark:bg-[#090b11] text-slate-800 dark:text-slate-100 overflow-hidden font-sans">
+    <div className="h-dvh w-full flex bg-slate-50 dark:bg-[#090b11] text-slate-800 dark:text-slate-100 overflow-hidden font-sans">
       {/* 1. PC SIDEBAR NAVIGATION (Visible only on md screens and up) */}
       <aside className="hidden md:flex w-64 bg-white dark:bg-[#10141f] border-r border-slate-200 dark:border-slate-800/80 flex-col shrink-0 justify-between p-5 z-20">
         <div className="space-y-6">
@@ -173,7 +173,7 @@ export default function App() {
         </div>
 
         {/* Mobile Bottom Navigation (Visible only on screens below md) */}
-        <nav className="flex md:hidden absolute bottom-0 left-0 right-0 bg-white/95 dark:bg-[#10141f]/95 border-t border-slate-200 dark:border-slate-800/70 h-16 shrink-0 grid grid-cols-5 z-20 backdrop-blur-md">
+        <nav className="flex md:hidden bg-white/95 dark:bg-[#10141f]/95 border-t border-slate-200 dark:border-slate-800/70 h-16 shrink-0 grid grid-cols-5 z-20 backdrop-blur-md">
           {tabs.map((tab) => (
             <button
               key={tab.id}
