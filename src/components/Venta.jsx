@@ -28,6 +28,8 @@ export default function Venta() {
   const [creandoClienteInline, setCreandoClienteInline] = useState(false)
   const [nuevoClienteNombre, setNuevoClienteNombre] = useState('')
   const [nuevoClienteTelefono, setNuevoClienteTelefono] = useState('')
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('')
+  const [visibleCount, setVisibleCount] = useState(12)
 
   const inputMontoRef = useRef(null)
   const scrollRef = useRef(null)
@@ -142,13 +144,30 @@ export default function Venta() {
     }
   }
 
-  const listadoProductosGrid = buscarProducto.trim()
-    ? productos.filter(
-        (p) =>
-          p.nombre.toLowerCase().includes(buscarProducto.trim().toLowerCase()) ||
-          p.id.toLowerCase().includes(buscarProducto.trim().toLowerCase())
-      ).slice(0, 16)
-    : productos.filter((p) => p.stock > 0).slice(0, 12)
+  // Resetear paginado al cambiar filtros
+  useEffect(() => {
+    setVisibleCount(12)
+  }, [buscarProducto, categoriaSeleccionada])
+
+  // Filtrado de productos por búsqueda y categoría
+  const listadoFiltrado = productos.filter((p) => {
+    const coincideBusqueda = !buscarProducto.trim() || 
+      p.nombre.toLowerCase().includes(buscarProducto.trim().toLowerCase()) ||
+      p.id.toLowerCase().includes(buscarProducto.trim().toLowerCase())
+    
+    const coincideCategoria = !categoriaSeleccionada || p.categoria === categoriaSeleccionada
+    
+    return coincideBusqueda && coincideCategoria
+  })
+
+  const listadoProductosGrid = listadoFiltrado.slice(0, visibleCount)
+
+  const handleLeftScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    if (scrollHeight - scrollTop - clientHeight < 150) {
+      setVisibleCount((prev) => Math.min(prev + 12, listadoFiltrado.length))
+    }
+  }
 
   // Sub-componente del contenido del carrito para reutilizar en móvil y escritorio
   const CartItemsList = () => (
@@ -198,7 +217,7 @@ export default function Venta() {
   return (
     <div className="flex-1 flex flex-col md:flex-row overflow-hidden h-full pb-16 md:pb-0 bg-[#090b11]">
       {/* SECCIÓN 1: LADO IZQUIERDO (Buscador, rápidos, monto) */}
-      <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-5" onScroll={handleLeftScroll}>
         {/* Warning caja cerrada */}
         {!cajaActiva && (
           <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-xs rounded-2xl py-3 px-4 flex items-center gap-2 shadow-inner">
@@ -235,10 +254,47 @@ export default function Venta() {
           </button>
         </section>
 
+        {/* Filtros por Categoría */}
+        <section className="flex gap-2 overflow-x-auto pb-1.5 shrink-0 scrollbar-none select-none">
+          {['', 'Bebidas', 'Golosinas', 'Snacks', 'Tabaquería', 'Helados', 'Varios'].map((cat) => {
+            const activo = categoriaSeleccionada === cat
+            const getCatEmoji = (c) => {
+              switch (c) {
+                case 'Bebidas': return '🥤'
+                case 'Golosinas': return '🍬'
+                case 'Snacks': return '🍿'
+                case 'Tabaquería': return '🚬'
+                case 'Helados': return '🍦'
+                case 'Varios': return '📦'
+                default: return '🛍️'
+              }
+            }
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategoriaSeleccionada(cat)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-black border transition-all btn-interactive whitespace-nowrap ${
+                  activo
+                    ? 'bg-indigo-650 border-indigo-500 text-white shadow-md shadow-indigo-600/10'
+                    : 'bg-[#10141f] border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>{getCatEmoji(cat)}</span>
+                <span>{cat || 'Todos'}</span>
+              </button>
+            )
+          })}
+        </section>
+
         {/* Grid de Productos Rápidos y Búsqueda */}
         <section className="space-y-3">
           <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest block pl-1">
-            {buscarProducto.trim() ? '🔎 Resultados de Búsqueda' : '🔥 Los Más Vendidos'}
+            {buscarProducto.trim() 
+              ? `🔎 Resultados de Búsqueda (${listadoFiltrado.length})` 
+              : categoriaSeleccionada 
+                ? `📂 Catálogo: ${categoriaSeleccionada} (${listadoFiltrado.length})` 
+                : `🔥 Los Más Vendidos (${listadoFiltrado.length})`}
           </h2>
           {listadoProductosGrid.length === 0 ? (
             <div className="bg-[#10141f] border border-slate-800/80 rounded-2xl p-6 text-center text-slate-400 text-xs font-medium">
