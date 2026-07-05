@@ -245,26 +245,43 @@ export default function Venta() {
               ⚠️ No se encontraron productos coincidentes.
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {listadoProductosGrid.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => agregarAlCarrito(p.id)}
-                  className="flex flex-col items-center justify-between bg-[#10141f]/70 border border-slate-800/80 rounded-2xl p-4.5 hover:border-indigo-500/50 hover:bg-[#10141f] active:scale-95 duration-100 hover:shadow-lg hover:shadow-indigo-950/30 text-center min-h-[110px] btn-interactive"
-                >
-                  <span className="text-xs sm:text-sm font-black text-slate-200 leading-snug line-clamp-2">
-                    {p.nombre}
-                  </span>
-                  <div className="mt-2 w-full">
-                    <span className="text-sm font-black text-emerald-450 block">
-                      ${p.precioVenta.toLocaleString('es-AR')}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 justify-center">
+              {listadoProductosGrid.map((p) => {
+                const getEmoji = (cat) => {
+                  switch (cat) {
+                    case 'Bebidas': return '🥤'
+                    case 'Golosinas': return '🍬'
+                    case 'Snacks': return '🍿'
+                    case 'Tabaquería': return '🚬'
+                    case 'Helados': return '🍦'
+                    default: return '📦'
+                  }
+                }
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => agregarAlCarrito(p.id)}
+                    className="relative flex flex-col items-center justify-center bg-gradient-to-b from-slate-900/60 to-[#10141f]/80 border border-slate-800 rounded-3xl p-5 hover:border-indigo-500/50 hover:bg-[#10141f] active:scale-95 duration-100 hover:shadow-xl hover:shadow-indigo-500/5 text-center min-h-[140px] gap-2 btn-interactive"
+                  >
+                    <span className="text-2xl filter drop-shadow">{getEmoji(p.categoria)}</span>
+                    <span className="text-xs font-black text-slate-200 leading-snug line-clamp-2 max-w-[95%]">
+                      {p.nombre}
                     </span>
-                    <span className={`text-[10px] font-bold block mt-0.5 ${p.stock <= p.stockMinimo ? 'text-rose-450' : 'text-slate-550'}`}>
-                      Stock: {p.stock}
-                    </span>
-                  </div>
-                </button>
-              ))}
+                    <div className="flex flex-col items-center gap-1.5 w-full mt-1">
+                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-black shadow-sm">
+                        ${p.precioVenta.toLocaleString('es-AR')}
+                      </span>
+                      <span className={`text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded-md ${
+                        p.stock <= p.stockMinimo 
+                          ? 'bg-rose-500/15 text-rose-400 border border-rose-500/10 animate-pulse' 
+                          : 'bg-slate-800/40 text-slate-450'
+                      }`}>
+                        Stock: {p.stock}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
         </section>
