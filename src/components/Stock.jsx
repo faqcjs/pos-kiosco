@@ -82,23 +82,34 @@ export default function Stock() {
     if (editando || !codigo) return
     const existing = productos.find((p) => p.id === codigo.trim())
     if (existing) {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Producto Existente',
-        mensaje: `El código "${codigo.trim()}" ya pertenece a:\n"${existing.nombre}"\n\n¿Querés cargar los datos de este producto existente para editarlo o sumarle stock?`,
-        alAceptar: () => {
-          setFormNombre(existing.nombre)
-          setFormPrecioCompra(existing.precioCompra)
-          setFormPrecioVenta(existing.precioVenta)
-          setFormStock(existing.stock)
-          setFormStockMinimo(existing.stockMinimo)
-          setFormCategoria(existing.categoria || '')
-          setEditando(true)
-        },
-        alCancelar: () => {
-          setFormId('')
-        }
-      })
+      if (isAdminAuthenticated) {
+        mostrarNotificacion({
+          tipo: 'warning',
+          titulo: 'Producto Existente',
+          mensaje: `El código "${codigo.trim()}" ya pertenece a:\n"${existing.nombre}"\n\n¿Querés cargar los datos de este producto existente para editarlo o sumarle stock?`,
+          alAceptar: () => {
+            setFormNombre(existing.nombre)
+            setFormPrecioCompra(existing.precioCompra)
+            setFormPrecioVenta(existing.precioVenta)
+            setFormStock(existing.stock)
+            setFormStockMinimo(existing.stockMinimo)
+            setFormCategoria(existing.categoria || '')
+            setEditando(true)
+          },
+          alCancelar: () => {
+            setFormId('')
+          }
+        })
+      } else {
+        mostrarNotificacion({
+          tipo: 'warning',
+          titulo: 'Producto Existente',
+          mensaje: `El código "${codigo.trim()}" ya pertenece a:\n"${existing.nombre}"\n\nSolo un administrador puede editar productos existentes. Si querés sumarle stock, usá los botones + y - de la lista.`,
+          alAceptar: () => {
+            setFormId('')
+          }
+        })
+      }
     }
   }
 
@@ -147,20 +158,14 @@ export default function Stock() {
               className="w-full bg-white border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#10141f] dark:border-slate-800/80 dark:text-slate-200 rounded-2xl py-3.5 pl-11 pr-4 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 font-medium"
             />
           </div>
-          {isAdminAuthenticated ? (
-            <button
-              onClick={abrirFormularioNuevo}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-5 py-3.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-indigo-600/15 btn-interactive shrink-0"
-            >
-              <span>+</span>
-              <span>Nuevo Producto</span>
-            </button>
-          ) : (
-            <div className="bg-slate-200/85 border border-slate-300 dark:bg-slate-800/80 dark:border-slate-700 text-slate-600 dark:text-slate-350 text-xs font-black px-4.5 py-3.5 rounded-2xl flex items-center gap-1.5 shadow-sm shrink-0">
-              <span>🔒</span>
-              <span>Vista de Solo Lectura</span>
-            </div>
-          )}
+          <button
+            onClick={abrirFormularioNuevo}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-4 sm:px-5 py-3.5 rounded-2xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/15 btn-interactive shrink-0"
+          >
+            <span>+</span>
+            <span className="hidden sm:inline">Nuevo Producto</span>
+            <span className="sm:hidden">Nuevo</span>
+          </button>
         </div>
 
         {/* Filtros rápidos */}

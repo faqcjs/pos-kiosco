@@ -194,17 +194,19 @@ export default function App() {
         </div>
 
         {/* Mobile Bottom Navigation (Visible only on screens below md) */}
-        <nav className="flex md:hidden bg-white/95 dark:bg-[#10141f]/95 border-t border-slate-200 dark:border-slate-800/70 h-16 shrink-0 grid grid-cols-6 z-20 backdrop-blur-md">
+        <nav className="flex md:hidden bg-white/95 dark:bg-[#10141f]/95 border-t border-slate-200 dark:border-slate-800/70 h-16 shrink-0 z-20 backdrop-blur-md items-center justify-around px-2">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-col items-center justify-center gap-0.5 transition-colors ${
-                activeTab === tab.id ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' : 'text-slate-500 dark:text-slate-400'
+              className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 transition-colors px-1 ${
+                activeTab === tab.id ? 'text-indigo-600 dark:text-indigo-400 font-extrabold scale-105' : 'text-slate-500 dark:text-slate-400'
               }`}
             >
-              <span className="text-lg">{tab.icon}</span>
-              <span className="text-[9px] uppercase font-black tracking-wider">{tab.label === 'Proveedores' ? 'Prov' : tab.label}</span>
+              <span className="text-xl leading-none">{tab.icon}</span>
+              <span className="text-[8px] uppercase font-black tracking-wide truncate max-w-full block">
+                {tab.id === 'proveedores' ? 'Prov' : tab.label}
+              </span>
             </button>
           ))}
         </nav>
