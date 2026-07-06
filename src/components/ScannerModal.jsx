@@ -21,8 +21,6 @@ export default function ScannerModal({ isOpen, onClose, onScanSuccess }) {
             (decodedText) => {
               // Éxito de lectura
               onScanSuccess(decodedText)
-              // Detener cámara al leer con éxito
-              detenerScanner()
             },
             (errorMessage) => {
               // Error de escaneo (silencioso, ocurre continuamente mientras busca)
@@ -41,8 +39,10 @@ export default function ScannerModal({ isOpen, onClose, onScanSuccess }) {
   }, [isOpen])
 
   const detenerScanner = () => {
-    if (qrCodeInstanceRef.current && qrCodeInstanceRef.current.isScanning) {
-      qrCodeInstanceRef.current
+    const html5QrCode = qrCodeInstanceRef.current
+    if (html5QrCode && html5QrCode.isScanning) {
+      qrCodeInstanceRef.current = null // Clear ref immediately to prevent race conditions
+      html5QrCode
         .stop()
         .then(() => {
           console.log('Cámara detenida con éxito.')

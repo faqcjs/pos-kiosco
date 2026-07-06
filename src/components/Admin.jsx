@@ -99,6 +99,29 @@ export default function Admin() {
       return
     }
 
+    const existing = productos.find((p) => p.id === formId.trim())
+    if (!editando && existing) {
+      mostrarNotificacion({
+        tipo: 'warning',
+        titulo: 'Producto Existente',
+        mensaje: `El código "${formId}" ya pertenece a:\n"${existing.nombre}"\n\n¿Querés cargar los datos de este producto existente para editarlo o sumarle stock?`,
+        alAceptar: () => {
+          setFormNombre(existing.nombre)
+          setFormPrecioCompra(existing.precioCompra)
+          setFormPrecioVenta(existing.precioVenta)
+          setFormStock(existing.stock)
+          setFormStockMinimo(existing.stockMinimo)
+          setFormCategoria(existing.categoria || '')
+          setEditando(true)
+          setModalStockAbierto(true)
+        },
+        alCancelar: () => {
+          // No hacer nada, se cierra la notificación
+        }
+      })
+      return
+    }
+
     agregarOEditarProducto({
       id: formId.trim(),
       nombre: formNombre.trim(),
@@ -419,6 +442,14 @@ export default function Admin() {
                         </span>
                       </div>
                     </div>
+
+                    <button
+                      onClick={() => abrirFormularioEditar(p)}
+                      className="p-2 text-slate-400 hover:text-indigo-655 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors shrink-0"
+                      title="Editar producto"
+                    >
+                      ✏️
+                    </button>
 
                     {/* Stock Controls */}
                     <div className="flex items-center gap-2 shrink-0 bg-slate-50 dark:bg-[#090b11]/80 rounded-2xl p-1.5 border border-slate-200 dark:border-slate-800/40">

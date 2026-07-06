@@ -76,6 +76,11 @@ export default function useVenta() {
     const prod = productos.find((p) => p.id === codigo)
     if (prod) {
       agregarAlCarrito(prod.id, 1)
+      mostrarNotificacion({
+        tipo: 'success',
+        titulo: 'Producto Agregado',
+        mensaje: `Agregado ${prod.nombre}`
+      })
     } else {
       mostrarNotificacion({
         tipo: 'warning',
