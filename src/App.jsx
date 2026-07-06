@@ -13,6 +13,7 @@ export default function App() {
   const cajaActiva = useKioskoStore(state => state.cajaActiva)
   const sidebarCollapsed = useKioskoStore(state => state.sidebarCollapsed)
   const toggleSidebar = useKioskoStore(state => state.toggleSidebar)
+  const toast = useKioskoStore(state => state.toast)
 
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme')
@@ -209,6 +210,20 @@ export default function App() {
         </nav>
       </main>
       <NotificacionModal />
+      {toast && (
+        <div
+          className={`fixed top-5 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-lg border backdrop-blur-md animate-slide-down font-bold text-sm transition-all duration-300 ${
+            toast.tipo === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 dark:bg-emerald-500/20'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 dark:bg-rose-500/20'
+          }`}
+        >
+          <span className="text-base shrink-0">
+            {toast.tipo === 'success' ? '✅' : '❌'}
+          </span>
+          <span className="whitespace-nowrap">{toast.mensaje}</span>
+        </div>
+      )}
     </div>
   )
 }

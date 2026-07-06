@@ -60,7 +60,7 @@ export default function NotificacionModal() {
 
   return (
     <>
-      <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/75 z-999 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+      <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/75 z-[999] backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
         <div
           className={`bg-white dark:bg-[#10141f] border ${getBorderColor()} rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl animate-slide-up`}
         >

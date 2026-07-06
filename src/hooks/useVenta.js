@@ -13,6 +13,7 @@ export default function useVenta() {
   const procesarCobro = useKioskoStore(state => state.procesarCobro)
   const agregarCliente = useKioskoStore(state => state.agregarCliente)
   const mostrarNotificacion = useKioskoStore(state => state.mostrarNotificacion)
+  const mostrarToast = useKioskoStore(state => state.mostrarToast)
 
   // State local
   const [buscarProducto, setBuscarProducto] = useState('')
@@ -49,6 +50,7 @@ export default function useVenta() {
       )
       if (prodEncontrado) {
         agregarAlCarrito(prodEncontrado.id, 1)
+        mostrarToast(`Agregado ${prodEncontrado.nombre}`, 'success')
         setBuscarProducto('') // Limpiar buscador
       }
     }
@@ -76,17 +78,9 @@ export default function useVenta() {
     const prod = productos.find((p) => p.id === codigo)
     if (prod) {
       agregarAlCarrito(prod.id, 1)
-      mostrarNotificacion({
-        tipo: 'success',
-        titulo: 'Producto Agregado',
-        mensaje: `Agregado ${prod.nombre}`
-      })
+      mostrarToast(`Agregado ${prod.nombre}`, 'success')
     } else {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Producto No Encontrado',
-        mensaje: `No existe ningún producto registrado con el código: ${codigo}`
-      })
+      mostrarToast('Producto no encontrado', 'error')
     }
     setScannerAbierto(false)
   }

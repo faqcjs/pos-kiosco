@@ -88,23 +88,14 @@ export default function Admin() {
     setModalStockAbierto(true)
   }
 
-  const guardarProducto = (e) => {
-    e.preventDefault()
-    if (!formId.trim() || !formNombre.trim() || !formPrecioVenta || !formStock) {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Campos Obligatorios',
-        mensaje: 'Por favor completa todos los campos obligatorios.'
-      })
-      return
-    }
-
-    const existing = productos.find((p) => p.id === formId.trim())
-    if (!editando && existing) {
+  const verificarProductoExistente = (codigo) => {
+    if (editando || !codigo) return
+    const existing = productos.find((p) => p.id === codigo.trim())
+    if (existing) {
       mostrarNotificacion({
         tipo: 'warning',
         titulo: 'Producto Existente',
-        mensaje: `El código "${formId}" ya pertenece a:\n"${existing.nombre}"\n\n¿Querés cargar los datos de este producto existente para editarlo o sumarle stock?`,
+        mensaje: `El código "${codigo.trim()}" ya pertenece a:\n"${existing.nombre}"\n\n¿Querés cargar los datos de este producto existente para editarlo o sumarle stock?`,
         alAceptar: () => {
           setFormNombre(existing.nombre)
           setFormPrecioCompra(existing.precioCompra)
@@ -113,11 +104,21 @@ export default function Admin() {
           setFormStockMinimo(existing.stockMinimo)
           setFormCategoria(existing.categoria || '')
           setEditando(true)
-          setModalStockAbierto(true)
         },
         alCancelar: () => {
-          // No hacer nada, se cierra la notificación
+          setFormId('')
         }
+      })
+    }
+  }
+
+  const guardarProducto = (e) => {
+    e.preventDefault()
+    if (!formId.trim() || !formNombre.trim() || !formPrecioVenta || !formStock) {
+      mostrarNotificacion({
+        tipo: 'warning',
+        titulo: 'Campos Obligatorios',
+        mensaje: 'Por favor completa todos los campos obligatorios.'
       })
       return
     }
@@ -138,6 +139,7 @@ export default function Admin() {
   const handleScanSuccessStock = (codigo) => {
     setFormId(codigo)
     setScannerStockAbierto(false)
+    verificarProductoExistente(codigo)
   }
 
   // Login handler
@@ -713,8 +715,9 @@ export default function Admin() {
                     placeholder="Código de barra o ID"
                     value={formId}
                     onChange={(e) => setFormId(e.target.value)}
+                    onBlur={(e) => verificarProductoExistente(e.target.value)}
                     disabled={editando}
-                    className="flex-grow bg-slate-100/70 disabled:bg-slate-200/80 border border-slate-200 text-slate-950 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:disabled:bg-slate-900 dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none font-mono"
+                    className="flex-grow bg-slate-100/70 disabled:bg-slate-200/80 border border-slate-200 text-slate-955 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:disabled:bg-slate-900 dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none font-mono"
                     required
                   />
                   {!editando && (
