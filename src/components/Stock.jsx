@@ -9,10 +9,12 @@ export default function Stock() {
   const actualizarStock = useKioskoStore(state => state.actualizarStock)
   const mostrarNotificacion = useKioskoStore(state => state.mostrarNotificacion)
   const isAdminAuthenticated = useKioskoStore(state => state.isAdminAuthenticated)
+  const mostrarToast = useKioskoStore(state => state.mostrarToast)
 
   // State local
   const [buscar, setBuscar] = useState('')
   const [filtroStockMinimo, setFiltroStockMinimo] = useState(false)
+  const [isSearchingAPI, setIsSearchingAPI] = useState(false)
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('')
   const [modalAbierto, setModalAbierto] = useState(false)
   const [scannerAbierto, setScannerAbierto] = useState(false)
@@ -78,6 +80,44 @@ export default function Stock() {
     setModalAbierto(true)
   }
 
+  const buscarProductoEnMercadoLibre = async (codigo) => {
+    const trimmed = codigo ? codigo.trim() : ''
+    if (!trimmed || trimmed.length < 8 || trimmed.length > 14) return
+
+    setIsSearchingAPI(true)
+    try {
+      const response = await fetch('https://api.mercadolibre.com/sites/MLA/search?q=' + trimmed)
+      const data = await response.json()
+      if (data.results && data.results.length > 0) {
+        const item = data.results[0]
+        setFormNombre(item.title)
+        if (item.category_id) {
+          try {
+            const catResponse = await fetch('https://api.mercadolibre.com/categories/' + item.category_id)
+            const catData = await catResponse.json()
+            if (catData.name) {
+              const catName = catData.name.trim()
+              const capitalizedCat = catName.charAt(0).toUpperCase() + catName.slice(1)
+              setFormCategoria(capitalizedCat)
+            } else {
+              setFormCategoria('General')
+            }
+          } catch (catErr) {
+            console.error(catErr)
+            setFormCategoria('General')
+          }
+        } else {
+          setFormCategoria('General')
+        }
+        mostrarToast('Datos autocompletados desde Mercado Libre', 'success')
+      }
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setIsSearchingAPI(false)
+    }
+  }
+
   const verificarProductoExistente = (codigo) => {
     if (editando || !codigo) return
     const existing = productos.find((p) => p.id === codigo.trim())
@@ -110,6 +150,8 @@ export default function Stock() {
           }
         })
       }
+    } else {
+      buscarProductoEnMercadoLibre(codigo)
     }
   }
 
@@ -339,6 +381,9 @@ export default function Stock() {
                     </button>
                   )}
                 </div>
+                {isSearchingAPI && (
+                  <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold animate-pulse pl-0.5 mt-1">⚡ Buscando información en Mercado Libre...</p>
+                )}
               </div>
 
               {/* Nombre */}
