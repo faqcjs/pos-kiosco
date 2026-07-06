@@ -90,11 +90,13 @@ export default function Admin() {
     setModalStockAbierto(true)
   }
 
-  const buscarProductoEnMercadoLibre = async (codigo) => {
+  const buscarProductoEnBasesDeDatos = async (codigo) => {
     const trimmed = codigo ? codigo.trim() : ''
     if (!trimmed || trimmed.length < 8 || trimmed.length > 14) return
 
     setIsSearchingAPI(true)
+    
+    // 1. Intentar con Mercado Libre
     try {
       const response = await fetch('https://api.mercadolibre.com/sites/MLA/search?q=' + trimmed)
       const data = await response.json()
@@ -120,12 +122,42 @@ export default function Admin() {
           setFormCategoria('General')
         }
         mostrarToast('Datos autocompletados desde Mercado Libre', 'success')
+        setIsSearchingAPI(false)
+        return
       }
     } catch (error) {
-      console.error(error)
-    } finally {
-      setIsSearchingAPI(false)
+      console.error('Error al buscar en Mercado Libre:', error)
     }
+
+    // 2. Fallback a OpenFoodFacts
+    try {
+      const offResponse = await fetch(`https://ar.openfoodfacts.org/api/v2/product/${trimmed}.json`)
+      const offData = await offResponse.json()
+      if (offData.status === 1 && offData.product) {
+        const pName = offData.product.product_name || offData.product.product_name_es || ''
+        if (pName) {
+          setFormNombre(pName)
+          let cat = 'General'
+          if (offData.product.categories) {
+            const catList = offData.product.categories.split(',')
+            if (catList.length > 0) {
+              const firstCat = catList[0].trim()
+              cat = firstCat.charAt(0).toUpperCase() + firstCat.slice(1)
+            }
+          }
+          setFormCategoria(cat)
+          mostrarToast('Datos autocompletados desde OpenFoodFacts', 'success')
+          setIsSearchingAPI(false)
+          return
+        }
+      }
+    } catch (offError) {
+      console.error('Error al buscar en OpenFoodFacts:', offError)
+    }
+
+    // 3. No encontrado en ninguna base de datos
+    mostrarToast('No se encontró información del producto', 'error')
+    setIsSearchingAPI(false)
   }
 
   const verificarProductoExistente = (codigo) => {
@@ -150,7 +182,7 @@ export default function Admin() {
         }
       })
     } else {
-      buscarProductoEnMercadoLibre(codigo)
+      buscarProductoEnBasesDeDatos(codigo)
     }
   }
 
