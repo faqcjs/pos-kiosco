@@ -265,14 +265,16 @@ export default function Stock() {
                 )}
 
                 <div className="flex items-center gap-2 shrink-0 bg-slate-50 dark:bg-[#090b11]/80 rounded-2xl p-1.5 border border-slate-200 dark:border-slate-800/40">
-                  <button
-                    onClick={() => actualizarStock(p.id, -1)}
-                    className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-350 transition-all btn-interactive"
-                  >
-                    -
-                  </button>
+                  {isAdminAuthenticated && (
+                    <button
+                      onClick={() => actualizarStock(p.id, -1)}
+                      className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-350 transition-all btn-interactive"
+                    >
+                      -
+                    </button>
+                  )}
 
-                  <div className="text-center min-w-[36px] px-1">
+                  <div className="text-center min-w-[36px] px-2.5">
                     <span
                       className={`text-sm font-black block leading-none ${
                         stockBajo ? 'text-amber-600 dark:text-amber-400 animate-pulse font-extrabold' : 'text-slate-800 dark:text-slate-200'
@@ -285,12 +287,14 @@ export default function Stock() {
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => actualizarStock(p.id, 1)}
-                    className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-350 transition-all btn-interactive"
-                  >
-                    +
-                  </button>
+                  {isAdminAuthenticated && (
+                    <button
+                      onClick={() => actualizarStock(p.id, 1)}
+                      className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-350 transition-all btn-interactive"
+                    >
+                      +
+                    </button>
+                  )}
                 </div>
               </div>
             )

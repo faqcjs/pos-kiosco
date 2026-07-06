@@ -32,9 +32,15 @@ export default function useCaja() {
         .reduce((acc, m) => acc + m.monto, 0)
     : 0
 
+  const totalCobrosClientes = cajaActiva
+    ? cajaActiva.movimientos
+        .filter((m) => m.tipo === 'ingreso' && m.motivo.includes('Cobro Deuda Cliente'))
+        .reduce((acc, m) => acc + m.monto, 0)
+    : 0
+
   const totalIngresos = cajaActiva
     ? cajaActiva.movimientos
-        .filter((m) => m.tipo === 'ingreso')
+        .filter((m) => m.tipo === 'ingreso' && !m.motivo.includes('Cobro Deuda Cliente'))
         .reduce((acc, m) => acc + m.monto, 0)
     : 0
 
@@ -45,7 +51,7 @@ export default function useCaja() {
     : 0
 
   const saldoTeorico = cajaActiva
-    ? cajaActiva.montoApertura + totalVentasEfectivo + totalIngresos - totalEgresos
+    ? cajaActiva.montoApertura + totalVentasEfectivo + totalCobrosClientes + totalIngresos - totalEgresos
     : 0
 
   const handleAbrir = (e) => {
@@ -146,6 +152,7 @@ export default function useCaja() {
     setMotivoMovimiento,
     totalVentasEfectivo,
     totalVentasQR,
+    totalCobrosClientes,
     totalIngresos,
     totalEgresos,
     saldoTeorico,

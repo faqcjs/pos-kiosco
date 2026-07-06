@@ -22,6 +22,7 @@ export default function Caja() {
     setMotivoMovimiento,
     totalVentasEfectivo,
     totalVentasQR,
+    totalCobrosClientes,
     totalIngresos,
     totalEgresos,
     saldoTeorico,
@@ -161,8 +162,8 @@ export default function Caja() {
         </button>
       </div>
 
-      {/* 2. Grid de Resumen de Saldos (Responsive: 2 col en mobile, 7 col en desktop) */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-3.5">
+      {/* 2. Grid de Resumen de Saldos (Responsive: 2 col en mobile, 8 col en desktop) */}
+      <div className="grid grid-cols-2 md:grid-cols-8 gap-3.5">
         <div className="bg-white border border-slate-205 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-4 shadow-sm">
           <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Efectivo Inicial</span>
           <span className="text-lg font-black text-slate-800 dark:text-slate-200 mt-1 block">
@@ -179,6 +180,12 @@ export default function Caja() {
           <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Ventas (QR / Transf.)</span>
           <span className="text-lg font-black text-blue-600 dark:text-blue-450 mt-1 block">
             +${totalVentasQR.toLocaleString('es-AR')}
+          </span>
+        </div>
+        <div className="bg-white border border-slate-205 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Cobros Clientes</span>
+          <span className="text-lg font-black text-emerald-650 dark:text-emerald-500 mt-1 block">
+            +${totalCobrosClientes.toLocaleString('es-AR')}
           </span>
         </div>
         <div className="bg-white border border-slate-205 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-4 shadow-sm">
