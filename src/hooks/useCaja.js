@@ -87,7 +87,9 @@ export default function useCaja() {
       return
     }
 
-    const descripcionFinal = motivoMovimiento.trim() || 'Ajuste de caja (Ingreso)'
+    const descripcionFinal = tipoMovimiento === 'egreso'
+      ? `Retiro de Caja - ${motivoMovimiento.trim()}`
+      : (motivoMovimiento.trim() || 'Ajuste de caja (Ingreso)')
     registrarMovimientoCaja(tipoMovimiento, monto, descripcionFinal)
 
     // Limpiar formulario
