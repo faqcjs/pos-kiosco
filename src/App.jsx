@@ -8,6 +8,65 @@ import { Stock } from '@/components/pos/stock/stock'
 import { Clientes } from '@/components/pos/clientes/clientes'
 import { Proveedores } from '@/components/pos/proveedores/proveedores'
 import { Admin } from '@/components/pos/admin/admin'
+import { Card, Input, Label } from '@/components/ui/kit'
+import { Button } from '@/components/ui/button'
+
+function AdminGate() {
+  const { state, loginAdmin } = useStore()
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState(false)
+
+  if (state.isAdminAuthenticated) {
+    return <Admin />
+  }
+
+  const handleLogin = (e) => {
+    e.preventDefault()
+    const success = loginAdmin(password)
+    if (success) {
+      setError(false)
+      setPassword('')
+    } else {
+      setError(true)
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-md mt-10">
+      <Card className="p-8 space-y-5">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto text-3xl">
+          ⚙️
+        </div>
+        <div className="text-center">
+          <h2 className="font-heading text-lg font-bold">Acceso de Administrador</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ingresá la contraseña para acceder al panel de administración.
+          </p>
+        </div>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <Label htmlFor="admin-pass">Contraseña</Label>
+            <Input
+              id="admin-pass"
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                setError(false)
+              }}
+              placeholder="Contraseña"
+              autoFocus
+            />
+            {error && <p className="mt-1.5 text-xs text-destructive font-semibold">Contraseña incorrecta</p>}
+          </div>
+          <Button type="submit" className="h-11 w-full bg-primary text-base font-bold">
+            Entrar
+          </Button>
+        </form>
+      </Card>
+    </div>
+  )
+}
 
 function Screen({ active }) {
   switch (active) {
@@ -22,7 +81,7 @@ function Screen({ active }) {
     case 'proveedores':
       return <Proveedores />
     case 'admin':
-      return <Admin />
+      return <AdminGate />
     default:
       return <Venta />
   }
@@ -30,10 +89,17 @@ function Screen({ active }) {
 
 function Shell() {
   const [active, setActive] = useState('venta')
-  const { hydrated } = useStore()
+  const { hydrated, logoutAdmin } = useStore()
+
+  const handleTabChange = (tab) => {
+    if (active === 'admin' && tab !== 'admin') {
+      logoutAdmin()
+    }
+    setActive(tab)
+  }
 
   return (
-    <AppShell active={active} onChange={setActive}>
+    <AppShell active={active} onChange={handleTabChange}>
       <div className="px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
         {hydrated ? (
           <Screen active={active} />

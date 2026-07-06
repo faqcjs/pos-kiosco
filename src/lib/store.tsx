@@ -36,6 +36,8 @@ function initialState(): AppState {
     currentShift: null,
     shiftHistory: [],
     theme: 'light',
+    adminPassword: 'admin123',
+    isAdminAuthenticated: false,
   }
 }
 
@@ -104,6 +106,9 @@ interface StoreContextValue {
   receiveGoods: (supplierId: string, amount: number, detail: string, paidCash: boolean) => void
   registerSupplierPayment: (supplierId: string, amount: number, fromCash: boolean) => void
   resetData: () => void
+  loginAdmin: (password: string) => boolean
+  logoutAdmin: () => void
+  changeAdminPassword: (newPassword: string) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -414,6 +419,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...initialState(), theme: s.theme }))
   }, [])
 
+  const loginAdmin = useCallback((password: string) => {
+    let success = false
+    setState((s) => {
+      if (password === (s.adminPassword || 'admin123')) {
+        success = true
+        return { ...s, isAdminAuthenticated: true }
+      }
+      return s
+    })
+    return success
+  }, [])
+
+  const logoutAdmin = useCallback(() => {
+    setState((s) => ({ ...s, isAdminAuthenticated: false }))
+  }, [])
+
+  const changeAdminPassword = useCallback((newPassword: string) => {
+    if (!newPassword || newPassword.trim().length === 0) return
+    setState((s) => ({ ...s, adminPassword: newPassword }))
+  }, [])
+
   const value = useMemo<StoreContextValue>(
     () => ({
       state,
@@ -433,6 +459,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       receiveGoods,
       registerSupplierPayment,
       resetData,
+      loginAdmin,
+      logoutAdmin,
+      changeAdminPassword,
     }),
     [
       state,
@@ -452,6 +481,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       receiveGoods,
       registerSupplierPayment,
       resetData,
+      loginAdmin,
+      logoutAdmin,
+      changeAdminPassword,
     ],
   )
 

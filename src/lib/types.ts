@@ -113,4 +113,6 @@ export interface AppState {
   currentShift: CashShift | null
   shiftHistory: CashShift[]
   theme: 'light' | 'dark'
+  adminPassword?: string
+  isAdminAuthenticated?: boolean
 }

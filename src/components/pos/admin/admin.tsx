@@ -22,8 +22,10 @@ import {
   ReceiptText,
   TrendingUp,
   Users,
+  Lock,
 } from 'lucide-react'
 import { Badge, Card, EmptyState, StatCard } from '@/components/ui/kit'
+import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/pos/page-header'
 import { customerBalance, supplierBalance, useStore } from '@/lib/store'
 import { formatDate, money, moneyShort } from '@/lib/format'
@@ -42,7 +44,7 @@ function startOfDay(d: Date) {
 }
 
 export function Admin() {
-  const { state } = useStore()
+  const { state, logoutAdmin } = useStore()
 
   const stats = useMemo(() => {
     const now = new Date()
@@ -121,8 +123,17 @@ export function Admin() {
   const hasData = state.sales.length > 0
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <PageHeader title="Panel de administración" subtitle="Resumen del negocio en tiempo real" />
+    <div className="mx-auto max-w-6xl space-y-5">
+      <PageHeader
+        title="Panel de administración"
+        description="Resumen del negocio en tiempo real"
+        action={
+          <Button variant="destructive" onClick={logoutAdmin}>
+            <Lock className="size-4" />
+            Cerrar sesión
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
