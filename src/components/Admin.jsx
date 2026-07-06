@@ -571,82 +571,149 @@ export default function Admin() {
                     <p className="text-sm font-semibold">No hay turnos registrados en el historial.</p>
                   </div>
                 ) : (
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800/80 text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                        <th className="pb-3 pr-2">Fecha y Hora</th>
-                        <th className="pb-3 pr-2">Cajeros</th>
-                        <th className="pb-3 pr-2 text-right">Inicial</th>
-                        <th className="pb-3 pr-2 text-right">Cierre Físico</th>
-                        <th className="pb-3 text-right">Diferencia</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold text-slate-700 dark:text-slate-350">
+                  <>
+                    {/* Mobile: clean list of cards */}
+                    <div className="md:hidden space-y-4">
                       {historialCajas.map((c) => {
                         const diff = c.diferencia || 0
+                        const cIngresos = (c.movimientos || [])
+                          .filter((m) => m.tipo === 'ingreso' && !m.motivo.includes('Cobro Deuda Cliente'))
+                          .reduce((acc, m) => acc + m.monto, 0)
+                        const cCobros = (c.movimientos || [])
+                          .filter((m) => m.tipo === 'ingreso' && m.motivo.includes('Cobro Deuda Cliente'))
+                          .reduce((acc, m) => acc + m.monto, 0)
+                        const cEgresos = (c.movimientos || [])
+                          .filter((m) => m.tipo === 'egreso')
+                          .reduce((acc, m) => acc + m.monto, 0)
+                        const cVentas = (c.movimientos || [])
+                          .filter((m) => m.tipo === 'venta' && m.motivo.includes('Efectivo'))
+                          .reduce((acc, m) => acc + m.monto, 0)
+
                         return (
-                          <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-[#151926]/40 transition-colors">
-                            <td className="py-3.5 pr-2">
-                              <span className="block font-bold text-slate-800 dark:text-slate-200">
-                                {formatFecha(c.fechaCierre)}
-                              </span>
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                                ID: {c.id}
-                              </span>
-                            </td>
-                            <td className="py-3.5 pr-2">
-                              <div className="space-y-0.5 text-[11px]">
-                                <div>
-                                  🔑 <span className="text-slate-400">Abre:</span>{' '}
-                                  <b>{c.cajeroApertura || 'Desconocido'}</b>
-                                </div>
-                                <div>
-                                  🔒 <span className="text-slate-400">Cierra:</span>{' '}
-                                  <b>{c.cajeroCierre || 'Desconocido'}</b>
-                                </div>
-                                <div className="text-[10px] mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/40 space-y-0.5 font-bold">
-                                  <div>
-                                    📥 <span className="text-slate-400">Agregado:</span>{' '}
-                                    <span className="text-emerald-600 dark:text-emerald-450">
-                                      +${(c.movimientos || []).filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    💸 <span className="text-slate-400">Retirado:</span>{' '}
-                                    <span className="text-rose-650 dark:text-rose-455">
-                                      -${(c.movimientos || []).filter(m => m.tipo === 'egreso').reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    🛒 <span className="text-slate-400">Ventas Ef:</span>{' '}
-                                    <span className="text-slate-600 dark:text-slate-350">
-                                      +${(c.movimientos || []).filter(m => m.tipo === 'venta' && m.motivo.includes('Efectivo')).reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
-                                    </span>
-                                  </div>
-                                </div>
+                          <div key={c.id} className="bg-slate-50 dark:bg-[#0c0f17] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 text-xs">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <span className="block font-bold text-slate-800 dark:text-slate-200">
+                                  {formatFecha(c.fechaCierre)}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                  ID: {c.id}
+                                </span>
                               </div>
-                            </td>
-                            <td className="py-3.5 pr-2 text-right">
-                              ${c.montoApertura.toLocaleString('es-AR')}
-                            </td>
-                            <td className="py-3.5 pr-2 text-right">
-                              ${c.montoCierreFisico.toLocaleString('es-AR')}
-                            </td>
-                            <td
-                              className={`py-3.5 text-right font-black text-sm ${
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wider uppercase border ${
                                 diff >= 0
-                                  ? 'text-emerald-600 dark:text-emerald-450'
-                                  : 'text-rose-600 dark:text-rose-455'
-                              }`}
-                            >
-                              {diff >= 0 ? '+' : ''}
-                              ${diff.toLocaleString('es-AR')}
-                            </td>
-                          </tr>
+                                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                  : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-455'
+                              }`}>
+                                Dif: {diff >= 0 ? '+' : ''}${diff.toLocaleString('es-AR')}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-slate-600 dark:text-slate-400">
+                              <div>Inicial: <b>${c.montoApertura.toLocaleString('es-AR')}</b></div>
+                              <div>Cierre Físico: <b>${c.montoCierreFisico.toLocaleString('es-AR')}</b></div>
+                              <div>Ventas Ef.: <b>+${cVentas.toLocaleString('es-AR')}</b></div>
+                              <div>Cobros Clientes: <b>+${cCobros.toLocaleString('es-AR')}</b></div>
+                              <div>Agregado: <b>+${cIngresos.toLocaleString('es-AR')}</b></div>
+                              <div>Retirado: <b>-${cEgresos.toLocaleString('es-AR')}</b></div>
+                              <div className="col-span-2 border-t border-dashed border-slate-200 dark:border-slate-800/80 pt-1.5 mt-1 font-bold text-slate-700 dark:text-slate-300">
+                                Efectivo Teórico: <b>${c.saldoTeorico.toLocaleString('es-AR')}</b>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-4 border-t border-slate-100 dark:border-slate-850 pt-2 text-[10px] text-slate-400 dark:text-slate-500">
+                              <div>Apertura: <b>{c.cajeroApertura || 'Desconocido'}</b></div>
+                              <div>Cierre: <b>{c.cajeroCierre || 'Desconocido'}</b></div>
+                            </div>
+                          </div>
                         )
                       })}
-                    </tbody>
-                  </table>
+                    </div>
+
+                    {/* Desktop: clean tabular view */}
+                    <table className="hidden md:table w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 dark:border-slate-800/80 text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                          <th className="pb-3 pr-2">Fecha y Hora</th>
+                          <th className="pb-3 pr-2">Cajeros</th>
+                          <th className="pb-3 pr-2 text-right">Inicial</th>
+                          <th className="pb-3 pr-2 text-right">Cierre Físico</th>
+                          <th className="pb-3 text-right">Diferencia</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold text-slate-700 dark:text-slate-350">
+                        {historialCajas.map((c) => {
+                          const diff = c.diferencia || 0
+                          return (
+                            <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-[#151926]/40 transition-colors">
+                              <td className="py-3.5 pr-2">
+                                <span className="block font-bold text-slate-800 dark:text-slate-200">
+                                  {formatFecha(c.fechaCierre)}
+                                </span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                                  ID: {c.id}
+                                </span>
+                              </td>
+                              <td className="py-3.5 pr-2">
+                                <div className="space-y-0.5 text-[11px]">
+                                  <div>
+                                    🔑 <span className="text-slate-400">Abre:</span>{' '}
+                                    <b>{c.cajeroApertura || 'Desconocido'}</b>
+                                  </div>
+                                  <div>
+                                    🔒 <span className="text-slate-400">Cierra:</span>{' '}
+                                    <b>{c.cajeroCierre || 'Desconocido'}</b>
+                                  </div>
+                                  <div className="text-[10px] mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/40 space-y-0.5 font-bold">
+                                    <div>
+                                      📥 <span className="text-slate-400">Agregado:</span>{' '}
+                                      <span className="text-emerald-600 dark:text-emerald-455">
+                                        +${(c.movimientos || []).filter(m => m.tipo === 'ingreso' && !m.motivo.includes('Cobro Deuda')).reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      🤝 <span className="text-slate-400">Fiadores:</span>{' '}
+                                      <span className="text-emerald-650 dark:text-emerald-500">
+                                        +${(c.movimientos || []).filter(m => m.tipo === 'ingreso' && m.motivo.includes('Cobro Deuda')).reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      💸 <span className="text-slate-400">Retirado:</span>{' '}
+                                      <span className="text-rose-650 dark:text-rose-455">
+                                        -${(c.movimientos || []).filter(m => m.tipo === 'egreso').reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      🛒 <span className="text-slate-400">Ventas Ef:</span>{' '}
+                                      <span className="text-slate-600 dark:text-slate-350">
+                                        +${(c.movimientos || []).filter(m => m.tipo === 'venta' && m.motivo.includes('Efectivo')).reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3.5 pr-2 text-right">
+                                ${c.montoApertura.toLocaleString('es-AR')}
+                              </td>
+                              <td className="py-3.5 pr-2 text-right">
+                                ${c.montoCierreFisico.toLocaleString('es-AR')}
+                              </td>
+                              <td
+                                className={`py-3.5 text-right font-black text-sm ${
+                                  diff >= 0
+                                    ? 'text-emerald-600 dark:text-emerald-450'
+                                    : 'text-rose-600 dark:text-rose-455'
+                                }`}
+                              >
+                                {diff >= 0 ? '+' : ''}
+                                ${diff.toLocaleString('es-AR')}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </>
                 )}
               </div>
             </section>
