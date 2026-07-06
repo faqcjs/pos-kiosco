@@ -604,6 +604,26 @@ export default function Admin() {
                                   🔒 <span className="text-slate-400">Cierra:</span>{' '}
                                   <b>{c.cajeroCierre || 'Desconocido'}</b>
                                 </div>
+                                <div className="text-[10px] mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/40 space-y-0.5 font-bold">
+                                  <div>
+                                    📥 <span className="text-slate-400">Agregado:</span>{' '}
+                                    <span className="text-emerald-600 dark:text-emerald-450">
+                                      +${(c.movimientos || []).filter(m => m.tipo === 'ingreso').reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    💸 <span className="text-slate-400">Retirado:</span>{' '}
+                                    <span className="text-rose-650 dark:text-rose-455">
+                                      -${(c.movimientos || []).filter(m => m.tipo === 'egreso').reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    🛒 <span className="text-slate-400">Ventas Ef:</span>{' '}
+                                    <span className="text-slate-600 dark:text-slate-350">
+                                      +${(c.movimientos || []).filter(m => m.tipo === 'venta' && m.motivo.includes('Efectivo')).reduce((acc, m) => acc + m.monto, 0).toLocaleString('es-AR')}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </td>
                             <td className="py-3.5 pr-2 text-right">

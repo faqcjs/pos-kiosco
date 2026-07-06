@@ -22,6 +22,7 @@ export default function Caja() {
     setMotivoMovimiento,
     totalVentasEfectivo,
     totalVentasQR,
+    totalIngresos,
     totalEgresos,
     saldoTeorico,
     handleAbrir,
@@ -96,14 +97,35 @@ export default function Caja() {
                   <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                     Cajero: <b>{c.cajeroApertura || 'Desconocido'}</b> (Apertura) | <b>{c.cajeroCierre || 'Desconocido'}</b> (Cierre)
                   </div>
-                  <div className="grid grid-cols-2 gap-2 border-t border-slate-100 dark:border-slate-800/80 pt-2.5 mt-2">
-                    <div>Inicial: <b>${c.montoApertura}</b></div>
-                    <div>Físico: <b>${c.montoCierreFisico}</b></div>
-                    <div>Teórico: <b>${c.saldoTeorico}</b></div>
-                    <div className={c.diferencia >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-rose-455 font-bold'}>
-                      Diferencia: {c.diferencia >= 0 ? '+' : ''}${c.diferencia}
-                    </div>
-                  </div>
+                  {(() => {
+                    const cIngresos = (c.movimientos || [])
+                      .filter((m) => m.tipo === 'ingreso')
+                      .reduce((acc, m) => acc + m.monto, 0)
+                    const cEgresos = (c.movimientos || [])
+                      .filter((m) => m.tipo === 'egreso')
+                      .reduce((acc, m) => acc + m.monto, 0)
+                    const cVentas = (c.movimientos || [])
+                      .filter((m) => m.tipo === 'venta' && m.motivo.includes('Efectivo'))
+                      .reduce((acc, m) => acc + m.monto, 0)
+                    
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 dark:border-slate-800/80 pt-2.5 mt-2">
+                          <div>Inicial: <b>${c.montoApertura.toLocaleString('es-AR')}</b></div>
+                          <div>Físico: <b>${c.montoCierreFisico.toLocaleString('es-AR')}</b></div>
+                          <div>Ventas Ef: <b>+${cVentas.toLocaleString('es-AR')}</b></div>
+                          <div>Agregado: <b>+${cIngresos.toLocaleString('es-AR')}</b></div>
+                          <div>Retirado: <b>-${cEgresos.toLocaleString('es-AR')}</b></div>
+                          <div>Teórico: <b>${c.saldoTeorico.toLocaleString('es-AR')}</b></div>
+                        </div>
+                        <div className={`text-right font-black border-t border-slate-100 dark:border-slate-800/80 pt-1.5 mt-1 text-[11px] ${
+                          c.diferencia >= 0 ? 'text-emerald-600 dark:text-emerald-450' : 'text-rose-600 dark:text-rose-455'
+                        }`}>
+                          Diferencia: {c.diferencia >= 0 ? '+' : ''}${c.diferencia.toLocaleString('es-AR')}
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
               ))}
             </div>
@@ -139,8 +161,8 @@ export default function Caja() {
         </button>
       </div>
 
-      {/* 2. Grid de Resumen de Saldos (Responsive: 2 col en mobile, 6 col en desktop) */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3.5">
+      {/* 2. Grid de Resumen de Saldos (Responsive: 2 col en mobile, 7 col en desktop) */}
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-3.5">
         <div className="bg-white border border-slate-205 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-4 shadow-sm">
           <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Efectivo Inicial</span>
           <span className="text-lg font-black text-slate-800 dark:text-slate-200 mt-1 block">
@@ -157,6 +179,12 @@ export default function Caja() {
           <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Ventas (QR / Transf.)</span>
           <span className="text-lg font-black text-blue-600 dark:text-blue-450 mt-1 block">
             +${totalVentasQR.toLocaleString('es-AR')}
+          </span>
+        </div>
+        <div className="bg-white border border-slate-205 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-4 shadow-sm">
+          <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Efectivo Agregado</span>
+          <span className="text-lg font-black text-emerald-600 dark:text-emerald-455 mt-1 block">
+            +${totalIngresos.toLocaleString('es-AR')}
           </span>
         </div>
         <div className="bg-white border border-slate-205 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-4 shadow-sm">

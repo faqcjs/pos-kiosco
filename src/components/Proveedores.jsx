@@ -189,32 +189,34 @@ export default function Proveedores() {
               📦 Cargar Mercadería / Pedido
             </h4>
             <form onSubmit={handleRecepcion} className="space-y-3">
-              <div className="flex gap-2">
-                <div className="relative flex-grow">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-450 dark:text-slate-500 font-bold text-sm">
-                    $
-                  </span>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex gap-2 flex-1">
+                  <div className="relative flex-[0.7] sm:flex-1">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-450 dark:text-slate-500 font-bold text-sm">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      placeholder="Costo total"
+                      value={montoRecepcion}
+                      onChange={(e) => setMontoRecepcion(e.target.value)}
+                      className="w-full bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 pl-8 pr-2 text-xs outline-none font-bold"
+                      required
+                    />
+                  </div>
                   <input
-                    type="number"
-                    placeholder="Costo total"
-                    value={montoRecepcion}
-                    onChange={(e) => setMontoRecepcion(e.target.value)}
-                    className="w-full bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 pl-8 pr-2 text-xs outline-none font-bold"
-                    required
+                    type="text"
+                    placeholder="Detalle ( Pepsi, Lácteos )"
+                    value={detalleRecepcion}
+                    onChange={(e) => setDetalleRecepcion(e.target.value)}
+                    className="flex-[1.3] sm:flex-[1.5] bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none"
                   />
                 </div>
-                <input
-                  type="text"
-                  placeholder="Detalle (ej. Lacteos, Pepsi)"
-                  value={detalleRecepcion}
-                  onChange={(e) => setDetalleRecepcion(e.target.value)}
-                  className="flex-[1.5] bg-slate-100/70 border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#090b11] dark:border-slate-800 dark:text-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none"
-                />
                 <button
                   type="submit"
-                  className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-md transition-all btn-interactive shrink-0"
+                  className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-md transition-all btn-interactive shrink-0"
                 >
-                  Registrar
+                  Registrar Recepción
                 </button>
               </div>
 
@@ -229,7 +231,7 @@ export default function Proveedores() {
                 <span>¿Pagar en el momento con efectivo de la caja chica?</span>
               </label>
               {recepcionPagada && !cajaActiva && (
-                <p className="text-[10px] text-rose-600 dark:text-rose-450 pl-0.5 animate-pulse">
+                <p className="text-[10px] text-rose-600 dark:text-rose-455 pl-0.5 animate-pulse">
                   ⚠️ No podés pagar en el momento: Caja cerrada.
                 </p>
               )}
@@ -243,7 +245,7 @@ export default function Proveedores() {
                 💵 Registrar Pago al Proveedor
               </h4>
               <form onSubmit={handlePago} className="space-y-3">
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-grow">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-bold">
                       $
@@ -259,9 +261,9 @@ export default function Proveedores() {
                   </div>
                   <button
                     type="submit"
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow-md transition-all btn-interactive"
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-md transition-all btn-interactive"
                   >
-                    Pagar
+                    Registrar Pago
                   </button>
                 </div>
 
@@ -275,7 +277,7 @@ export default function Proveedores() {
                   <span>¿Descontar de la caja chica del día?</span>
                 </label>
                 {pagarDeCajaChica && !cajaActiva && (
-                  <p className="text-[10px] text-rose-600 dark:text-rose-450">
+                  <p className="text-[10px] text-rose-600 dark:text-rose-455">
                     ⚠️ Caja cerrada. Debés abrir la caja para poder usar fondos de caja chica.
                   </p>
                 )}

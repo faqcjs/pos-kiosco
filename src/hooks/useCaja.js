@@ -32,6 +32,12 @@ export default function useCaja() {
         .reduce((acc, m) => acc + m.monto, 0)
     : 0
 
+  const totalIngresos = cajaActiva
+    ? cajaActiva.movimientos
+        .filter((m) => m.tipo === 'ingreso')
+        .reduce((acc, m) => acc + m.monto, 0)
+    : 0
+
   const totalEgresos = cajaActiva
     ? cajaActiva.movimientos
         .filter((m) => m.tipo === 'egreso')
@@ -39,7 +45,7 @@ export default function useCaja() {
     : 0
 
   const saldoTeorico = cajaActiva
-    ? cajaActiva.montoApertura + totalVentasEfectivo - totalEgresos
+    ? cajaActiva.montoApertura + totalVentasEfectivo + totalIngresos - totalEgresos
     : 0
 
   const handleAbrir = (e) => {
@@ -138,6 +144,7 @@ export default function useCaja() {
     setMotivoMovimiento,
     totalVentasEfectivo,
     totalVentasQR,
+    totalIngresos,
     totalEgresos,
     saldoTeorico,
     handleAbrir,

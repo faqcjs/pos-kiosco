@@ -52,11 +52,15 @@ export const createCajaSlice = (set, get) => ({
         .filter((m) => m.tipo === 'venta' && m.motivo.includes('Efectivo'))
         .reduce((acc, m) => acc + m.monto, 0)
       
+      const totalIngresos = state.cajaActiva.movimientos
+        .filter((m) => m.tipo === 'ingreso')
+        .reduce((acc, m) => acc + m.monto, 0)
+      
       const totalEgresos = state.cajaActiva.movimientos
         .filter((m) => m.tipo === 'egreso')
         .reduce((acc, m) => acc + m.monto, 0)
 
-      const saldoTeorico = state.cajaActiva.montoApertura + totalVentasEfectivo - totalEgresos
+      const saldoTeorico = state.cajaActiva.montoApertura + totalVentasEfectivo + totalIngresos - totalEgresos
       const diferencia = Number(montoFisico) - saldoTeorico
 
       const cajaCerrada = {
