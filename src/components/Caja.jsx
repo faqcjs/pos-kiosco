@@ -1,107 +1,38 @@
-import { useState } from 'react'
-import useKioskoStore from '../store/kioskoStore'
+import useCaja from '../hooks/useCaja'
 
 export default function Caja() {
   const {
     cajaActiva,
     historialCajas,
-    abrirCaja,
-    cerrarCaja,
-    registrarMovimientoCaja,
-    mostrarNotificacion,
-  } = useKioskoStore()
-
-  // State local
-  const [montoInicialInput, setMontoInicialInput] = useState('')
-  const [montoCierre, setMontoCierre] = useState('')
-  const [modalCierreAbierto, setModalCierreAbierto] = useState(false)
-  const [montoMovimiento, setMontoMovimiento] = useState('')
-  const [tipoMovimiento, setTipoMovimiento] = useState('ingreso') // 'ingreso' (Agregar), 'egreso' (Sacar)
-  const [motivoMovimiento, setMotivoMovimiento] = useState('')
-
-  // Totales de la sesión activa
-  const totalVentasEfectivo = cajaActiva
-    ? cajaActiva.movimientos
-        .filter((m) => m.tipo === 'venta' && m.motivo.includes('Efectivo'))
-        .reduce((acc, m) => acc + m.monto, 0)
-    : 0
-
-  const totalVentasQR = cajaActiva
-    ? cajaActiva.movimientos
-        .filter((m) => m.tipo === 'venta' && m.motivo.includes('QR / Transferencia'))
-        .reduce((acc, m) => acc + m.monto, 0)
-    : 0
-
-  const totalEgresos = cajaActiva
-    ? cajaActiva.movimientos
-        .filter((m) => m.tipo === 'egreso')
-        .reduce((acc, m) => acc + m.monto, 0)
-    : 0
-
-  const saldoTeorico = cajaActiva
-    ? cajaActiva.montoApertura + totalVentasEfectivo - totalEgresos
-    : 0
-
-  const handleAbrir = (e) => {
-    e.preventDefault()
-    const num = parseFloat(montoInicialInput)
-    if (!isNaN(num) && num >= 0) {
-      abrirCaja(num)
-      setMontoInicialInput('')
-    }
-  }
-
-  const handleMovimiento = (e) => {
-    e.preventDefault()
-    const monto = parseFloat(montoMovimiento)
-    if (isNaN(monto) || monto <= 0) {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Monto Inválido',
-        mensaje: 'Por favor ingresá un monto mayor a 0.'
-      })
-      return
-    }
-
-    if (tipoMovimiento === 'egreso' && !motivoMovimiento.trim()) {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Motivo Requerido',
-        mensaje: 'Para retirar dinero es obligatorio indicar el por qué o una descripción.'
-      })
-      return
-    }
-
-    const descripcionFinal = motivoMovimiento.trim() || 'Ajuste de caja (Ingreso)'
-    registrarMovimientoCaja(tipoMovimiento, monto, descripcionFinal)
-
-    // Limpiar formulario
-    setMontoMovimiento('')
-    setMotivoMovimiento('')
-  }
-
-  const handleCerrar = (e) => {
-    e.preventDefault()
-    const monto = parseFloat(montoCierre)
-    if (!isNaN(monto) && monto >= 0) {
-      cerrarCaja(monto)
-      setMontoCierre('')
-      setModalCierreAbierto(false)
-    }
-  }
-
-  const formatFecha = (isoString) => {
-    return new Date(isoString).toLocaleString('es-AR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      day: '2-digit',
-      month: '2-digit',
-    })
-  }
+    montoInicialInput,
+    setMontoInicialInput,
+    cajeroAperturaInput,
+    setCajeroAperturaInput,
+    montoCierre,
+    setMontoCierre,
+    cajeroCierreInput,
+    setCajeroCierreInput,
+    modalCierreAbierto,
+    setModalCierreAbierto,
+    montoMovimiento,
+    setMontoMovimiento,
+    tipoMovimiento,
+    setTipoMovimiento,
+    motivoMovimiento,
+    setMotivoMovimiento,
+    totalVentasEfectivo,
+    totalVentasQR,
+    totalEgresos,
+    saldoTeorico,
+    handleAbrir,
+    handleMovimiento,
+    handleCerrar,
+    formatFecha,
+  } = useCaja()
 
   if (!cajaActiva) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 dark:bg-[#090b11] flex flex-col md:flex-row gap-6 justify-center items-start pb-6">
+      <div className="w-full h-full overflow-y-auto p-4 md:p-6 bg-slate-50 dark:bg-[#090b11] flex flex-col md:flex-row gap-6 justify-center items-start pb-6">
         {/* Formulario Apertura */}
         <div className="bg-white border border-slate-200 dark:bg-[#10141f] dark:border-slate-800 rounded-3xl p-6 shadow-xl max-w-md w-full text-center space-y-5 mx-auto md:mx-0 self-center">
           <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/25 rounded-full flex items-center justify-center mx-auto text-3xl animate-pulse">
@@ -114,18 +45,28 @@ export default function Caja() {
             </p>
           </div>
           <form onSubmit={handleAbrir} className="space-y-4">
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400 dark:text-slate-500">
-                $
-              </span>
+            <div className="space-y-3">
               <input
-                type="number"
-                placeholder="Monto inicial"
-                value={montoInicialInput}
-                onChange={(e) => setMontoInicialInput(e.target.value)}
-                className="w-full text-center text-2xl font-black text-slate-900 bg-slate-105/70 border border-slate-200 rounded-2xl py-3 pl-8 outline-none focus:bg-white focus:border-indigo-500 dark:text-slate-200 dark:bg-[#090b11] dark:border-slate-800"
+                type="text"
+                placeholder="Nombre del cajero"
+                value={cajeroAperturaInput}
+                onChange={(e) => setCajeroAperturaInput(e.target.value)}
+                className="w-full text-center text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl py-3 px-4 outline-none focus:bg-white focus:border-indigo-500 dark:text-slate-200 dark:bg-[#090b11] dark:border-slate-800"
                 required
               />
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400 dark:text-slate-500">
+                  $
+                </span>
+                <input
+                  type="number"
+                  placeholder="Monto inicial"
+                  value={montoInicialInput}
+                  onChange={(e) => setMontoInicialInput(e.target.value)}
+                  className="w-full text-center text-2xl font-black text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-8 outline-none focus:bg-white focus:border-indigo-500 dark:text-slate-200 dark:bg-[#090b11] dark:border-slate-800"
+                  required
+                />
+              </div>
             </div>
             <button
               type="submit"
@@ -152,6 +93,9 @@ export default function Caja() {
                     <span>Turno finalizado</span>
                     <span>{formatFecha(c.fechaCierre)}</span>
                   </div>
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                    Cajero: <b>{c.cajeroApertura || 'Desconocido'}</b> (Apertura) | <b>{c.cajeroCierre || 'Desconocido'}</b> (Cierre)
+                  </div>
                   <div className="grid grid-cols-2 gap-2 border-t border-slate-100 dark:border-slate-800/80 pt-2.5 mt-2">
                     <div>Inicial: <b>${c.montoApertura}</b></div>
                     <div>Físico: <b>${c.montoCierreFisico}</b></div>
@@ -170,7 +114,7 @@ export default function Caja() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50 dark:bg-[#090b11] pb-6">
+    <div className="w-full h-full overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50 dark:bg-[#090b11] pb-6">
       {/* 1. Header con Estado y Botón de Cierre */}
       <div className="flex justify-between items-center bg-white border border-slate-200 dark:bg-[#10141f] dark:border-slate-800 rounded-3xl p-5 shadow-sm">
         <div className="space-y-1">
@@ -184,7 +128,7 @@ export default function Caja() {
             </span>
           </div>
           <p className="text-xxs text-slate-400 dark:text-slate-500">
-            Abierta el {formatFecha(cajaActiva.fechaApertura)}
+            Abierta el {formatFecha(cajaActiva.fechaApertura)} por <b>{cajaActiva.cajeroApertura || 'Desconocido'}</b>
           </p>
         </div>
         <button
@@ -379,18 +323,28 @@ export default function Caja() {
             </p>
 
             <form onSubmit={handleCerrar} className="space-y-4">
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400 dark:text-slate-500">
-                  $
-                </span>
+              <div className="space-y-3">
                 <input
-                  type="number"
-                  placeholder="Efectivo en caja física"
-                  value={montoCierre}
-                  onChange={(e) => setMontoCierre(e.target.value)}
-                  className="w-full text-center text-3xl font-black text-slate-900 bg-slate-100/70 border border-slate-205 focus:bg-white focus:border-rose-500 dark:text-slate-205 dark:bg-[#090b11] dark:border-slate-800 rounded-2xl py-3 pl-8 outline-none"
+                  type="text"
+                  placeholder="Nombre del cajero"
+                  value={cajeroCierreInput}
+                  onChange={(e) => setCajeroCierreInput(e.target.value)}
+                  className="w-full text-center text-sm font-semibold text-slate-900 bg-slate-100/70 border border-slate-205 focus:bg-white focus:border-rose-500 dark:text-slate-200 dark:bg-[#090b11] dark:border-slate-800 rounded-2xl py-3 px-4 outline-none"
                   required
                 />
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400 dark:text-slate-500">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    placeholder="Efectivo en caja física"
+                    value={montoCierre}
+                    onChange={(e) => setMontoCierre(e.target.value)}
+                    className="w-full text-center text-3xl font-black text-slate-900 bg-slate-100/70 border border-slate-205 focus:bg-white focus:border-rose-500 dark:text-slate-205 dark:bg-[#090b11] dark:border-slate-800 rounded-2xl py-3 pl-8 outline-none"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="bg-slate-50 border border-slate-200 text-slate-600 dark:bg-[#151926] dark:border-slate-800/80 dark:text-slate-400 rounded-2xl p-4 text-xs space-y-1">

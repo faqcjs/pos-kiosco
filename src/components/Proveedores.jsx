@@ -2,7 +2,13 @@ import { useState } from 'react'
 import useKioskoStore from '../store/kioskoStore'
 
 export default function Proveedores() {
-  const { proveedores, agregarProveedor, registrarRecepcionMercaderia, registrarPagoProveedor, eliminarProveedor, cajaActiva, mostrarNotificacion } = useKioskoStore()
+  const proveedores = useKioskoStore(state => state.proveedores)
+  const agregarProveedor = useKioskoStore(state => state.agregarProveedor)
+  const registrarRecepcionMercaderia = useKioskoStore(state => state.registrarRecepcionMercaderia)
+  const registrarPagoProveedor = useKioskoStore(state => state.registrarPagoProveedor)
+  const eliminarProveedor = useKioskoStore(state => state.eliminarProveedor)
+  const cajaActiva = useKioskoStore(state => state.cajaActiva)
+  const mostrarNotificacion = useKioskoStore(state => state.mostrarNotificacion)
 
   // State local
   const [buscar, setBuscar] = useState('')

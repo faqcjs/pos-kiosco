@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
-import useKioskoStore from '../store/kioskoStore'
+import useVenta from '../hooks/useVenta'
 import ScannerModal from './ScannerModal'
+import useKioskoStore from '../store/kioskoStore'
 
 export default function Venta() {
   const {
@@ -9,173 +9,49 @@ export default function Venta() {
     cajaActiva,
     clientes,
     agregarAlCarrito,
-    agregarMontoRapido,
     actualizarCantidadCarrito,
     eliminarDelCarrito,
-    procesarCobro,
     agregarCliente,
-    mostrarNotificacion,
-  } = useKioskoStore()
+    buscarProducto,
+    setBuscarProducto,
+    montoRapidoInput,
+    setMontoRapidoInput,
+    scannerAbierto,
+    setScannerAbierto,
+    modalCobroAbierto,
+    setModalCobroAbierto,
+    metodoSeleccionado,
+    setMetodoSeleccionado,
+    clienteSeleccionadoId,
+    setClienteSeleccionadoId,
+    pagaCon,
+    setPagaCon,
+    creandoClienteInline,
+    setCreandoClienteInline,
+    nuevoClienteNombre,
+    setNuevoClienteNombre,
+    nuevoClienteTelefono,
+    setNuevoClienteTelefono,
+    categoriaSeleccionada,
+    setCategoriaSeleccionada,
+    cartDrawerOpen,
+    setCartDrawerOpen,
+    inputMontoRef,
+    scrollRef,
+    total,
+    handleAgregarMontoRapido,
+    handleKeyDownMonto,
+    handleScanSuccess,
+    handleCobrar,
+    confirmarCobro,
+    listadoFiltrado,
+    listadoProductosGrid,
+    handleLeftScroll,
+    esVistaMasVendidos,
+  } = useVenta()
 
-  // State local
-  const [buscarProducto, setBuscarProducto] = useState('')
-  const [montoRapidoInput, setMontoRapidoInput] = useState('')
-  const [scannerAbierto, setScannerAbierto] = useState(false)
-  const [modalCobroAbierto, setModalCobroAbierto] = useState(false)
-  const [metodoSeleccionado, setMetodoSeleccionado] = useState('')
-  const [clienteSeleccionadoId, setClienteSeleccionadoId] = useState('')
-  const [pagaCon, setPagaCon] = useState('')
-  const [creandoClienteInline, setCreandoClienteInline] = useState(false)
-  const [nuevoClienteNombre, setNuevoClienteNombre] = useState('')
-  const [nuevoClienteTelefono, setNuevoClienteTelefono] = useState('')
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('')
-  const [visibleCount, setVisibleCount] = useState(12)
-  const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
-
-  const inputMontoRef = useRef(null)
-  const scrollRef = useRef(null)
-
-  const total = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0)
-
-  // Auto-scroll del carrito cuando se agregan items
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [carrito])
-
-  // Escuchar inputs del buscador para código de barra exacto
-  useEffect(() => {
-    if (buscarProducto) {
-      const prodEncontrado = productos.find(
-        (p) => p.id === buscarProducto.trim()
-      )
-      if (prodEncontrado) {
-        agregarAlCarrito(prodEncontrado.id, 1)
-        setBuscarProducto('') // Limpiar buscador
-      }
-    }
-  }, [buscarProducto])
-
-  const handleAgregarMontoRapido = () => {
-    const num = parseFloat(montoRapidoInput)
-    if (!isNaN(num) && num > 0) {
-      agregarMontoRapido(num)
-      setMontoRapidoInput('')
-      inputMontoRef.current?.focus()
-    }
-  }
-
-  const handleKeyDownMonto = (e) => {
-    if (e.key === 'Enter') handleAgregarMontoRapido()
-  }
-
-  const handleScanSuccess = (codigo) => {
-    const prod = productos.find((p) => p.id === codigo)
-    if (prod) {
-      agregarAlCarrito(prod.id, 1)
-    } else {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Producto No Encontrado',
-        mensaje: `No existe ningún producto registrado con el código: ${codigo}`
-      })
-    }
-    setScannerAbierto(false)
-  }
-
-  const handleCobrar = () => {
-    if (!cajaActiva) {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Caja Cerrada',
-        mensaje: 'Primero debés abrir la caja desde la pestaña de Caja.'
-      })
-      return
-    }
-    setModalCobroAbierto(true)
-  }
-
-  const confirmarCobro = () => {
-    if (!metodoSeleccionado) {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Método de Pago',
-        mensaje: 'Por favor seleccioná un método de pago.'
-      })
-      return
-    }
-
-    if (metodoSeleccionado === 'Fiado' && !clienteSeleccionadoId) {
-      mostrarNotificacion({
-        tipo: 'warning',
-        titulo: 'Cliente Requerido',
-        mensaje: 'Por favor seleccioná qué cliente va a fiar.'
-      })
-      return
-    }
-
-    const clienteNombre = metodoSeleccionado === 'Fiado'
-      ? clientes.find((c) => c.id === clienteSeleccionadoId)?.nombre
-      : null
-
-    const items = carrito
-      .map((p) => `${p.nombre} x${p.cantidad} = $${p.precio * p.cantidad}`)
-      .join('\n')
-
-    const exito = procesarCobro(
-      metodoSeleccionado,
-      metodoSeleccionado === 'Fiado' ? clienteSeleccionadoId : null,
-      metodoSeleccionado === 'Efectivo' ? Number(pagaCon) || 0 : 0
-    )
-
-    if (exito) {
-      mostrarNotificacion({
-        tipo: 'success',
-        titulo: 'Venta Completada',
-        mensaje: `Venta procesada con éxito!\n\nMétodo: ${metodoSeleccionado} ${clienteNombre ? `(${clienteNombre})` : ''}\nTotal: $${total.toLocaleString('es-AR')}\n\n${items}`
-      })
-      setModalCobroAbierto(false)
-      setMetodoSeleccionado('')
-      setClienteSeleccionadoId('')
-      setPagaCon('')
-      setCreandoClienteInline(false)
-      setNuevoClienteNombre('')
-      setNuevoClienteTelefono('')
-    }
-  }
-
-  // Resetear paginado al cambiar filtros
-  useEffect(() => {
-    setVisibleCount(12)
-  }, [buscarProducto, categoriaSeleccionada])
-
-  const esVistaMasVendidos = !buscarProducto.trim() && !categoriaSeleccionada
-
-  // Filtrado de productos por búsqueda y categoría
-  const listadoFiltrado = esVistaMasVendidos
-    ? productos.filter((p) => p.stock > 0).slice(0, 10)
-    : productos.filter((p) => {
-        const coincideBusqueda = !buscarProducto.trim() || 
-          p.nombre.toLowerCase().includes(buscarProducto.trim().toLowerCase()) ||
-          p.id.toLowerCase().includes(buscarProducto.trim().toLowerCase())
-        
-        const coincideCategoria = !categoriaSeleccionada || p.categoria === categoriaSeleccionada
-        
-        return coincideBusqueda && coincideCategoria
-      })
-
-  const listadoProductosGrid = esVistaMasVendidos 
-    ? listadoFiltrado
-    : listadoFiltrado.slice(0, visibleCount)
-
-  const handleLeftScroll = (e) => {
-    if (esVistaMasVendidos) return
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    if (scrollHeight - scrollTop - clientHeight < 150) {
-      setVisibleCount((prev) => Math.min(prev + 12, listadoFiltrado.length))
-    }
-  }
+  const cartCollapsed = useKioskoStore(state => state.cartCollapsed)
+  const toggleCart = useKioskoStore(state => state.toggleCart)
 
   // Sub-componente del contenido del carrito para reutilizar en móvil y escritorio
   const CartItemsList = () => (
@@ -384,47 +260,118 @@ export default function Venta() {
       </div>
 
       {/* SECCIÓN 2: LADO DERECHO - CARRO DE ESCRITORIO (Visible sólo en PC) */}
-      <div className="hidden md:flex w-96 bg-white dark:bg-[#10141f] border-l border-slate-200 dark:border-slate-800/80 flex-col justify-between shrink-0 overflow-hidden shadow-sm">
+      <div className={`hidden md:flex ${cartCollapsed ? 'w-20' : 'w-96'} bg-white dark:bg-[#10141f] border-l border-slate-200 dark:border-slate-800/80 flex-col justify-between shrink-0 overflow-hidden shadow-sm transition-all duration-350 ease-in-out`}>
         {/* Encabezado Carrito */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800/80 flex justify-between items-center bg-slate-100 dark:bg-[#141926]">
-          <span className="font-extrabold text-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-            🛒 Carrito Activo
-          </span>
-          <span className="bg-indigo-500/15 text-indigo-655 dark:text-indigo-400 text-xs font-black px-2.5 py-1 rounded-full">
-            {carrito.length} Items
-          </span>
+        <div className={`p-4 border-b border-slate-200 dark:border-slate-800/80 flex ${cartCollapsed ? 'flex-col gap-3 items-center justify-center' : 'justify-between items-center'} bg-slate-100 dark:bg-[#141926]`}>
+          {cartCollapsed ? (
+            <div className="flex flex-col items-center gap-3">
+              <button
+                onClick={toggleCart}
+                className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800/60 text-slate-500 dark:text-slate-400 transition-colors btn-interactive"
+                title="Expandir carrito"
+              >
+                ◀
+              </button>
+              <div className="relative">
+                <span className="text-xl">🛒</span>
+                {carrito.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-indigo-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                    {carrito.length}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <span className="font-extrabold text-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                🛒 Carrito Activo
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="bg-indigo-500/15 text-indigo-655 dark:text-indigo-400 text-xs font-black px-2.5 py-1 rounded-full">
+                  {carrito.length} Items
+                </span>
+                <button
+                  onClick={toggleCart}
+                  className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-[#1f2638] text-slate-500 dark:text-slate-400 transition-colors btn-interactive"
+                  title="Contraer carrito"
+                >
+                  ▶
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Lista del Carrito con auto-scroll */}
-        <div className="flex-grow overflow-y-auto p-4 space-y-4" ref={scrollRef}>
-          {carrito.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-3 text-slate-400 dark:text-slate-500">
-              <span className="text-4xl animate-pulse">🛒</span>
-              <p className="text-sm font-semibold">El carrito está vacío</p>
-              <p className="text-xs max-w-[200px]">Hace click en los productos rápidos o escanealos para agregarlos.</p>
-            </div>
+        <div className={`flex-grow overflow-y-auto ${cartCollapsed ? 'p-2' : 'p-4'} space-y-4`} ref={scrollRef}>
+          {cartCollapsed ? (
+            carrito.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                <span className="text-2xl opacity-50">🛒</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3">
+                {carrito.map((item) => (
+                  <div key={item.id} className="relative flex flex-col items-center group" title={`${item.nombre} (x${item.cantidad})`}>
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-sm select-none font-bold">
+                      📦
+                    </div>
+                    <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border border-white dark:border-[#10141f]">
+                      {item.cantidad}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
           ) : (
-            <CartItemsList />
+            carrito.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center space-y-3 text-slate-400 dark:text-slate-500">
+                <span className="text-4xl animate-pulse">🛒</span>
+                <p className="text-sm font-semibold">El carrito está vacío</p>
+                <p className="text-xs max-w-[200px]">Hace click en los productos rápidos o escanealos para agregarlos.</p>
+              </div>
+            ) : (
+              <CartItemsList />
+            )
           )}
         </div>
 
         {/* Resumen & Checkout de Escritorio */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800/80 bg-slate-100 dark:bg-[#141926] space-y-4">
-          <div className="flex justify-between items-end">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Subtotal</span>
-            <span className="text-2xl font-black text-slate-800 dark:text-slate-100">${total.toLocaleString('es-AR')}</span>
-          </div>
+        <div className={`p-4 border-t border-slate-200 dark:border-slate-800/80 bg-slate-100 dark:bg-[#141926] ${cartCollapsed ? 'py-5' : 'space-y-4'}`}>
+          {cartCollapsed ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total</span>
+                <span className="text-xs font-black text-slate-800 dark:text-slate-100">${total.toLocaleString('es-AR')}</span>
+              </div>
+              <button
+                onClick={handleCobrar}
+                disabled={total === 0}
+                className="w-12 h-12 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-slate-800 dark:disabled:to-slate-800 text-white font-black flex items-center justify-center text-xl shadow-lg shadow-emerald-500/15 btn-interactive transition-all"
+                title={`Cobrar: $${total.toLocaleString('es-AR')}`}
+              >
+                💵
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between items-end">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Subtotal</span>
+                <span className="text-2xl font-black text-slate-800 dark:text-slate-100">${total.toLocaleString('es-AR')}</span>
+              </div>
 
-          <button
-            onClick={handleCobrar}
-            disabled={total === 0}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-slate-800 dark:disabled:to-slate-800 text-white font-black text-lg py-4 rounded-2xl shadow-lg shadow-emerald-500/15 flex items-center justify-center gap-2 btn-interactive"
-          >
-            <span>Cobrar</span>
-            <span className="text-xl font-black border-l border-white/20 pl-2">
-              ${total.toLocaleString('es-AR')}
-            </span>
-          </button>
+              <button
+                onClick={handleCobrar}
+                disabled={total === 0}
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-slate-800 dark:disabled:to-slate-800 text-white font-black text-lg py-4 rounded-2xl shadow-lg shadow-emerald-500/15 flex items-center justify-center gap-2 btn-interactive"
+              >
+                <span>Cobrar</span>
+                <span className="text-xl font-black border-l border-white/20 pl-2">
+                  ${total.toLocaleString('es-AR')}
+                </span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 

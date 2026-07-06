@@ -1,7 +1,8 @@
 import useKioskoStore from '../store/kioskoStore'
 
 export default function NotificacionModal() {
-  const { notificacion, cerrarNotificacion } = useKioskoStore()
+  const notificacion = useKioskoStore(state => state.notificacion)
+  const cerrarNotificacion = useKioskoStore(state => state.cerrarNotificacion)
 
   if (!notificacion) return null
 

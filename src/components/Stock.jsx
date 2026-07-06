@@ -3,7 +3,12 @@ import useKioskoStore from '../store/kioskoStore'
 import ScannerModal from './ScannerModal'
 
 export default function Stock() {
-  const { productos, agregarOEditarProducto, eliminarProducto, actualizarStock, mostrarNotificacion } = useKioskoStore()
+  const productos = useKioskoStore(state => state.productos)
+  const agregarOEditarProducto = useKioskoStore(state => state.agregarOEditarProducto)
+  const eliminarProducto = useKioskoStore(state => state.eliminarProducto)
+  const actualizarStock = useKioskoStore(state => state.actualizarStock)
+  const mostrarNotificacion = useKioskoStore(state => state.mostrarNotificacion)
+  const isAdminAuthenticated = useKioskoStore(state => state.isAdminAuthenticated)
 
   // State local
   const [buscar, setBuscar] = useState('')
@@ -117,13 +122,20 @@ export default function Stock() {
               className="w-full bg-white border border-slate-200 text-slate-900 focus:bg-white focus:border-indigo-500 dark:bg-[#10141f] dark:border-slate-800/80 dark:text-slate-200 rounded-2xl py-3.5 pl-11 pr-4 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 font-medium"
             />
           </div>
-          <button
-            onClick={abrirFormularioNuevo}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-5 py-3.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-indigo-600/15 btn-interactive shrink-0"
-          >
-            <span>+</span>
-            <span>Nuevo Producto</span>
-          </button>
+          {isAdminAuthenticated ? (
+            <button
+              onClick={abrirFormularioNuevo}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-5 py-3.5 rounded-2xl flex items-center gap-2 shadow-lg shadow-indigo-600/15 btn-interactive shrink-0"
+            >
+              <span>+</span>
+              <span>Nuevo Producto</span>
+            </button>
+          ) : (
+            <div className="bg-slate-200/85 border border-slate-300 dark:bg-slate-800/80 dark:border-slate-700 text-slate-600 dark:text-slate-350 text-xs font-black px-4.5 py-3.5 rounded-2xl flex items-center gap-1.5 shadow-sm shrink-0">
+              <span>🔒</span>
+              <span>Vista de Solo Lectura</span>
+            </div>
+          )}
         </div>
 
         {/* Filtros rápidos */}
@@ -189,7 +201,10 @@ export default function Stock() {
                 key={p.id}
                 className="bg-white border border-slate-200/80 dark:bg-[#10141f] dark:border-slate-800/80 rounded-2xl p-4 shadow-sm flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700/80 transition-colors"
               >
-                <div className="space-y-1.5 pr-3 min-w-0 flex-1 cursor-pointer" onClick={() => abrirFormularioEditar(p)}>
+                <div
+                  className={`space-y-1.5 pr-3 min-w-0 flex-1 ${isAdminAuthenticated ? 'cursor-pointer' : ''}`}
+                  onClick={isAdminAuthenticated ? () => abrirFormularioEditar(p) : undefined}
+                >
                   <p className="font-bold text-slate-800 dark:text-slate-200 leading-tight truncate">{p.nombre}</p>
                   <div className="flex items-center gap-2 text-xxs">
                     <span className="text-slate-400 dark:text-slate-500 font-mono truncate max-w-[120px]">
@@ -211,12 +226,14 @@ export default function Stock() {
 
                 {/* Stock Controls */}
                 <div className="flex items-center gap-2 shrink-0 bg-slate-50 dark:bg-[#090b11]/80 rounded-2xl p-1.5 border border-slate-200 dark:border-slate-800/40">
-                  <button
-                    onClick={() => actualizarStock(p.id, -1)}
-                    className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-all btn-interactive"
-                  >
-                    -
-                  </button>
+                  {isAdminAuthenticated && (
+                    <button
+                      onClick={() => actualizarStock(p.id, -1)}
+                      className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-350 transition-all btn-interactive"
+                    >
+                      -
+                    </button>
+                  )}
 
                   <div className="text-center min-w-[36px] px-1">
                     <span
@@ -231,12 +248,14 @@ export default function Stock() {
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => actualizarStock(p.id, 1)}
-                    className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-all btn-interactive"
-                  >
-                    +
-                  </button>
+                  {isAdminAuthenticated && (
+                    <button
+                      onClick={() => actualizarStock(p.id, 1)}
+                      className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-[#10141f] dark:hover:bg-slate-800 font-black active:scale-90 flex items-center justify-center text-slate-600 dark:text-slate-350 transition-all btn-interactive"
+                    >
+                      +
+                    </button>
+                  )}
                 </div>
               </div>
             )
