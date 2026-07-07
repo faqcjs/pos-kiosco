@@ -161,7 +161,7 @@ export function Venta() {
   return (
     <div className="flex h-full flex-col lg:flex-row">
       {/* Left: products */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto p-4 lg:p-6">
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto p-1.5 lg:p-6">
         <div className="mx-auto my-auto flex w-full max-w-6xl flex-col gap-4">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">

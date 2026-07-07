@@ -46,7 +46,7 @@ export function Clientes() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 p-4 sm:px-4 lg:p-6">
+    <div className="mx-auto max-w-4xl space-y-5 p-1.5 lg:p-6">
       <PageHeader
         title="Fiar / Clientes"
         description="Cuentas corrientes de clientes."
@@ -159,7 +159,7 @@ function CustomerDetail({
   const entries = [...customer.entries].sort((a, b) => +new Date(b.date) - +new Date(a.date))
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-4 sm:px-4 lg:p-6">
+    <div className="mx-auto max-w-3xl space-y-5 p-1.5 lg:p-6">
       <button
         onClick={onBack}
         className="flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"

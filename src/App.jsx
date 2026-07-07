@@ -93,7 +93,7 @@ function Shell() {
 
   return (
     <AppShell active={active} onChange={setActive}>
-      <div className="px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+      <div className="px-1.5 py-2.5 sm:px-6 lg:px-8 lg:py-8">
         {hydrated ? (
           <Screen active={active} />
         ) : (

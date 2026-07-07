@@ -88,7 +88,7 @@ export function Stock() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-4 lg:p-6">
+    <div className="mx-auto max-w-5xl space-y-5 p-1.5 lg:p-6">
       <PageHeader
         title="Stock"
         description="Catálogo e inventario de productos."

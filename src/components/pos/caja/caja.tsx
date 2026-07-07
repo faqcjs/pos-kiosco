@@ -34,7 +34,7 @@ export function Caja() {
   const shift = state.currentShift
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 p-4 lg:p-6">
+    <div className="mx-auto max-w-4xl space-y-5 p-1.5 lg:p-6">
       <PageHeader title="Caja" description="Control del flujo de efectivo por turno." />
       {shift ? (
         <OpenShiftView shift={shift} onClose={closeShift} onMovement={addMovement} toast={toast} />

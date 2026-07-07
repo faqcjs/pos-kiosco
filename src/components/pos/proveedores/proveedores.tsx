@@ -55,7 +55,7 @@ export function Proveedores() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-4 sm:px-4 lg:p-6">
+    <div className="mx-auto max-w-5xl p-1.5 lg:p-6">
       <PageHeader
         title="Proveedores"
         subtitle="Cuenta corriente con tus proveedores"
@@ -197,7 +197,7 @@ function SupplierDetail({
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-4 sm:px-4 lg:p-6">
+    <div className="mx-auto max-w-3xl p-1.5 lg:p-6">
       <button
         onClick={onBack}
         className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
