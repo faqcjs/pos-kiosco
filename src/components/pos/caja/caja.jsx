@@ -38,7 +38,7 @@ export function Caja() {
       {shift ? (
         <OpenShiftView shift={shift} onClose={closeShift} onMovement={addMovement} toast={toast} />
       ) : (
-        <ClosedShiftView onOpen={openShift} toast={toast} />
+        <ClosedShiftView onOpen={openShift} toast={toast} currentUser={state.currentUser} />
       )}
       <ShiftHistory history={state.shiftHistory} />
     </div>
@@ -48,9 +48,10 @@ export function Caja() {
 function ClosedShiftView({
   onOpen,
   toast,
+  currentUser,
 }) {
   const [amount, setAmount] = useState('')
-  const [openedBy, setOpenedBy] = useState('')
+  const cashierName = currentUser?.name || 'Desconocido'
   return (
     <Card className="flex flex-col items-center gap-4 p-8 text-center">
       <div className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
@@ -59,20 +60,10 @@ function ClosedShiftView({
       <div>
         <h2 className="font-heading text-lg font-bold">La caja está cerrada</h2>
         <p className="mt-1 text-sm text-muted-foreground text-pretty">
-          Iniciá el turno ingresando tu nombre y el monto inicial de apertura.
+          Iniciá el turno ingresando el monto inicial de apertura.
         </p>
       </div>
       <div className="w-full max-w-xs text-left space-y-3">
-        <div>
-          <Label htmlFor="openedBy">Nombre del cajero</Label>
-          <Input
-            id="openedBy"
-            value={openedBy}
-            onChange={(e) => setOpenedBy(e.target.value)}
-            placeholder="Tu nombre"
-            required
-          />
-        </div>
         <div>
           <Label htmlFor="opening">Monto de apertura</Label>
           <Input
@@ -88,14 +79,12 @@ function ClosedShiftView({
       </div>
       <Button
         className="h-12 w-full max-w-xs bg-success text-base font-bold text-success-foreground hover:bg-success/90"
-        disabled={!openedBy.trim()}
         onClick={() => {
           const n = Number(amount)
-          if (n < 0 || Number.isNaN(n) || !openedBy.trim()) return
-          onOpen(n, openedBy.trim())
+          if (n < 0 || Number.isNaN(n)) return
+          onOpen(n, cashierName)
           toast('Caja abierta')
           setAmount('')
-          setOpenedBy('')
         }}
       >
         <LockOpen className="size-5" />

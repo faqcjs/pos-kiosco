@@ -10,6 +10,7 @@ import { Proveedores } from '@/components/pos/proveedores/proveedores'
 import { Admin } from '@/components/pos/admin/admin'
 import { Card, Input, Label } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
+import { formatDateTime } from '@/lib/format'
 
 function LoginScreen() {
   const { login } = useStore()
@@ -103,6 +104,42 @@ function LoginScreen() {
   )
 }
 
+function BlockScreen({ currentShift, logout }) {
+  const openedBy = currentShift?.openedBy || 'Otro cajero'
+  const openedAt = currentShift ? formatDateTime(currentShift.openedAt) : ''
+
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="flex size-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 text-4xl shadow-sm">
+            🔒
+          </div>
+          <h2 className="mt-6 text-2xl font-bold tracking-tight font-heading text-foreground">
+            Caja Bloqueada
+          </h2>
+        </div>
+
+        <Card className="p-8 shadow-xl border border-border/50 bg-card/50 backdrop-blur-sm space-y-6">
+          <p className="text-sm text-muted-foreground text-center leading-relaxed">
+            Caja en uso por otro cajero. El turno actual fue abierto por <strong className="text-foreground">{openedBy}</strong> el <strong className="text-foreground">{openedAt}</strong>.
+          </p>
+          <p className="text-sm text-muted-foreground text-center leading-relaxed">
+            Cerrá el turno desde la cuenta correspondiente antes de poder operar.
+          </p>
+
+          <Button
+            onClick={logout}
+            className="h-11 w-full bg-destructive text-base font-bold transition-all hover:bg-destructive/95 shadow-md hover:shadow-lg active:scale-[0.98]"
+          >
+            Cerrar sesión
+          </Button>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
 function Screen({ active, setActive }) {
   const { state } = useStore()
   const isAdmin = state.currentUser?.role === 'administrador'
@@ -133,7 +170,7 @@ function Screen({ active, setActive }) {
 
 function Shell() {
   const [active, setActive] = useState('venta')
-  const { state, hydrated } = useStore()
+  const { state, hydrated, logout } = useStore()
 
   if (!hydrated) {
     return (
@@ -145,6 +182,29 @@ function Shell() {
 
   if (!state.currentUser) {
     return <LoginScreen />
+  }
+
+  // Shift block checking
+  const isShiftActive = !!state.currentShift
+  const isShiftOwner = state.currentUser?.name === state.currentShift?.openedBy
+  const isAdmin = state.currentUser?.role === 'administrador'
+
+  if (isShiftActive && !isShiftOwner) {
+    if (!isAdmin) {
+      // Cashiers are completely blocked
+      return <BlockScreen currentShift={state.currentShift} logout={logout} />
+    } else {
+      // Admins are allowed to view/use 'admin' tab, but blocked on other screens
+      if (active !== 'admin') {
+        return (
+          <AppShell active={active} onChange={setActive}>
+            <div className="px-1.5 py-2.5 sm:px-6 lg:px-8 lg:py-8">
+              <BlockScreen currentShift={state.currentShift} logout={logout} />
+            </div>
+          </AppShell>
+        )
+      }
+    }
   }
 
   return (

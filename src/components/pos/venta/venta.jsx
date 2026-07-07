@@ -1,7 +1,7 @@
 'use client'
 
 import { Camera, Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle, PanelRightClose, PanelRightOpen } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
@@ -34,6 +34,25 @@ export function Venta() {
       return next
     })
   }
+
+  const categoryContainerRef = useRef(null)
+
+  useEffect(() => {
+    const container = categoryContainerRef.current
+    if (!container) return
+
+    const handleWheel = (e) => {
+      if (e.deltaY !== 0) {
+        container.scrollLeft += e.deltaY
+        e.preventDefault()
+      }
+    }
+
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -196,7 +215,7 @@ export function Venta() {
             </div>
 
             {/* category filters */}
-            <div className="no-scrollbar -mx-1.5 lg:-mx-6 flex flex-row flex-nowrap gap-2 overflow-x-auto px-1.5 lg:px-6 pb-1 touch-pan-x select-none">
+            <div ref={categoryContainerRef} className="no-scrollbar -mx-1.5 lg:-mx-6 flex flex-row flex-nowrap gap-2 overflow-x-auto px-1.5 lg:px-6 pb-1 touch-pan-x select-none">
               {['Todos', ...CATEGORIES].map((c) => (
                 <button
                   key={c}
