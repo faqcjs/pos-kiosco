@@ -196,7 +196,7 @@ export function Venta() {
             </div>
 
             {/* category filters */}
-            <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            <div className="no-scrollbar -mx-1.5 lg:-mx-6 flex flex-row flex-nowrap gap-2 overflow-x-auto px-1.5 lg:px-6 pb-1 touch-pan-x select-none">
               {['Todos', ...CATEGORIES].map((c) => (
                 <button
                   key={c}

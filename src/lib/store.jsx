@@ -448,6 +448,7 @@ export function useStore() {
         cashReceived: args.cashReceived,
         change: args.change,
         cost,
+        soldBy: currentUser?.username || 'admin',
       }
 
       // 1. Insert sale

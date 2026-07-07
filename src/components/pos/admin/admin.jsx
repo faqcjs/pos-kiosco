@@ -704,6 +704,41 @@ function UsersTab({ state, createUser }) {
     return (state.users || []).filter((u) => u.role === 'cajero')
   }, [state.users])
 
+  // Calculate metrics for each cashier
+  const cashierMetrics = useMemo(() => {
+    const metrics = {}
+    
+    // Initialize
+    for (const c of cashiers) {
+      metrics[c.username] = {
+        totalSales: 0,
+        salesCount: 0,
+        totalDiff: 0,
+      }
+    }
+    
+    // Sum sales
+    for (const sale of state.sales || []) {
+      const u = sale.soldBy || 'admin'
+      if (metrics[u]) {
+        metrics[u].totalSales += sale.total
+        metrics[u].salesCount += 1
+      }
+    }
+    
+    // Sum shift differences.
+    // Shift closedBy matches c.name (the complete name).
+    // Let's match by name.
+    for (const shift of state.shiftHistory || []) {
+      const closedByUser = (state.users || []).find((u) => u.name === shift.closedBy)
+      if (closedByUser && metrics[closedByUser.username]) {
+        metrics[closedByUser.username].totalDiff += (shift.difference || 0)
+      }
+    }
+    
+    return metrics
+  }, [cashiers, state.sales, state.shiftHistory, state.users])
+
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!name.trim() || !username.trim() || !password.trim()) return
@@ -720,7 +755,7 @@ function UsersTab({ state, createUser }) {
         <div>
           <h3 className="font-heading font-semibold text-lg">Cajeros Registrados</h3>
           <p className="text-xs text-muted-foreground">
-            Lista de cuentas de cajeros con acceso al sistema.
+            Lista de cuentas de cajeros y métricas de desempeño acumuladas.
           </p>
         </div>
         {cashiers.length === 0 ? (
@@ -733,16 +768,28 @@ function UsersTab({ state, createUser }) {
                   <th className="py-2.5">Nombre</th>
                   <th className="py-2.5">Usuario</th>
                   <th className="py-2.5">Contraseña</th>
+                  <th className="py-2.5 text-right">Ventas</th>
+                  <th className="py-2.5 text-right">Operac.</th>
+                  <th className="py-2.5 text-right">Diff. Caja</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {cashiers.map((c) => (
-                  <tr key={c.id}>
-                    <td className="py-3 font-medium text-foreground">{c.name}</td>
-                    <td className="py-3 text-muted-foreground">{c.username}</td>
-                    <td className="py-3 text-muted-foreground font-mono">{c.password}</td>
-                  </tr>
-                ))}
+                {cashiers.map((c) => {
+                  const m = cashierMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
+                  const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
+                  return (
+                    <tr key={c.id} className="hover:bg-muted/10 transition-colors">
+                      <td className="py-3 font-medium text-foreground">{c.name}</td>
+                      <td className="py-3 text-muted-foreground">{c.username}</td>
+                      <td className="py-3 text-muted-foreground font-mono">{c.password}</td>
+                      <td className="py-3 text-right font-semibold tabular-nums text-foreground">{money(m.totalSales)}</td>
+                      <td className="py-3 text-right tabular-nums text-muted-foreground">{m.salesCount}</td>
+                      <td className={`py-3 text-right tabular-nums ${diffColor}`}>
+                        {m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff)}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

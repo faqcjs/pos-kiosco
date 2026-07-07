@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS public.sales (
     "customerId" TEXT,
     "cashReceived" NUMERIC DEFAULT 0,
     change NUMERIC DEFAULT 0,
-    cost NUMERIC DEFAULT 0
+    cost NUMERIC DEFAULT 0,
+    "soldBy" TEXT
 );
 
 ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
