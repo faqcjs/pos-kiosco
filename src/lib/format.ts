@@ -1,12 +1,13 @@
-const currency = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
-
 export function money(value: number): string {
-  return currency.format(Number.isFinite(value) ? value : 0)
+  const num = Number.isFinite(value) ? value : 0
+  const hasDecimals = num % 1 !== 0
+  const formatter = new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  })
+  return formatter.format(num)
 }
 
 export function moneyShort(value: number): string {

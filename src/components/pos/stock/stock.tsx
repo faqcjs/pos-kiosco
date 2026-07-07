@@ -31,6 +31,7 @@ export function Stock() {
   const [query, setQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [draft, setDraft] = useState<Draft>(EMPTY)
+  const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
 
   const alerts = useMemo(
     () => state.products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock),
@@ -45,8 +46,26 @@ export function Stock() {
   }, [state.products, query])
 
   function openNew() {
-    setDraft(EMPTY)
-    setFormOpen(true)
+    setBarcodeSearchOpen(true)
+  }
+
+  function handleSelectBarcode(code: string) {
+    setBarcodeSearchOpen(false)
+    if (!code) {
+      setDraft(EMPTY)
+      setFormOpen(true)
+      return
+    }
+
+    const existing = state.products.find((p) => p.barcode === code)
+    if (existing) {
+      setDraft(existing)
+      toast('Producto encontrado. Editando...')
+      setFormOpen(true)
+    } else {
+      setDraft({ ...EMPTY, barcode: code })
+      setFormOpen(true)
+    }
   }
   function openEdit(p: Product) {
     setDraft(p)
@@ -210,6 +229,12 @@ export function Stock() {
         setDraft={setDraft}
         onSave={save}
       />
+
+      <BarcodeSearchModal
+        open={barcodeSearchOpen}
+        onClose={() => setBarcodeSearchOpen(false)}
+        onSelectBarcode={handleSelectBarcode}
+      />
     </div>
   )
 }
@@ -360,6 +385,83 @@ function ProductFormModal({
         onClose={() => setScannerOpen(false)}
         onDetect={(code) => {
           setDraft({ ...draft, barcode: code })
+          setScannerOpen(false)
+        }}
+      />
+    </>
+  )
+}
+
+function BarcodeSearchModal({
+  open,
+  onClose,
+  onSelectBarcode,
+}: {
+  open: boolean
+  onClose: () => void
+  onSelectBarcode: (code: string) => void
+}) {
+  const [barcode, setBarcode] = useState('')
+  const [scannerOpen, setScannerOpen] = useState(false)
+
+  const handleContinue = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    onSelectBarcode(barcode.trim())
+    setBarcode('')
+  }
+
+  return (
+    <>
+      <Modal
+        open={open}
+        onClose={onClose}
+        title="Código de barras"
+        footer={
+          <div className="flex gap-2 w-full">
+            <Button variant="outline" className="flex-1" onClick={() => { onSelectBarcode(''); setBarcode('') }}>
+              Sin código / Omitir
+            </Button>
+            <Button className="flex-1 bg-primary text-primary-foreground font-bold" onClick={handleContinue}>
+              Continuar
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleContinue} className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Ingresá o escaneá el código de barras para verificar si el producto ya existe en el stock.
+          </p>
+          <div>
+            <Label htmlFor="search-barcode">Código de barras</Label>
+            <div className="flex gap-2">
+              <Input
+                id="search-barcode"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder="Escaneá o escribí el código"
+                inputMode="numeric"
+                autoFocus
+              />
+              <Button
+                variant="outline"
+                type="button"
+                className="h-11 w-11 shrink-0 p-0"
+                onClick={() => setScannerOpen(true)}
+                aria-label="Escanear"
+              >
+                <Camera className="size-5" />
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      <ScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetect={(code) => {
+          onSelectBarcode(code)
+          setBarcode('')
           setScannerOpen(false)
         }}
       />
