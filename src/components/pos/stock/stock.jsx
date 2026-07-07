@@ -25,7 +25,8 @@ const EMPTY = {
 
 export function Stock() {
   const { state, addProduct, updateProduct, deleteProduct, adjustStock } = useStore()
-  const isAdmin = state.isAdminAuthenticated
+  const role = state.currentUser?.role
+  const isAdmin = role === 'administrador'
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
@@ -94,10 +95,12 @@ export function Stock() {
         title="Stock"
         description="Catálogo e inventario de productos."
         action={
-          <Button onClick={openNew}>
-            <Plus className="size-4" />
-            Nuevo producto
-          </Button>
+          role !== 'cajero' && (
+            <Button onClick={openNew}>
+              <Plus className="size-4" />
+              Nuevo producto
+            </Button>
+          )
         }
       />
 
@@ -187,7 +190,6 @@ export function Stock() {
                     {p.stock}
                   </span>
                   <button
-                    disabled={!isAdmin}
                     onClick={() => adjustStock(p.id, 1)}
                     className="flex size-9 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed sm:size-7"
                     aria-label="Sumar stock"
@@ -196,23 +198,27 @@ export function Stock() {
                   </button>
                 </div>
                 <div className="flex items-center justify-end gap-1">
-                  <button
-                    onClick={() => openEdit(p)}
-                    className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="Editar"
-                  >
-                    <Pencil className="size-4" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      deleteProduct(p.id)
-                      toast('Producto eliminado', 'info')
-                    }}
-                    className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    aria-label="Eliminar"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  {role !== 'cajero' && (
+                    <>
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        aria-label="Editar"
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          deleteProduct(p.id)
+                          toast('Producto eliminado', 'info')
+                        }}
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="Eliminar"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )
@@ -248,7 +254,7 @@ function ProductFormModal({
   onSave,
 }) {
   const { state } = useStore()
-  const isAdmin = state.isAdminAuthenticated
+  const isAdmin = state.currentUser?.role === 'administrador'
   const [scannerOpen, setScannerOpen] = useState(false)
   const margin = draft.price - draft.cost
   const marginPct = draft.cost > 0 ? Math.round((margin / draft.cost) * 100) : 0

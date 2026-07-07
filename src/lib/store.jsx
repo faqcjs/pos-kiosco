@@ -68,6 +68,7 @@ export const useUIStore = create()(
       theme: 'light',
       adminPassword: 'admin123',
       isAdminAuthenticated: false,
+      currentUser: null,
       
       toggleTheme: () => set((state) => {
         const nextTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -89,6 +90,7 @@ export const useUIStore = create()(
         if (!newPassword || newPassword.trim().length === 0) return
         set({ adminPassword: newPassword })
       },
+      setCurrentUser: (user) => set({ currentUser: user }),
     }),
     {
       name: 'kiosko-pos-ui-state',
@@ -122,11 +124,13 @@ export function useStore() {
   const uiTheme = useUIStore((s) => s.theme)
   const adminPassword = useUIStore((s) => s.adminPassword)
   const isAdminAuthenticated = useUIStore((s) => s.isAdminAuthenticated)
+  const currentUser = useUIStore((s) => s.currentUser)
   
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const loginAdmin = useUIStore((s) => s.loginAdmin)
   const logoutAdmin = useUIStore((s) => s.logoutAdmin)
   const changeAdminPassword = useUIStore((s) => s.changeAdminPassword)
+  const setCurrentUser = useUIStore((s) => s.setCurrentUser)
 
   // Apply theme class side effect
   useEffect(() => {
@@ -186,6 +190,16 @@ export function useStore() {
     },
   })
 
+  const { data: users = [], isLoading: loadingUsers } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('users').select('*').order('name')
+      if (error) throw error
+      return data || []
+    },
+    enabled: currentUser?.role === 'administrador',
+  })
+
   // Compute shifts states
   const currentShift = useMemo(() => {
     return shifts.find((s) => s.status === 'open') || null
@@ -195,7 +209,7 @@ export function useStore() {
     return shifts.filter((s) => s.status === 'closed')
   }, [shifts])
 
-  const hydrated = !loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts
+  const hydrated = !loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts && (currentUser?.role === 'administrador' ? !loadingUsers : true)
 
   // Mutations
   const addProductMutation = useMutation({
@@ -494,15 +508,36 @@ export function useStore() {
       await supabase.from('customers').delete().eq('1', '1')
       await supabase.from('suppliers').delete().eq('1', '1')
       await supabase.from('shifts').delete().eq('1', '1')
+      await supabase.from('users').delete().eq('1', '1')
 
       await supabase.from('products').insert(SEED_PRODUCTS)
       await supabase.from('sales').insert(generateMockSales())
       await supabase.from('customers').insert(SEED_CUSTOMERS)
       await supabase.from('suppliers').insert(SEED_SUPPLIERS)
+      await supabase.from('users').insert([
+        { id: 'u-admin', username: 'admin', password: 'admin123', role: 'administrador', name: 'Administrador' },
+        { id: 'u-cajero', username: 'cajero', password: '123', role: 'cajero', name: 'Juan Cajero' },
+      ])
     },
     onSuccess: () => {
       qc.invalidateQueries()
     },
+  })
+
+  const addUserMutation = useMutation({
+    mutationFn: async ({ username, password, name }) => {
+      const user = {
+        id: uid(),
+        username,
+        password,
+        role: 'cajero',
+        name,
+      }
+      const { data, error } = await supabase.from('users').insert([user]).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   })
 
   // Callback wrapper definitions to preserve component APIs
@@ -566,6 +601,27 @@ export function useStore() {
     resetDataMutation.mutate()
   }, [resetDataMutation])
 
+  const login = useCallback(async (username, password) => {
+    const { data, error } = await supabase.from('users').select('*').eq('username', username).eq('password', password)
+    if (error) {
+      console.error(error)
+      return false
+    }
+    if (data && data.length > 0) {
+      setCurrentUser(data[0])
+      return true
+    }
+    return false
+  }, [setCurrentUser])
+
+  const logout = useCallback(() => {
+    setCurrentUser(null)
+  }, [setCurrentUser])
+
+  const createUser = useCallback((username, password, name) => {
+    addUserMutation.mutate({ username, password, name })
+  }, [addUserMutation])
+
   // Combine query and Zustand states
   const state = useMemo(() => ({
     products,
@@ -577,6 +633,8 @@ export function useStore() {
     theme: uiTheme,
     adminPassword,
     isAdminAuthenticated,
+    currentUser,
+    users,
   }), [
     products,
     sales,
@@ -587,6 +645,8 @@ export function useStore() {
     uiTheme,
     adminPassword,
     isAdminAuthenticated,
+    currentUser,
+    users,
   ])
 
   return {
@@ -610,5 +670,8 @@ export function useStore() {
     loginAdmin,
     logoutAdmin,
     changeAdminPassword,
+    login,
+    logout,
+    createUser,
   }
 }

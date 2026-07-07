@@ -26,7 +26,7 @@ import {
   Percent,
   ChevronRight,
 } from 'lucide-react'
-import { Badge, Card, EmptyState, StatCard, Modal } from '@/components/ui/kit'
+import { Badge, Card, EmptyState, StatCard, Modal, Input, Label } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/pos/page-header'
 import { customerBalance, supplierBalance, useStore } from '@/lib/store'
@@ -45,13 +45,14 @@ function startOfDay(d) {
 }
 
 export function Admin() {
-  const { state, logoutAdmin, resetData } = useStore()
+  const { state, logout, resetData, createUser } = useStore()
 
   const handleReset = () => {
     if (window.confirm('¿Estás seguro de que querés resetear todos los datos? Se borrarán todos los registros de la base de datos y se restaurarán los datos de prueba iniciales.')) {
       resetData()
     }
   }
+  const [adminTab, setAdminTab] = useState('stats') // "stats" / "cajeros"
   const [range, setRange] = useState('Semana') // "Hoy", "Semana", "Mes", "6 Meses"
   const [visibleDays, setVisibleDays] = useState(10)
   const [selectedDay, setSelectedDay] = useState(null)
@@ -273,13 +274,41 @@ export function Admin() {
             >
               Resetear Datos
             </Button>
-            <Button variant="destructive" onClick={logoutAdmin}>
+            <Button variant="destructive" onClick={logout}>
               <Lock className="size-4" />
               Cerrar sesión
             </Button>
           </div>
         }
       />
+
+      <div className="flex rounded-lg border border-border p-0.5 bg-muted/50 max-w-[240px]">
+        <button
+          onClick={() => setAdminTab('stats')}
+          className={`flex-1 text-center rounded-md py-1 text-xs font-medium transition-all duration-200 ease-out ${
+            adminTab === 'stats'
+              ? 'bg-card text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Estadísticas
+        </button>
+        <button
+          onClick={() => setAdminTab('cajeros')}
+          className={`flex-1 text-center rounded-md py-1 text-xs font-medium transition-all duration-200 ease-out ${
+            adminTab === 'cajeros'
+              ? 'bg-card text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Cajeros
+        </button>
+      </div>
+
+      {adminTab === 'cajeros' ? (
+        <UsersTab state={state} createUser={createUser} />
+      ) : (
+        <>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
@@ -660,6 +689,113 @@ export function Admin() {
           </div>
         )}
       </Modal>
+        </>
+      )}
+    </div>
+  )
+}
+
+function UsersTab({ state, createUser }) {
+  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+
+  const cashiers = useMemo(() => {
+    return (state.users || []).filter((u) => u.role === 'cajero')
+  }, [state.users])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!name.trim() || !username.trim() || !password.trim()) return
+    createUser(username.trim(), password.trim(), name.trim())
+    setName('')
+    setUsername('')
+    setPassword('')
+  }
+
+  return (
+    <div className="grid gap-6 md:grid-cols-3 animate-in fade-in slide-in-from-bottom-2 duration-350">
+      {/* List */}
+      <Card className="p-5 md:col-span-2 space-y-4">
+        <div>
+          <h3 className="font-heading font-semibold text-lg">Cajeros Registrados</h3>
+          <p className="text-xs text-muted-foreground">
+            Lista de cuentas de cajeros con acceso al sistema.
+          </p>
+        </div>
+        {cashiers.length === 0 ? (
+          <EmptyState title="Sin cajeros" description="No hay cajeros registrados todavía." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground font-semibold">
+                  <th className="py-2.5">Nombre</th>
+                  <th className="py-2.5">Usuario</th>
+                  <th className="py-2.5">Contraseña</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {cashiers.map((c) => (
+                  <tr key={c.id}>
+                    <td className="py-3 font-medium text-foreground">{c.name}</td>
+                    <td className="py-3 text-muted-foreground">{c.username}</td>
+                    <td className="py-3 text-muted-foreground font-mono">{c.password}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Form */}
+      <Card className="p-5 h-fit space-y-4">
+        <div>
+          <h3 className="font-heading font-semibold text-lg">Nuevo Cajero</h3>
+          <p className="text-xs text-muted-foreground">
+            Crear una nueva cuenta de cajero.
+          </p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="cashier-name">Nombre Completo</Label>
+            <Input
+              id="cashier-name"
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ej. Juan Pérez"
+            />
+          </div>
+          <div>
+            <Label htmlFor="cashier-username">Usuario</Label>
+            <Input
+              id="cashier-username"
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Ej. juan.cajero"
+            />
+          </div>
+          <div>
+            <Label htmlFor="cashier-password">Contraseña</Label>
+            <Input
+              id="cashier-password"
+              type="text"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Contraseña de acceso"
+            />
+          </div>
+          <Button type="submit" className="w-full h-11 font-bold">
+            Registrar Cajero
+          </Button>
+        </form>
+      </Card>
     </div>
   )
 }

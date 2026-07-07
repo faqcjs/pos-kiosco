@@ -25,6 +25,10 @@ function getMockDB() {
     customers: SEED_CUSTOMERS,
     suppliers: SEED_SUPPLIERS,
     shifts: [],
+    users: [
+      { id: 'u-admin', username: 'admin', password: 'admin123', role: 'administrador', name: 'Administrador' },
+      { id: 'u-cajero', username: 'cajero', password: '123', role: 'cajero', name: 'Juan Cajero' },
+    ],
   }
   localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(initial))
   return initial

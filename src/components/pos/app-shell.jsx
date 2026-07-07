@@ -109,6 +109,15 @@ export function AppShell({
     return localStorage.getItem('pos-sidebar-collapsed') === 'true'
   })
 
+  const { state, logout } = useStore()
+
+  const filteredNav = NAV.filter((item) => {
+    if (item.id === 'admin') {
+      return state.currentUser?.role !== 'cajero'
+    }
+    return true
+  })
+
   const toggleSidebar = () => {
     setCollapsed((c) => {
       const next = !c
@@ -117,7 +126,7 @@ export function AppShell({
     })
   }
 
-  const activeLabel = NAV.find((n) => n.id === active)?.label ?? 'Kiosko POS'
+  const activeLabel = filteredNav.find((n) => n.id === active)?.label ?? 'Kiosko POS'
 
   return (
     <div className="flex min-h-dvh bg-background">
@@ -165,7 +174,7 @@ export function AppShell({
 
         {/* Nav */}
         <nav className="mt-4 flex flex-1 flex-col gap-1 px-2">
-          {NAV.map((item) => {
+          {filteredNav.map((item) => {
             const Icon = item.icon
             const isActive = active === item.id
             return (
@@ -202,8 +211,33 @@ export function AppShell({
         </nav>
 
         {/* Footer */}
-        <div className={cn('flex flex-col gap-2 border-t border-sidebar-border px-2 pt-3', collapsed && 'items-center')}>
-          <ThemeToggle />
+        <div className={cn('flex flex-col gap-3 border-t border-sidebar-border px-3 pt-3 pb-2', collapsed && 'items-center px-2')}>
+          {!collapsed && (
+            <div className="flex flex-col gap-1 text-xs">
+              <span className="font-semibold text-foreground truncate">{state.currentUser?.name}</span>
+              <div className="flex items-center gap-1">
+                <Badge tone={state.currentUser?.role === 'administrador' ? 'default' : 'muted'} className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
+                  {state.currentUser?.role === 'administrador' ? 'Administrador' : 'Cajero'}
+                </Badge>
+              </div>
+            </div>
+          )}
+          <div className={cn("flex items-center justify-between gap-2", collapsed && "flex-col w-full")}>
+            <ThemeToggle compact={collapsed} />
+            <button
+              onClick={logout}
+              title="Cerrar sesión"
+              className={cn(
+                "flex items-center justify-center rounded-xl border border-border bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-colors",
+                collapsed ? "size-10" : "px-3 py-2.5 text-xs font-semibold gap-1.5 flex-1"
+              )}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="size-4 shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+              </svg>
+              {!collapsed && <span className="truncate">Cerrar sesión</span>}
+            </button>
+          </div>
         </div>
 
         {/* Collapse toggle — floats on the right edge */}
@@ -225,27 +259,49 @@ export function AppShell({
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur lg:hidden">
-          <div className="flex items-center gap-2">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Store className="size-4.5" />
+        <header className="sticky top-0 z-30 flex flex-col gap-2 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur lg:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Store className="size-4.5" />
+              </div>
+              <span className="font-heading text-base font-bold">{activeLabel}</span>
             </div>
-            <span className="font-heading text-base font-bold">{activeLabel}</span>
+            <div className="flex items-center gap-2">
+              <Badge tone={isMockMode ? "warning" : "success"} className="text-[10px] px-1.5 py-0.5">
+                {isMockMode ? "Mock" : "Supabase"}
+              </Badge>
+              <CajaStatus compact />
+              <ThemeToggle compact />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge tone={isMockMode ? "warning" : "success"} className="text-[10px] px-1.5 py-0.5">
-              {isMockMode ? "Mock" : "Supabase"}
-            </Badge>
-            <CajaStatus compact />
-            <ThemeToggle compact />
+          <div className="flex items-center justify-between border-t border-border/50 pt-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-foreground">{state.currentUser?.name}</span>
+              <Badge tone={state.currentUser?.role === 'administrador' ? 'default' : 'muted'} className="text-[9px] px-1.5 py-0.5">
+                {state.currentUser?.role === 'administrador' ? 'Administrador' : 'Cajero'}
+              </Badge>
+            </div>
+            <button
+              onClick={logout}
+              className="flex items-center gap-1 font-bold text-destructive hover:text-destructive/80 active:scale-95 transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="size-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+              </svg>
+              <span>Cerrar sesión</span>
+            </button>
           </div>
         </header>
 
         <main className="min-w-0 flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</main>
 
         {/* Mobile bottom nav */}
-        <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-          {NAV.map((item) => {
+        <nav className={cn(
+          "fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden",
+          filteredNav.length === 5 ? "grid-cols-5" : "grid-cols-6"
+        )}>
+          {filteredNav.map((item) => {
             const Icon = item.icon
             const isActive = active === item.id
             return (
