@@ -59,8 +59,11 @@ function ClosedShiftView({
       </div>
       <div>
         <h2 className="font-heading text-lg font-bold">La caja está cerrada</h2>
-        <p className="mt-1 text-sm text-muted-foreground text-pretty">
-          Iniciá el turno ingresando el monto inicial de apertura.
+        <p className="mt-1.5 text-sm text-muted-foreground text-pretty">
+          El cajero <strong className="text-foreground">{cashierName}</strong> va a abrir el turno.
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Ingresá el monto de efectivo inicial en caja para iniciar las operaciones.
         </p>
       </div>
       <div className="w-full max-w-xs text-left space-y-3">
