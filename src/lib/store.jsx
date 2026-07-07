@@ -8,29 +8,16 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from 'react'
-import type {
-  AppState,
-  CartItem,
-  CashMovement,
-  CashShift,
-  Customer,
-  MovementType,
-  PaymentMethod,
-  Product,
-  Sale,
-  Supplier,
-} from './types'
 import { uid } from './format'
-import { SEED_CUSTOMERS, SEED_PRODUCTS, SEED_SUPPLIERS } from './seed'
+import { SEED_CUSTOMERS, SEED_PRODUCTS, SEED_SUPPLIERS, generateMockSales } from './seed'
 
 const STORAGE_KEY = 'kiosko-pos-state-v1'
 
-function initialState(): AppState {
+function initialState() {
   return {
     products: SEED_PRODUCTS,
-    sales: [],
+    sales: generateMockSales(),
     customers: SEED_CUSTOMERS,
     suppliers: SEED_SUPPLIERS,
     currentShift: null,
@@ -42,19 +29,19 @@ function initialState(): AppState {
 }
 
 // ---------- selectors ----------
-export function customerBalance(c: Customer): number {
+export function customerBalance(c) {
   return c.entries.reduce((sum, e) => sum + (e.type === 'compra' ? e.amount : -e.amount), 0)
 }
 
-export function supplierBalance(s: Supplier): number {
+export function supplierBalance(s) {
   return s.entries.reduce((sum, e) => sum + (e.type === 'factura' ? e.amount : -e.amount), 0)
 }
 
-export function shiftTheoretical(shift: CashShift): number {
+export function shiftTheoretical(shift) {
   return shift.openingAmount + shift.movements.reduce((sum, m) => sum + m.amount, 0)
 }
 
-export function shiftTotals(shift: CashShift, sales: Sale[]) {
+export function shiftTotals(shift, sales) {
   let cashSales = 0
   let manualIn = 0
   let manualOut = 0
@@ -77,44 +64,10 @@ export function shiftTotals(shift: CashShift, sales: Sale[]) {
 }
 
 // ---------- context ----------
-interface StoreContextValue {
-  state: AppState
-  hydrated: boolean
-  toggleTheme: () => void
-  // products
-  addProduct: (p: Omit<Product, 'id'>) => void
-  updateProduct: (p: Product) => void
-  deleteProduct: (id: string) => void
-  adjustStock: (id: string, delta: number) => void
-  // sales
-  completeSale: (args: {
-    items: CartItem[]
-    method: PaymentMethod
-    customerId?: string
-    cashReceived?: number
-    change?: number
-  }) => void
-  // caja
-  openShift: (openingAmount: number, openedBy: string) => void
-  closeShift: (counted: number, closedBy: string) => void
-  addMovement: (type: MovementType, amount: number, reason: string) => void
-  // customers
-  addCustomer: (name: string, phone: string) => Customer
-  registerCustomerPayment: (customerId: string, amount: number) => void
-  // suppliers
-  addSupplier: (name: string) => Supplier
-  receiveGoods: (supplierId: string, amount: number, detail: string, paidCash: boolean) => void
-  registerSupplierPayment: (supplierId: string, amount: number, fromCash: boolean) => void
-  resetData: () => void
-  loginAdmin: (password: string) => boolean
-  logoutAdmin: () => void
-  changeAdminPassword: (newPassword: string) => void
-}
+const StoreContext = createContext(null)
 
-const StoreContext = createContext<StoreContextValue | null>(null)
-
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(initialState)
+export function StoreProvider({ children }) {
+  const [state, setState] = useState(initialState)
   const [hydrated, setHydrated] = useState(false)
   const firstLoad = useRef(true)
 
@@ -123,7 +76,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (raw) {
-        const parsed = JSON.parse(raw) as AppState
+        const parsed = JSON.parse(raw)
         setState({ ...initialState(), ...parsed })
       }
     } catch {
@@ -162,19 +115,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))
   }, [])
 
-  const addProduct = useCallback((p: Omit<Product, 'id'>) => {
+  const addProduct = useCallback((p) => {
     setState((s) => ({ ...s, products: [...s.products, { ...p, id: uid() }] }))
   }, [])
 
-  const updateProduct = useCallback((p: Product) => {
+  const updateProduct = useCallback((p) => {
     setState((s) => ({ ...s, products: s.products.map((x) => (x.id === p.id ? p : x)) }))
   }, [])
 
-  const deleteProduct = useCallback((id: string) => {
+  const deleteProduct = useCallback((id) => {
     setState((s) => ({ ...s, products: s.products.filter((x) => x.id !== id) }))
   }, [])
 
-  const adjustStock = useCallback((id: string, delta: number) => {
+  const adjustStock = useCallback((id, delta) => {
     setState((s) => ({
       ...s,
       products: s.products.map((x) =>
@@ -184,13 +137,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const completeSale = useCallback(
-    (args: {
-      items: CartItem[]
-      method: PaymentMethod
-      customerId?: string
-      cashReceived?: number
-      change?: number
-    }) => {
+    (args) => {
       setState((s) => {
         if (!s.currentShift || s.currentShift.status !== 'open') {
           return s
@@ -204,7 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             if (prod) cost += prod.cost * item.qty
           }
         }
-        const sale: Sale = {
+        const sale = {
           id: uid(),
           date: new Date().toISOString(),
           items: args.items,
@@ -228,7 +175,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         let customers = s.customers
 
         if (args.method === 'efectivo' && currentShift && currentShift.status === 'open') {
-          const mov: CashMovement = {
+          const mov = {
             id: uid(),
             date: sale.date,
             type: 'venta',
@@ -259,9 +206,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [],
   )
 
-  const openShift = useCallback((openingAmount: number, openedBy: string) => {
+  const openShift = useCallback((openingAmount, openedBy) => {
     setState((s) => {
-      const shift: CashShift = {
+      const shift = {
         id: uid(),
         openedAt: new Date().toISOString(),
         openingAmount,
@@ -273,11 +220,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const closeShift = useCallback((counted: number, closedBy: string) => {
+  const closeShift = useCallback((counted, closedBy) => {
     setState((s) => {
       if (!s.currentShift) return s
       const theoretical = shiftTheoretical(s.currentShift)
-      const closed: CashShift = {
+      const closed = {
         ...s.currentShift,
         closedAt: new Date().toISOString(),
         closingCounted: counted,
@@ -290,11 +237,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const addMovement = useCallback((type: MovementType, amount: number, reason: string) => {
+  const addMovement = useCallback((type, amount, reason) => {
     setState((s) => {
       if (!s.currentShift) return s
       const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
-      const mov: CashMovement = { id: uid(), date: new Date().toISOString(), type, amount: signed, reason }
+      const mov = { id: uid(), date: new Date().toISOString(), type, amount: signed, reason }
       return {
         ...s,
         currentShift: { ...s.currentShift, movements: [...s.currentShift.movements, mov] },
@@ -302,27 +249,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const addCustomer = useCallback((name: string, phone: string) => {
-    const customer: Customer = { id: uid(), name, phone, entries: [] }
+  const addCustomer = useCallback((name, phone) => {
+    const customer = { id: uid(), name, phone, entries: [] }
     setState((s) => ({ ...s, customers: [...s.customers, customer] }))
     return customer
   }, [])
 
-  const registerCustomerPayment = useCallback((customerId: string, amount: number) => {
+  const registerCustomerPayment = useCallback((customerId, amount) => {
     setState((s) => {
       const date = new Date().toISOString()
       const customers = s.customers.map((c) =>
         c.id === customerId
           ? {
               ...c,
-              entries: [...c.entries, { id: uid(), date, type: 'pago' as const, amount, detail: 'Pago de deuda' }],
+              entries: [...c.entries, { id: uid(), date, type: 'pago', amount, detail: 'Pago de deuda' }],
             }
           : c,
       )
       let currentShift = s.currentShift
       if (currentShift && currentShift.status === 'open') {
         const cust = s.customers.find((c) => c.id === customerId)
-        const mov: CashMovement = {
+        const mov = {
           id: uid(),
           date,
           type: 'cobro_fiado',
@@ -335,14 +282,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const addSupplier = useCallback((name: string) => {
-    const supplier: Supplier = { id: uid(), name, entries: [] }
+  const addSupplier = useCallback((name) => {
+    const supplier = { id: uid(), name, entries: [] }
     setState((s) => ({ ...s, suppliers: [...s.suppliers, supplier] }))
     return supplier
   }, [])
 
   const receiveGoods = useCallback(
-    (supplierId: string, amount: number, detail: string, paidCash: boolean) => {
+    (supplierId, amount, detail, paidCash) => {
       setState((s) => {
         const date = new Date().toISOString()
         let suppliers = s.suppliers.map((sup) =>
@@ -351,7 +298,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 ...sup,
                 entries: [
                   ...sup.entries,
-                  { id: uid(), date, type: 'factura' as const, amount, detail, paidCash },
+                  { id: uid(), date, type: 'factura', amount, detail, paidCash },
                 ],
               }
             : sup,
@@ -365,14 +312,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   ...sup,
                   entries: [
                     ...sup.entries,
-                    { id: uid(), date, type: 'pago' as const, amount, detail: `Pago contado: ${detail}` },
+                    { id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` },
                   ],
                 }
               : sup,
           )
           if (currentShift && currentShift.status === 'open') {
             const sup = s.suppliers.find((x) => x.id === supplierId)
-            const mov: CashMovement = {
+            const mov = {
               id: uid(),
               date,
               type: 'pago_proveedor',
@@ -389,21 +336,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const registerSupplierPayment = useCallback(
-    (supplierId: string, amount: number, fromCash: boolean) => {
+    (supplierId, amount, fromCash) => {
       setState((s) => {
         const date = new Date().toISOString()
         const suppliers = s.suppliers.map((sup) =>
           sup.id === supplierId
             ? {
                 ...sup,
-                entries: [...sup.entries, { id: uid(), date, type: 'pago' as const, amount, detail: 'Pago a proveedor' }],
+                entries: [...sup.entries, { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor' }],
               }
             : sup,
         )
         let currentShift = s.currentShift
         if (fromCash && currentShift && currentShift.status === 'open') {
           const sup = s.suppliers.find((x) => x.id === supplierId)
-          const mov: CashMovement = {
+          const mov = {
             id: uid(),
             date,
             type: 'pago_proveedor',
@@ -422,7 +369,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...initialState(), theme: s.theme }))
   }, [])
 
-  const loginAdmin = useCallback((password: string) => {
+  const loginAdmin = useCallback((password) => {
     let success = false
     setState((s) => {
       if (password === (s.adminPassword || 'admin123')) {
@@ -438,12 +385,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, isAdminAuthenticated: false }))
   }, [])
 
-  const changeAdminPassword = useCallback((newPassword: string) => {
+  const changeAdminPassword = useCallback((newPassword) => {
     if (!newPassword || newPassword.trim().length === 0) return
     setState((s) => ({ ...s, adminPassword: newPassword }))
   }, [])
 
-  const value = useMemo<StoreContextValue>(
+  const value = useMemo(
     () => ({
       state,
       hydrated,

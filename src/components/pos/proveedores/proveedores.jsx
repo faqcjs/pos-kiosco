@@ -8,13 +8,12 @@ import { PageHeader } from '@/components/pos/page-header'
 import { supplierBalance, useStore } from '@/lib/store'
 import { formatDateTime, money } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
-import type { Supplier } from '@/lib/types'
 
 export function Proveedores() {
   const { state, addSupplier, receiveGoods, registerSupplierPayment } = useStore()
   const toast = useToast()
   const [query, setQuery] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState(null)
   const [newOpen, setNewOpen] = useState(false)
   const [newName, setNewName] = useState('')
 
@@ -155,12 +154,6 @@ function SupplierDetail({
   onReceive,
   onPay,
   cashOpen,
-}: {
-  supplier: Supplier
-  onBack: () => void
-  onReceive: (supplierId: string, amount: number, detail: string, paidCash: boolean) => void
-  onPay: (supplierId: string, amount: number, fromCash: boolean) => void
-  cashOpen: boolean
 }) {
   const toast = useToast()
   const balance = supplierBalance(supplier)

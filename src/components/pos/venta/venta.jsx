@@ -7,7 +7,7 @@ import { Badge, Card, Input } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
-import { CATEGORIES, CATEGORY_ICON, type CartItem, type Category, type PaymentMethod, type Product } from '@/lib/types'
+import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { PaymentModal } from './payment-modal'
 import { ScannerModal } from './scanner-modal'
@@ -16,9 +16,9 @@ export function Venta() {
   const { state, completeSale } = useStore()
   const toast = useToast()
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState<Category | 'Todos'>('Todos')
+  const [category, setCategory] = useState('Todos')
   const [quickAmount, setQuickAmount] = useState('')
-  const [cart, setCart] = useState<CartItem[]>([])
+  const [cart, setCart] = useState([])
   const [scannerOpen, setScannerOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [mobileCartOpen, setMobileCartOpen] = useState(false)
@@ -44,7 +44,7 @@ export function Venta() {
     })
 
     if (!q && category === 'Todos') {
-      const salesCount: Record<string, number> = {}
+      const salesCount = {}
       for (const sale of state.sales) {
         for (const item of sale.items) {
           if (item.productId) {
@@ -83,7 +83,7 @@ export function Venta() {
     )
   }
 
-  function addProductToCart(p: Product) {
+  function addProductToCart(p) {
     if (p.stock <= 0) {
       toast(`Sin stock: ${p.name}`, 'error')
       return
@@ -101,7 +101,7 @@ export function Venta() {
     })
   }
 
-  function changeQty(id: string, delta: number) {
+  function changeQty(id, delta) {
     setCart((c) =>
       c
         .map((i) => {
@@ -118,7 +118,7 @@ export function Venta() {
     )
   }
 
-  function removeItem(id: string) {
+  function removeItem(id) {
     setCart((c) => c.filter((i) => i.id !== id))
   }
 
@@ -132,7 +132,7 @@ export function Venta() {
     setQuickAmount('')
   }
 
-  function handleScan(code: string) {
+  function handleScan(code) {
     const prod = state.products.find((p) => p.barcode === code)
     if (prod) {
       addProductToCart(prod)
@@ -143,12 +143,7 @@ export function Venta() {
     }
   }
 
-  function handleConfirmSale(args: {
-    method: PaymentMethod
-    customerId?: string
-    cashReceived?: number
-    change?: number
-  }) {
+  function handleConfirmSale(args) {
     completeSale({ items: cart, ...args })
     const label =
       args.method === 'efectivo' ? 'Efectivo' : args.method === 'qr' ? 'QR/Transferencia' : 'Fiado'
@@ -199,7 +194,7 @@ export function Venta() {
 
           {/* category filters */}
           <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            {(['Todos', ...CATEGORIES] as const).map((c) => (
+            {['Todos', ...CATEGORIES].map((c) => (
               <button
                 key={c}
                 onClick={() => setCategory(c)}
@@ -391,13 +386,6 @@ function CartPanel({
   onRemove,
   onPay,
   onCollapse,
-}: {
-  cart: CartItem[]
-  total: number
-  onChangeQty: (id: string, delta: number) => void
-  onRemove: (id: string) => void
-  onPay: () => void
-  onCollapse?: () => void
 }) {
   return (
     <>

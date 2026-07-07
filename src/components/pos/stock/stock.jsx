@@ -9,12 +9,10 @@ import { PageHeader } from '@/components/pos/page-header'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
-import { CATEGORIES, CATEGORY_ICON, type Category, type Product } from '@/lib/types'
+import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-type Draft = Omit<Product, 'id'> & { id?: string }
-
-const EMPTY: Draft = {
+const EMPTY = {
   barcode: '',
   name: '',
   category: 'Varios',
@@ -30,7 +28,7 @@ export function Stock() {
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
-  const [draft, setDraft] = useState<Draft>(EMPTY)
+  const [draft, setDraft] = useState(EMPTY)
   const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
 
   const alerts = useMemo(
@@ -49,7 +47,7 @@ export function Stock() {
     setBarcodeSearchOpen(true)
   }
 
-  function handleSelectBarcode(code: string) {
+  function handleSelectBarcode(code) {
     setBarcodeSearchOpen(false)
     if (!code) {
       setDraft(EMPTY)
@@ -67,7 +65,8 @@ export function Stock() {
       setFormOpen(true)
     }
   }
-  function openEdit(p: Product) {
+
+  function openEdit(p) {
     setDraft(p)
     setFormOpen(true)
   }
@@ -78,7 +77,7 @@ export function Stock() {
       return
     }
     if (draft.id) {
-      updateProduct(draft as Product)
+      updateProduct(draft)
       toast('Producto actualizado')
     } else {
       addProduct(draft)
@@ -245,12 +244,6 @@ function ProductFormModal({
   draft,
   setDraft,
   onSave,
-}: {
-  open: boolean
-  onClose: () => void
-  draft: Draft
-  setDraft: (d: Draft) => void
-  onSave: () => void
 }) {
   const { state } = useStore()
   const isAdmin = state.isAdminAuthenticated
@@ -307,7 +300,7 @@ function ProductFormModal({
             <Select
               id="cat"
               value={draft.category}
-              onChange={(e) => setDraft({ ...draft, category: e.target.value as Category })}
+              onChange={(e) => setDraft({ ...draft, category: e.target.value })}
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
@@ -396,15 +389,11 @@ function BarcodeSearchModal({
   open,
   onClose,
   onSelectBarcode,
-}: {
-  open: boolean
-  onClose: () => void
-  onSelectBarcode: (code: string) => void
 }) {
   const [barcode, setBarcode] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
 
-  const handleContinue = (e?: React.FormEvent) => {
+  const handleContinue = (e) => {
     e?.preventDefault()
     onSelectBarcode(barcode.trim())
     setBarcode('')

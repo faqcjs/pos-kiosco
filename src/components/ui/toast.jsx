@@ -1,22 +1,15 @@
 'use client'
 
 import { CheckCircle2, Info, XCircle } from 'lucide-react'
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useState } from 'react'
 import { cn } from '@/lib/utils'
 
-type ToastTone = 'success' | 'error' | 'info'
-interface Toast {
-  id: number
-  message: string
-  tone: ToastTone
-}
+const ToastContext = createContext(null)
 
-const ToastContext = createContext<((message: string, tone?: ToastTone) => void) | null>(null)
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([])
 
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([])
-
-  const toast = useCallback((message: string, tone: ToastTone = 'success') => {
+  const toast = useCallback((message, tone = 'success') => {
     const id = Date.now() + Math.random()
     setToasts((t) => [...t, { id, message, tone }])
     setTimeout(() => {

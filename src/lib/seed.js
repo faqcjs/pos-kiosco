@@ -1,6 +1,4 @@
-import type { Product, Customer, Supplier } from './types'
-
-export const SEED_PRODUCTS: Product[] = [
+export const SEED_PRODUCTS = [
   { id: 'p1', barcode: '7790895000001', name: 'Coca-Cola 500ml', category: 'Bebidas', cost: 600, price: 1200, stock: 24, minStock: 6 },
   { id: 'p2', barcode: '7790895000002', name: 'Agua Mineral 500ml', category: 'Bebidas', cost: 300, price: 700, stock: 30, minStock: 8 },
   { id: 'p3', barcode: '7790895000003', name: 'Sprite 1.5L', category: 'Bebidas', cost: 900, price: 1800, stock: 4, minStock: 6 },
@@ -21,7 +19,7 @@ export const SEED_PRODUCTS: Product[] = [
   { id: 'p18', barcode: '7790895000052', name: 'Chicles Beldent', category: 'Golosinas', cost: 250, price: 550, stock: 35, minStock: 10 },
 ]
 
-export const SEED_CUSTOMERS: Customer[] = [
+export const SEED_CUSTOMERS = [
   {
     id: 'c1',
     name: 'Juan Pérez',
@@ -42,7 +40,7 @@ export const SEED_CUSTOMERS: Customer[] = [
   },
 ]
 
-export const SEED_SUPPLIERS: Supplier[] = [
+export const SEED_SUPPLIERS = [
   {
     id: 's1',
     name: 'Distribuidora Central',
@@ -59,3 +57,85 @@ export const SEED_SUPPLIERS: Supplier[] = [
     ],
   },
 ]
+
+export function generateMockSales() {
+  const sales = []
+  const now = new Date()
+  
+  for (let i = 180; i >= 0; i--) {
+    const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
+    
+    // Determine number of sales for this day
+    const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6
+    const numSales = isWeekend ? (Math.floor(Math.random() * 5) + 4) : (Math.floor(Math.random() * 4) + 2) // 4-8 on weekends, 2-5 on weekdays
+    
+    for (let s = 0; s < numSales; s++) {
+      // Set random hour between 08:00 and 22:00
+      const saleDate = new Date(currentDate)
+      saleDate.setHours(
+        Math.floor(Math.random() * 14) + 8, // 8 to 21
+        Math.floor(Math.random() * 60), // 0 to 59
+        Math.floor(Math.random() * 60)
+      )
+      
+      // Don't generate future sales if we are on day 0 (today)
+      if (saleDate.getTime() > now.getTime()) {
+        continue
+      }
+      
+      // Determine items
+      const numItems = Math.floor(Math.random() * 3) + 1 // 1 to 3 items
+      const items = []
+      let total = 0
+      let cost = 0
+      
+      // Randomly select products without duplicating within the same sale
+      const selectedProducts = []
+      while (selectedProducts.length < numItems) {
+        const prod = SEED_PRODUCTS[Math.floor(Math.random() * SEED_PRODUCTS.length)]
+        if (!selectedProducts.find(p => p.id === prod.id)) {
+          selectedProducts.push(prod)
+        }
+      }
+      
+      for (const prod of selectedProducts) {
+        const qty = Math.floor(Math.random() * 2) + 1 // 1 or 2 units
+        items.push({
+          productId: prod.id,
+          name: prod.name,
+          price: prod.price,
+          qty: qty
+        })
+        total += prod.price * qty
+        cost += prod.cost * qty
+      }
+      
+      // Determine payment method and optional customer
+      const r = Math.random()
+      let method = 'efectivo'
+      let customerId = null
+      if (r > 0.9) {
+        method = 'fiado'
+        customerId = Math.random() > 0.5 ? 'c1' : 'c2'
+      } else if (r > 0.6) {
+        method = 'qr'
+      }
+      
+      sales.push({
+        id: `s-${i}-${s}-${Math.random().toString(36).slice(2, 6)}`,
+        date: saleDate.toISOString(),
+        items,
+        total,
+        method,
+        customerId,
+        cost,
+        cashReceived: method === 'efectivo' ? Math.ceil(total / 100) * 100 : null,
+        change: method === 'efectivo' ? Math.ceil(total / 100) * 100 - total : null
+      })
+    }
+  }
+  
+  // Sort sales from newest to oldest
+  return sales.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+}
+

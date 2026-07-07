@@ -8,13 +8,12 @@ import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { formatDateTime, money } from '@/lib/format'
 import { customerBalance, useStore } from '@/lib/store'
-import type { Customer } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export function Clientes() {
   const { state, addCustomer, registerCustomerPayment } = useStore()
   const toast = useToast()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState(null)
   const [newOpen, setNewOpen] = useState(false)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -147,11 +146,6 @@ function CustomerDetail({
   onBack,
   onPay,
   hasOpenShift,
-}: {
-  customer: Customer
-  onBack: () => void
-  onPay: (amount: number) => void
-  hasOpenShift: boolean
 }) {
   const [payOpen, setPayOpen] = useState(false)
   const [amount, setAmount] = useState('')

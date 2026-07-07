@@ -4,15 +4,10 @@ import { X } from 'lucide-react'
 import {
   forwardRef,
   useEffect,
-  type InputHTMLAttributes,
-  type LabelHTMLAttributes,
-  type ReactNode,
-  type SelectHTMLAttributes,
-  type TextareaHTMLAttributes,
 } from 'react'
 import { cn } from '@/lib/utils'
 
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function Card({ className, ...props }) {
   return (
     <div
       className={cn('rounded-2xl border border-border bg-card text-card-foreground', className)}
@@ -21,7 +16,7 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
   )
 }
 
-export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
+export function Label({ className, ...props }) {
   return (
     <label
       className={cn('mb-1.5 block text-sm font-medium text-foreground', className)}
@@ -30,7 +25,7 @@ export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElem
   )
 }
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+export const Input = forwardRef(
   function Input({ className, ...props }, ref) {
     return (
       <input
@@ -45,7 +40,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   },
 )
 
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
+export const Textarea = forwardRef(
   function Textarea({ className, ...props }, ref) {
     return (
       <textarea
@@ -60,7 +55,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   },
 )
 
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
+export const Select = forwardRef(
   function Select({ className, children, ...props }, ref) {
     return (
       <select
@@ -77,9 +72,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
   },
 )
 
-type BadgeTone = 'default' | 'success' | 'warning' | 'danger' | 'muted' | 'accent'
-
-const badgeTones: Record<BadgeTone, string> = {
+const badgeTones = {
   default: 'bg-primary/10 text-primary',
   success: 'bg-success/15 text-success',
   warning: 'bg-warning/20 text-warning-foreground dark:text-warning',
@@ -92,10 +85,6 @@ export function Badge({
   tone = 'default',
   className,
   children,
-}: {
-  tone?: BadgeTone
-  className?: string
-  children: ReactNode
 }) {
   return (
     <span
@@ -117,17 +106,10 @@ export function Modal({
   children,
   variant = 'sheet',
   footer,
-}: {
-  open: boolean
-  onClose: () => void
-  title?: ReactNode
-  children: ReactNode
-  variant?: 'sheet' | 'center'
-  footer?: ReactNode
 }) {
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e) => {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
@@ -146,11 +128,11 @@ export function Modal({
       <button
         aria-label="Cerrar"
         onClick={onClose}
-        className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px] animate-in fade-in"
+        className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px] animate-in fade-in duration-200"
       />
       <div
         className={cn(
-          'relative z-10 flex w-full flex-col bg-card text-card-foreground shadow-2xl',
+          'relative z-10 flex w-full flex-col bg-card text-card-foreground shadow-2xl duration-300 animate-in zoom-in-95 slide-in-from-bottom-8 ease-out',
           variant === 'sheet'
             ? 'mt-auto max-h-[92vh] rounded-t-3xl sm:mx-auto sm:my-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-3xl'
             : 'm-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-lg rounded-3xl',
@@ -192,10 +174,6 @@ export function EmptyState({
   icon,
   title,
   description,
-}: {
-  icon?: ReactNode
-  title: string
-  description?: string
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border px-6 py-12 text-center">
@@ -213,15 +191,8 @@ export function StatCard({
   tone = 'default',
   icon,
   className,
-}: {
-  label: string
-  value: string
-  sub?: ReactNode
-  tone?: 'default' | 'success' | 'warning' | 'danger' | 'accent'
-  icon?: ReactNode
-  className?: string
 }) {
-  const tones: Record<string, string> = {
+  const tones = {
     default: 'text-foreground',
     success: 'text-success',
     warning: 'text-warning',

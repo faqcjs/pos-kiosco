@@ -16,10 +16,9 @@ import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { formatDateTime, formatTime, money } from '@/lib/format'
 import { shiftTheoretical, shiftTotals, useStore } from '@/lib/store'
-import type { CashShift, MovementType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-const MOV_LABEL: Record<MovementType, string> = {
+const MOV_LABEL = {
   apertura: 'Apertura',
   venta: 'Venta efectivo',
   ingreso: 'Ingreso',
@@ -49,9 +48,6 @@ export function Caja() {
 function ClosedShiftView({
   onOpen,
   toast,
-}: {
-  onOpen: (amount: number, openedBy: string) => void
-  toast: (m: string, t?: 'success' | 'error' | 'info') => void
 }) {
   const [amount, setAmount] = useState('')
   const [openedBy, setOpenedBy] = useState('')
@@ -114,11 +110,6 @@ function OpenShiftView({
   onClose,
   onMovement,
   toast,
-}: {
-  shift: CashShift
-  onClose: (counted: number, closedBy: string) => void
-  onMovement: (type: MovementType, amount: number, reason: string) => void
-  toast: (m: string, t?: 'success' | 'error' | 'info') => void
 }) {
   const { state } = useStore()
   const { cashSales, manualIn, manualOut, qrSales } = useMemo(
@@ -127,7 +118,7 @@ function OpenShiftView({
   )
   const theoretical = useMemo(() => shiftTheoretical(shift), [shift])
 
-  const [movType, setMovType] = useState<'ingreso' | 'egreso'>('ingreso')
+  const [movType, setMovType] = useState('ingreso')
   const [movAmount, setMovAmount] = useState('')
   const [movReason, setMovReason] = useState('')
   const [closeOpen, setCloseOpen] = useState(false)
@@ -184,14 +175,14 @@ function OpenShiftView({
 
       {/* register movement */}
       <Card className="p-4">
-        <h3 className="font-heading text-base font-bold">Registrar movimiento</h3>
+        <h3 className="font-heading text-base font-bold">Registrar movement</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-[140px_1fr_1fr_auto] sm:items-end">
           <div>
             <Label htmlFor="movtype">Tipo</Label>
             <Select
               id="movtype"
               value={movType}
-              onChange={(e) => setMovType(e.target.value as 'ingreso' | 'egreso')}
+              onChange={(e) => setMovType(e.target.value)}
             >
               <option value="ingreso">Ingreso (+)</option>
               <option value="egreso">Egreso (-)</option>
@@ -346,7 +337,7 @@ function OpenShiftView({
   )
 }
 
-function ShiftHistory({ history }: { history: CashShift[] }) {
+function ShiftHistory({ history }) {
   const [open, setOpen] = useState(false)
   if (history.length === 0) return null
   return (

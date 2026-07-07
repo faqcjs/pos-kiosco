@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input, Label, Modal, Select } from '@/components/ui/kit'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
-import type { PaymentMethod } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const QUICK_BILLS = [2000, 10000, 20000]
@@ -16,16 +15,11 @@ export function PaymentModal({
   onClose,
   total,
   onConfirm,
-}: {
-  open: boolean
-  onClose: () => void
-  total: number
-  onConfirm: (args: { method: PaymentMethod; customerId?: string; cashReceived?: number; change?: number }) => void
 }) {
   const { state, addCustomer } = useStore()
-  const [method, setMethod] = useState<PaymentMethod>('efectivo')
-  const [cash, setCash] = useState<number>(0)
-  const [customerId, setCustomerId] = useState<string>('')
+  const [method, setMethod] = useState('efectivo')
+  const [cash, setCash] = useState(0)
+  const [customerId, setCustomerId] = useState('')
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
@@ -59,7 +53,7 @@ export function PaymentModal({
     reset()
   }
 
-  const methods: { id: PaymentMethod; label: string; icon: typeof Banknote }[] = [
+  const methods = [
     { id: 'efectivo', label: 'Efectivo', icon: Banknote },
     { id: 'qr', label: 'QR / Transf.', icon: QrCode },
     { id: 'fiado', label: 'Fiado', icon: NotebookPen },
@@ -140,7 +134,7 @@ export function PaymentModal({
               </button>
               <button
                 onClick={() => setCash(0)}
-                className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted"
+                className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-muted"
               >
                 Limpiar
               </button>

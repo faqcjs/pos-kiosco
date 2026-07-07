@@ -13,20 +13,11 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react'
-import { useState, type ComponentType } from 'react'
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/lib/store'
 
-export type TabId = 'venta' | 'caja' | 'stock' | 'fiar' | 'proveedores' | 'admin'
-
-interface NavItem {
-  id: TabId
-  label: string
-  short: string
-  icon: ComponentType<{ className?: string }>
-}
-
-const NAV: NavItem[] = [
+const NAV = [
   { id: 'venta', label: 'Venta', short: 'Venta', icon: ShoppingCart },
   { id: 'caja', label: 'Caja', short: 'Caja', icon: Wallet },
   { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
@@ -35,7 +26,7 @@ const NAV: NavItem[] = [
   { id: 'admin', label: 'Admin', short: 'Admin', icon: BarChart3 },
 ]
 
-function CajaStatus({ compact = false }: { compact?: boolean }) {
+function CajaStatus({ compact = false }) {
   const { state } = useStore()
   const open = state.currentShift?.status === 'open'
 
@@ -90,7 +81,7 @@ function CajaStatus({ compact = false }: { compact?: boolean }) {
   )
 }
 
-function ThemeToggle({ compact = false }: { compact?: boolean }) {
+function ThemeToggle({ compact = false }) {
   const { state, toggleTheme } = useStore()
   const dark = state.theme === 'dark'
   return (
@@ -111,10 +102,6 @@ export function AppShell({
   active,
   onChange,
   children,
-}: {
-  active: TabId
-  onChange: (t: TabId) => void
-  children: React.ReactNode
 }) {
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('pos-sidebar-collapsed') === 'true'
