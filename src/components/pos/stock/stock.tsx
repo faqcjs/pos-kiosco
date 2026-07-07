@@ -26,6 +26,7 @@ const EMPTY: Draft = {
 
 export function Stock() {
   const { state, addProduct, updateProduct, deleteProduct, adjustStock } = useStore()
+  const isAdmin = state.isAdminAuthenticated
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
@@ -150,8 +151,9 @@ export function Stock() {
                 </span>
                 <div className="flex items-center justify-start gap-1.5 sm:justify-center">
                   <button
+                    disabled={!isAdmin}
                     onClick={() => adjustStock(p.id, -1)}
-                    className="flex size-7 items-center justify-center rounded-lg border border-border hover:bg-muted"
+                    className="flex size-7 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Restar stock"
                   >
                     <Minus className="size-3.5" />
@@ -159,14 +161,15 @@ export function Stock() {
                   <span
                     className={cn(
                       'w-10 text-center text-sm font-bold tabular-nums',
-                      low && 'text-warning-foreground',
+                      low && 'text-warning',
                     )}
                   >
                     {p.stock}
                   </span>
                   <button
+                    disabled={!isAdmin}
                     onClick={() => adjustStock(p.id, 1)}
-                    className="flex size-7 items-center justify-center rounded-lg border border-border hover:bg-muted"
+                    className="flex size-7 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Sumar stock"
                   >
                     <Plus className="size-3.5" />
@@ -224,6 +227,8 @@ function ProductFormModal({
   setDraft: (d: Draft) => void
   onSave: () => void
 }) {
+  const { state } = useStore()
+  const isAdmin = state.isAdminAuthenticated
   const [scannerOpen, setScannerOpen] = useState(false)
   const margin = draft.price - draft.cost
   const marginPct = draft.cost > 0 ? Math.round((margin / draft.cost) * 100) : 0
@@ -331,6 +336,7 @@ function ProductFormModal({
                 value={draft.stock || ''}
                 onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) || 0 })}
                 placeholder="0"
+                disabled={Boolean(draft.id && !isAdmin)}
               />
             </div>
             <div>
@@ -342,6 +348,7 @@ function ProductFormModal({
                 value={draft.minStock || ''}
                 onChange={(e) => setDraft({ ...draft, minStock: Number(e.target.value) || 0 })}
                 placeholder="0"
+                disabled={Boolean(draft.id && !isAdmin)}
               />
             </div>
           </div>

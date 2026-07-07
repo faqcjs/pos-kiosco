@@ -1,6 +1,6 @@
 'use client'
 
-import { Camera, Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle } from 'lucide-react'
+import { Camera, Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input } from '@/components/ui/kit'
@@ -22,6 +22,17 @@ export function Venta() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [mobileCartOpen, setMobileCartOpen] = useState(false)
+  const [cartCollapsed, setCartCollapsed] = useState(() => {
+    return localStorage.getItem('pos-cart-collapsed') === 'true'
+  })
+
+  const toggleCartCollapsed = () => {
+    setCartCollapsed((c) => {
+      const next = !c
+      localStorage.setItem('pos-cart-collapsed', String(next))
+      return next
+    })
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -129,118 +140,160 @@ export function Venta() {
   return (
     <div className="flex h-full flex-col lg:flex-row">
       {/* Left: products */}
-      <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 lg:p-6">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar producto o código..."
-              className="pl-10"
-            />
-          </div>
-          <Button
-            variant="outline"
-            className="h-11 w-11 shrink-0 p-0"
-            onClick={() => setScannerOpen(true)}
-            aria-label="Escanear código"
-          >
-            <Camera className="size-5" />
-          </Button>
-        </div>
-
-        {/* category filters */}
-        <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          {(['Todos', ...CATEGORIES] as const).map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={cn(
-                'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors',
-                category === c
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted',
-              )}
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto p-4 lg:p-6">
+        <div className="mx-auto my-auto flex w-full max-w-6xl flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar producto o código..."
+                className="pl-10"
+              />
+            </div>
+            <Button
+              variant="outline"
+              className="h-11 w-11 shrink-0 p-0"
+              onClick={() => setScannerOpen(true)}
+              aria-label="Escanear código"
             >
-              {c !== 'Todos' && <span>{CATEGORY_ICON[c]}</span>}
-              {c}
-            </button>
-          ))}
-        </div>
-
-        {/* quick amount */}
-        <div className="flex items-center gap-2 rounded-xl border border-dashed border-border bg-card px-3 py-2">
-          <span className="text-sm font-medium text-muted-foreground">Monto rápido</span>
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-            <Input
-              value={quickAmount}
-              onChange={(e) => setQuickAmount(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.nativeEvent.isComposing) addQuickAmount()
-              }}
-              type="number"
-              inputMode="numeric"
-              placeholder="500"
-              className="h-9 pl-7"
-            />
+              <Camera className="size-5" />
+            </Button>
           </div>
-          <Button className="h-9" onClick={addQuickAmount}>
-            <Plus className="size-4" />
-            Agregar
-          </Button>
-        </div>
 
-        {/* product grid */}
-        <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto pb-2 sm:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((p) => {
-            const low = p.stock <= p.minStock
-            const out = p.stock <= 0
-            return (
+          {/* category filters */}
+          <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            {(['Todos', ...CATEGORIES] as const).map((c) => (
               <button
-                key={p.id}
-                onClick={() => addProductToCart(p)}
-                disabled={out}
+                key={c}
+                onClick={() => setCategory(c)}
                 className={cn(
-                  'flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all hover:border-primary/50 hover:shadow-sm disabled:opacity-50',
+                  'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors',
+                  category === c
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-card text-muted-foreground hover:bg-muted',
                 )}
               >
-                <div className="flex items-start justify-between">
-                  <span className="text-2xl">{CATEGORY_ICON[p.category]}</span>
-                  {out ? (
-                    <Badge tone="danger">Sin stock</Badge>
-                  ) : low ? (
-                    <Badge tone="warning">
-                      <AlertTriangle className="size-3" />
-                      {p.stock}
-                    </Badge>
-                  ) : (
-                    <Badge tone="muted">{p.stock} u.</Badge>
-                  )}
-                </div>
-                <p className="mt-2 line-clamp-2 min-h-10 text-sm font-medium leading-tight">{p.name}</p>
-                <p className="mt-1 font-heading text-lg font-bold text-primary">{money(p.price)}</p>
+                {c !== 'Todos' && <span>{CATEGORY_ICON[c]}</span>}
+                {c}
               </button>
-            )
-          })}
-          {filtered.length === 0 && (
-            <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
-              No se encontraron productos.
+            ))}
+          </div>
+
+          {/* quick amount */}
+          <div className="flex items-center gap-2 rounded-xl border border-dashed border-border bg-card px-3 py-2">
+            <span className="text-sm font-medium text-muted-foreground">Monto rápido</span>
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+              <Input
+                value={quickAmount}
+                onChange={(e) => setQuickAmount(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) addQuickAmount()
+                }}
+                type="number"
+                inputMode="numeric"
+                placeholder="500"
+                className="h-9 pl-7"
+              />
             </div>
-          )}
+            <Button className="h-9" onClick={addQuickAmount}>
+              <Plus className="size-4" />
+              Agregar
+            </Button>
+          </div>
+
+          {/* product grid */}
+          <div className="grid auto-rows-min grid-cols-2 gap-3 pb-2 sm:grid-cols-3 xl:grid-cols-4">
+            {filtered.map((p) => {
+              const low = p.stock <= p.minStock
+              const out = p.stock <= 0
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => addProductToCart(p)}
+                  disabled={out}
+                  className={cn(
+                    'flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all hover:border-primary/50 hover:shadow-sm disabled:opacity-50',
+                  )}
+                >
+                  <div className="flex items-start justify-between">
+                    <span className="text-2xl">{CATEGORY_ICON[p.category]}</span>
+                    {out ? (
+                      <Badge tone="danger">Sin stock</Badge>
+                    ) : low ? (
+                      <Badge tone="warning">
+                        <AlertTriangle className="size-3" />
+                        {p.stock}
+                      </Badge>
+                    ) : (
+                      <Badge tone="muted">{p.stock} u.</Badge>
+                    )}
+                  </div>
+                  <p className="mt-2 line-clamp-2 min-h-10 text-sm font-medium leading-tight">{p.name}</p>
+                  <p className="mt-1 font-heading text-lg font-bold text-primary">{money(p.price)}</p>
+                </button>
+              )
+            })}
+            {filtered.length === 0 && (
+              <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
+                No se encontraron productos.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Right: cart (desktop) */}
-      <aside className="hidden w-80 shrink-0 flex-col border-l border-border bg-card lg:flex xl:w-96">
-        <CartPanel
-          cart={cart}
-          total={total}
-          onChangeQty={changeQty}
-          onRemove={removeItem}
-          onPay={() => setPayOpen(true)}
-        />
+      {/* Right: cart (desktop) — single aside with smooth width transition */}
+      <aside
+        className={cn(
+          'hidden shrink-0 flex-col border-l border-border bg-card lg:flex',
+          'transition-[width] duration-300 ease-in-out overflow-hidden',
+          cartCollapsed ? 'w-[72px]' : 'w-80 xl:w-96',
+        )}
+      >
+        {cartCollapsed ? (
+          /* Compact state: icon + badge + total */
+          <div className="flex h-full flex-col items-center py-5 gap-4">
+            <button
+              onClick={toggleCartCollapsed}
+              aria-label="Expandir carrito"
+              title="Expandir carrito"
+              className="relative flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              <ShoppingCart className="size-5" />
+              {cartCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex size-[18px] items-center justify-center rounded-full bg-primary text-[9px] font-bold leading-none text-primary-foreground">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+            {cartCount > 0 && (
+              <p className="[writing-mode:vertical-lr] rotate-180 text-xs font-bold tabular-nums text-primary select-none">
+                {money(total)}
+              </p>
+            )}
+            <div className="flex-1" />
+            <button
+              onClick={toggleCartCollapsed}
+              aria-label="Expandir carrito"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Expandir carrito"
+            >
+              <PanelRightOpen className="size-4" />
+            </button>
+          </div>
+        ) : (
+          <CartPanel
+            cart={cart}
+            total={total}
+            onChangeQty={changeQty}
+            onRemove={removeItem}
+            onPay={() => setPayOpen(true)}
+            onCollapse={toggleCartCollapsed}
+          />
+        )}
       </aside>
 
       {/* Mobile FAB */}
@@ -302,66 +355,85 @@ function CartPanel({
   onChangeQty,
   onRemove,
   onPay,
+  onCollapse,
 }: {
   cart: CartItem[]
   total: number
   onChangeQty: (id: string, delta: number) => void
   onRemove: (id: string) => void
   onPay: () => void
+  onCollapse?: () => void
 }) {
   return (
     <>
-      <div className="flex items-center justify-between px-4 py-4">
-        <h2 className="font-heading text-lg font-bold">Carrito</h2>
-        <Badge tone="muted">{cart.length} items</Badge>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          <h2 className="font-heading text-base font-bold">Carrito</h2>
+          <Badge tone="muted">{cart.length}</Badge>
+        </div>
+        {onCollapse && (
+          <button
+            onClick={onCollapse}
+            aria-label="Colapsar carrito"
+            title="Colapsar carrito"
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <PanelRightClose className="size-4" />
+          </button>
+        )}
       </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4">
+
+      {/* Items */}
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-2">
         {cart.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
-            <ShoppingCart className="size-10 opacity-40" />
+            <ShoppingCart className="size-10 opacity-30" />
             <p className="text-sm">El carrito está vacío</p>
           </div>
         ) : (
           cart.map((item) => (
-            <Card key={item.id} className="flex items-center gap-3 p-2.5">
+            <Card key={item.id} className="flex items-center gap-2 p-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{item.name}</p>
                 <p className="text-xs text-muted-foreground tabular-nums">{money(item.price)} c/u</p>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 <button
                   onClick={() => onChangeQty(item.id, -1)}
-                  className="flex size-7 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-muted"
+                  className="flex size-6 items-center justify-center rounded-md border border-border text-foreground transition-colors hover:bg-muted"
                   aria-label="Restar"
                 >
-                  <Minus className="size-3.5" />
+                  <Minus className="size-3" />
                 </button>
-                <span className="w-6 text-center text-sm font-semibold tabular-nums">{item.qty}</span>
+                <span className="w-7 text-center text-sm font-semibold tabular-nums">{item.qty}</span>
                 <button
                   onClick={() => onChangeQty(item.id, 1)}
-                  className="flex size-7 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-muted"
+                  className="flex size-6 items-center justify-center rounded-md border border-border text-foreground transition-colors hover:bg-muted"
                   aria-label="Sumar"
                 >
-                  <Plus className="size-3.5" />
+                  <Plus className="size-3" />
                 </button>
               </div>
-              <div className="w-16 text-right text-sm font-bold tabular-nums">
+              <div className="w-14 text-right text-xs font-bold tabular-nums">
                 {money(item.price * item.qty)}
               </div>
               <button
                 onClick={() => onRemove(item.id)}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 aria-label="Eliminar"
               >
-                <Trash2 className="size-4" />
+                <Trash2 className="size-3.5" />
               </button>
             </Card>
           ))
         )}
       </div>
+
+      {/* Footer */}
       <div className="border-t border-border p-4">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Subtotal</span>
+          <span className="text-sm text-muted-foreground">Total</span>
           <span className="font-heading text-2xl font-bold tabular-nums">{money(total)}</span>
         </div>
         <Button

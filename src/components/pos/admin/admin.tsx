@@ -123,7 +123,7 @@ export function Admin() {
   const hasData = state.sales.length > 0
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="mx-auto max-w-6xl min-h-[80vh] flex flex-col justify-center py-6 space-y-5">
       <PageHeader
         title="Panel de administración"
         description="Resumen del negocio en tiempo real"

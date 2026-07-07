@@ -10,8 +10,10 @@ import {
   Sun,
   Truck,
   Wallet,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
-import type { ComponentType } from 'react'
+import { useState, type ComponentType } from 'react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/lib/store'
 
@@ -36,11 +38,37 @@ const NAV: NavItem[] = [
 function CajaStatus({ compact = false }: { compact?: boolean }) {
   const { state } = useStore()
   const open = state.currentShift?.status === 'open'
+
+  if (compact) {
+    return (
+      <div
+        title={open ? 'Caja abierta' : 'Caja cerrada'}
+        className={cn(
+          'mx-auto flex size-8 shrink-0 items-center justify-center rounded-lg border',
+          open
+            ? 'border-success/30 bg-success/10 text-success'
+            : 'border-destructive/30 bg-destructive/10 text-destructive',
+        )}
+      >
+        <span className="relative flex size-2">
+          {open && (
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-75" />
+          )}
+          <span
+            className={cn(
+              'relative inline-flex size-2 rounded-full',
+              open ? 'bg-success' : 'bg-destructive',
+            )}
+          />
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-full border font-semibold',
-        compact ? 'px-2.5 py-1 text-xs' : 'px-3 py-1.5 text-sm',
+        'flex items-center gap-2 rounded-full border font-semibold px-3 py-1.5 text-sm',
         open
           ? 'border-success/30 bg-success/10 text-success'
           : 'border-destructive/30 bg-destructive/10 text-destructive',
@@ -57,7 +85,7 @@ function CajaStatus({ compact = false }: { compact?: boolean }) {
           )}
         />
       </span>
-      {open ? (compact ? 'ABIERTA' : 'CAJA ABIERTA') : compact ? 'CERRADA' : 'CAJA CERRADA'}
+      {open ? 'CAJA ABIERTA' : 'CAJA CERRADA'}
     </div>
   )
 }
@@ -88,25 +116,58 @@ export function AppShell({
   onChange: (t: TabId) => void
   children: React.ReactNode
 }) {
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('pos-sidebar-collapsed') === 'true'
+  })
+
+  const toggleSidebar = () => {
+    setCollapsed((c) => {
+      const next = !c
+      localStorage.setItem('pos-sidebar-collapsed', String(next))
+      return next
+    })
+  }
+
   return (
     <div className="flex min-h-dvh bg-background">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-4 lg:flex">
-        <div className="flex items-center gap-2.5 px-2">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Store className="size-5" />
+      <aside
+        className={cn(
+          'sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-sidebar-border bg-sidebar py-4 lg:flex',
+          'transition-[width] duration-300 ease-in-out',
+          collapsed ? 'w-[72px]' : 'w-60',
+        )}
+      >
+        {/* Logo */}
+        <div className={cn('flex items-center px-3', collapsed ? 'justify-center' : 'gap-2.5 px-4')}>
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <Store className="size-[18px]" />
           </div>
-          <div>
-            <p className="font-heading text-base font-bold leading-tight">Kiosko POS</p>
-            <p className="text-xs text-muted-foreground">Sistema v1.2</p>
+          <div
+            className={cn(
+              'overflow-hidden transition-all duration-300 ease-in-out',
+              collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
+            )}
+          >
+            <p className="whitespace-nowrap font-heading text-sm font-bold leading-tight">Kiosko POS</p>
+            <p className="whitespace-nowrap text-xs text-muted-foreground">Sistema v1.2</p>
           </div>
         </div>
 
-        <div className="mt-4 px-1">
-          <CajaStatus />
+        {/* Caja status */}
+        <div className={cn('mt-4 px-3', collapsed ? 'flex justify-center' : '')}>
+          <div
+            className={cn(
+              'overflow-hidden transition-all duration-300 ease-in-out',
+              collapsed ? 'w-8' : 'w-full',
+            )}
+          >
+            <CajaStatus compact={collapsed} />
+          </div>
         </div>
 
-        <nav className="mt-5 flex flex-1 flex-col gap-1">
+        {/* Nav */}
+        <nav className="mt-4 flex flex-1 flex-col gap-1 px-2">
           {NAV.map((item) => {
             const Icon = item.icon
             const isActive = active === item.id
@@ -114,24 +175,54 @@ export function AppShell({
               <button
                 key={item.id}
                 onClick={() => onChange(item.id)}
+                title={collapsed ? item.label : undefined}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                  'group relative flex items-center rounded-xl transition-all duration-150',
+                  collapsed ? 'h-10 w-10 mx-auto justify-center' : 'gap-3 px-3 py-2.5',
                   isActive
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent',
                 )}
               >
-                <Icon className="size-5" />
-                {item.label}
+                <Icon className={cn('shrink-0', collapsed ? 'size-[18px]' : 'size-5')} />
+                <span
+                  className={cn(
+                    'whitespace-nowrap text-sm font-medium overflow-hidden transition-all duration-300 ease-in-out',
+                    collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
+                  )}
+                >
+                  {item.label}
+                </span>
+                {/* Tooltip on collapsed */}
+                {collapsed && (
+                  <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-lg bg-popover px-2.5 py-1.5 text-xs font-semibold text-popover-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 z-50">
+                    {item.label}
+                  </span>
+                )}
               </button>
             )
           })}
         </nav>
 
-        <div className="flex items-center justify-between border-t border-sidebar-border pt-3">
-          <span className="px-1 text-xs text-muted-foreground">Tema</span>
+        {/* Footer */}
+        <div className={cn('flex flex-col gap-2 border-t border-sidebar-border px-2 pt-3', collapsed && 'items-center')}>
           <ThemeToggle />
         </div>
+
+        {/* Collapse toggle — floats on the right edge */}
+        <button
+          onClick={toggleSidebar}
+          aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
+          title={collapsed ? 'Expandir menú' : 'Contraer menú'}
+          className={cn(
+            'absolute -right-3 top-8 z-10 flex size-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-muted-foreground shadow-sm transition-all hover:bg-sidebar-accent hover:text-foreground',
+          )}
+        >
+          {collapsed
+            ? <PanelLeftOpen className="size-3.5" />
+            : <PanelLeftClose className="size-3.5" />
+          }
+        </button>
       </aside>
 
       {/* Main column */}

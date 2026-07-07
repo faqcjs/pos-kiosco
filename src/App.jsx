@@ -89,17 +89,10 @@ function Screen({ active }) {
 
 function Shell() {
   const [active, setActive] = useState('venta')
-  const { hydrated, logoutAdmin } = useStore()
-
-  const handleTabChange = (tab) => {
-    if (active === 'admin' && tab !== 'admin') {
-      logoutAdmin()
-    }
-    setActive(tab)
-  }
+  const { hydrated } = useStore()
 
   return (
-    <AppShell active={active} onChange={handleTabChange}>
+    <AppShell active={active} onChange={setActive}>
       <div className="px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
         {hydrated ? (
           <Screen active={active} />
