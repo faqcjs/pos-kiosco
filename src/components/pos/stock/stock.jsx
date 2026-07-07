@@ -346,19 +346,7 @@ function ProductFormModal({
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label htmlFor="stock">Stock inicial</Label>
-              <Input
-                id="stock"
-                type="number"
-                inputMode="numeric"
-                value={draft.stock || ''}
-                onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) || 0 })}
-                placeholder="0"
-                disabled={Boolean(draft.id && !isAdmin)}
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="minStock">Stock mínimo</Label>
               <Input
