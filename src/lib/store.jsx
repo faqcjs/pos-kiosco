@@ -6,6 +6,19 @@ import { supabase } from './supabase'
 import { uid } from './format'
 import { SEED_PRODUCTS, SEED_CUSTOMERS, SEED_SUPPLIERS, generateMockSales } from './seed'
 
+function sanitizeProduct(p) {
+  return {
+    id: p.id,
+    barcode: p.barcode || '',
+    name: p.name || '',
+    category: p.category || 'Varios',
+    cost: Number(p.cost) || 0,
+    price: Number(p.price) || 0,
+    stock: Number(p.stock) || 0,
+    "minStock": Number(p.minStock) || 0
+  }
+}
+
 // --- selectors ---
 export function customerBalance(c) {
   if (!c || !c.entries) return 0
@@ -140,7 +153,7 @@ export function useStore() {
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sales').select('*').order('date')
+      const { data, error } = await supabase.from('sales').select('*').order('date', { ascending: false })
       if (error) throw error
       return data || []
     },
@@ -167,7 +180,7 @@ export function useStore() {
   const { data: shifts = [], isLoading: loadingShifts } = useQuery({
     queryKey: ['shifts'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('shifts').select('*').order('openedAt')
+      const { data, error } = await supabase.from('shifts').select('*').order('openedAt', { ascending: false })
       if (error) throw error
       return data || []
     },
@@ -179,7 +192,7 @@ export function useStore() {
   }, [shifts])
 
   const shiftHistory = useMemo(() => {
-    return shifts.filter((s) => s.status === 'closed').reverse()
+    return shifts.filter((s) => s.status === 'closed')
   }, [shifts])
 
   const hydrated = !loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts
@@ -187,7 +200,8 @@ export function useStore() {
   // Mutations
   const addProductMutation = useMutation({
     mutationFn: async (p) => {
-      const { data, error } = await supabase.from('products').insert([p]).select()
+      const sanitized = sanitizeProduct(p)
+      const { data, error } = await supabase.from('products').insert([sanitized]).select()
       if (error) throw error
       return data[0]
     },
@@ -196,7 +210,8 @@ export function useStore() {
 
   const updateProductMutation = useMutation({
     mutationFn: async (p) => {
-      const { data, error } = await supabase.from('products').update(p).eq('id', p.id).select()
+      const sanitized = sanitizeProduct(p)
+      const { data, error } = await supabase.from('products').update(sanitized).eq('id', p.id).select()
       if (error) throw error
       return data[0]
     },
