@@ -154,123 +154,129 @@ export function Venta() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row lg:h-[calc(100dvh-4rem)] overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-[calc(100dvh-9.5rem)] lg:h-[calc(100dvh-4rem)] overflow-hidden">
       {/* Left: products */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto p-1.5 lg:p-6">
-        <div className="mx-auto my-auto flex w-full max-w-6xl flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar..."
-                className="pl-10 placeholder:text-muted-foreground sm:placeholder:content-[''] [&::placeholder]:sm:hidden"
-                aria-label="Buscar producto o código"
-              />
-              <span className="pointer-events-none absolute inset-y-0 left-10 hidden items-center text-muted-foreground sm:flex">
-                <span className="sr-only">Buscar producto o código...</span>
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              className="h-11 w-11 shrink-0 p-0"
-              onClick={() => setScannerOpen(true)}
-              aria-label="Escanear código"
-            >
-              <Camera className="size-5" />
-            </Button>
-            {/* Mobile: toggle quick amount */}
-            <Button
-              variant="outline"
-              className="h-11 shrink-0 px-3 lg:hidden"
-              onClick={() => setShowQuickAmount((v) => !v)}
-              aria-label="Monto rápido"
-            >
-              <Plus className="size-4" />
-              <span className="ml-1 text-xs font-medium">Monto</span>
-            </Button>
-          </div>
-
-          {/* category filters */}
-          <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            {['Todos', ...CATEGORIES].map((c) => (
-              <button
-                key={c}
-                onClick={() => setCategory(c)}
-                className={cn(
-                  'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors',
-                  category === c
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card text-muted-foreground hover:bg-muted',
-                )}
+      <div className="flex min-w-0 flex-1 flex-col p-1.5 lg:p-6 h-full overflow-hidden">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 flex-1 min-h-0">
+          
+          {/* Header section (Fixed at top) */}
+          <div className="flex flex-col gap-4 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar..."
+                  className="pl-10 placeholder:text-muted-foreground sm:placeholder:content-[''] [&::placeholder]:sm:hidden"
+                  aria-label="Buscar producto o código"
+                />
+                <span className="pointer-events-none absolute inset-y-0 left-10 hidden items-center text-muted-foreground sm:flex">
+                  <span className="sr-only">Buscar producto o código...</span>
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                className="h-11 w-11 shrink-0 p-0"
+                onClick={() => setScannerOpen(true)}
+                aria-label="Escanear código"
               >
-                {c !== 'Todos' && <span>{CATEGORY_ICON[c]}</span>}
-                {c}
-              </button>
-            ))}
-          </div>
-
-          {/* quick amount — always visible on desktop, collapsible on mobile */}
-          <div className={cn('flex items-center gap-2 rounded-xl border border-dashed border-border bg-card px-3 py-2', 'hidden lg:flex', showQuickAmount && '!flex')}>
-            <span className="text-sm font-medium text-muted-foreground">Monto rápido</span>
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-              <Input
-                value={quickAmount}
-                onChange={(e) => setQuickAmount(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) addQuickAmount()
-                }}
-                type="number"
-                inputMode="numeric"
-                placeholder="500"
-                className="h-9 pl-7"
-              />
+                <Camera className="size-5" />
+              </Button>
+              {/* Mobile: toggle quick amount */}
+              <Button
+                variant="outline"
+                className="h-11 shrink-0 px-3 lg:hidden"
+                onClick={() => setShowQuickAmount((v) => !v)}
+                aria-label="Monto rápido"
+              >
+                <Plus className="size-4" />
+                <span className="ml-1 text-xs font-medium">Monto</span>
+              </Button>
             </div>
-            <Button className="h-9" onClick={addQuickAmount}>
-              <Plus className="size-4" />
-              Agregar
-            </Button>
-          </div>
 
-          {/* product grid */}
-          <div className="grid auto-rows-min grid-cols-2 gap-3 pb-2 sm:grid-cols-3 xl:grid-cols-4">
-            {filtered.map((p) => {
-              const low = p.stock <= p.minStock
-              const out = p.stock <= 0
-              return (
+            {/* category filters */}
+            <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {['Todos', ...CATEGORIES].map((c) => (
                 <button
-                  key={p.id}
-                  onClick={() => addProductToCart(p)}
-                  disabled={out}
+                  key={c}
+                  onClick={() => setCategory(c)}
                   className={cn(
-                    'flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all hover:border-primary/50 hover:shadow-sm disabled:opacity-50',
+                    'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors',
+                    category === c
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-card text-muted-foreground hover:bg-muted',
                   )}
                 >
-                  <div className="flex items-start justify-between">
-                    <span className="text-2xl">{CATEGORY_ICON[p.category]}</span>
-                    {out ? (
-                      <Badge tone="danger">Sin stock</Badge>
-                    ) : low ? (
-                      <Badge tone="warning">
-                        <AlertTriangle className="size-3" />
-                        {p.stock}
-                      </Badge>
-                    ) : (
-                      <Badge tone="muted">{p.stock} u.</Badge>
-                    )}
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight">{p.name}</p>
-                  <p className="mt-1 font-heading text-lg font-bold text-primary">{money(p.price)}</p>
+                  {c !== 'Todos' && <span>{CATEGORY_ICON[c]}</span>}
+                  {c}
                 </button>
-              )
-            })}
-            {filtered.length === 0 && (
-              <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
-                No se encontraron productos.
+              ))}
+            </div>
+
+            {/* quick amount — always visible on desktop, collapsible on mobile */}
+            <div className={cn('flex items-center gap-2 rounded-xl border border-dashed border-border bg-card px-3 py-2', 'hidden lg:flex', showQuickAmount && '!flex')}>
+              <span className="text-sm font-medium text-muted-foreground">Monto rápido</span>
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  value={quickAmount}
+                  onChange={(e) => setQuickAmount(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) addQuickAmount()
+                  }}
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="500"
+                  className="h-9 pl-7"
+                />
               </div>
-            )}
+              <Button className="h-9" onClick={addQuickAmount}>
+                <Plus className="size-4" />
+                Agregar
+              </Button>
+            </div>
+          </div>
+
+          {/* Scrollable grid area */}
+          <div className="flex-1 overflow-y-auto min-h-0 pr-0.5">
+            <div className="grid auto-rows-min grid-cols-2 gap-3 pb-2 sm:grid-cols-3 xl:grid-cols-4">
+              {filtered.map((p) => {
+                const low = p.stock <= p.minStock
+                const out = p.stock <= 0
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => addProductToCart(p)}
+                    disabled={out}
+                    className={cn(
+                      'flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all hover:border-primary/50 hover:shadow-sm disabled:opacity-50',
+                    )}
+                  >
+                    <div className="flex items-start justify-between">
+                      <span className="text-2xl">{CATEGORY_ICON[p.category]}</span>
+                      {out ? (
+                        <Badge tone="danger">Sin stock</Badge>
+                      ) : low ? (
+                        <Badge tone="warning">
+                          <AlertTriangle className="size-3" />
+                          {p.stock}
+                        </Badge>
+                      ) : (
+                        <Badge tone="muted">{p.stock} u.</Badge>
+                      )}
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight">{p.name}</p>
+                    <p className="mt-1 font-heading text-lg font-bold text-primary">{money(p.price)}</p>
+                  </button>
+                )
+              })}
+              {filtered.length === 0 && (
+                <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
+                  No se encontraron productos.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
