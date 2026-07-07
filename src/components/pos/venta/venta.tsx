@@ -22,6 +22,7 @@ export function Venta() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [mobileCartOpen, setMobileCartOpen] = useState(false)
+  const [showQuickAmount, setShowQuickAmount] = useState(false)
   const [cartCollapsed, setCartCollapsed] = useState(() => {
     return localStorage.getItem('pos-cart-collapsed') === 'true'
   })
@@ -61,6 +62,26 @@ export function Venta() {
 
   const total = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart])
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart])
+
+  const isShiftOpen = state.currentShift?.status === 'open'
+
+  if (!isShiftOpen) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center p-4">
+        <Card className="max-w-md p-8 text-center space-y-5">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-warning/10 text-warning mx-auto text-3xl">
+            ⚠️
+          </div>
+          <div className="space-y-2">
+            <h2 className="font-heading text-lg font-bold">Caja cerrada</h2>
+            <p className="text-sm text-muted-foreground">
+              Para realizar una venta, primero debes registrar la apertura de caja en la sección de <b>Caja</b>.
+            </p>
+          </div>
+        </Card>
+      </div>
+    )
+  }
 
   function addProductToCart(p: Product) {
     if (p.stock <= 0) {
@@ -148,9 +169,13 @@ export function Venta() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar producto o código..."
-                className="pl-10"
+                placeholder="Buscar..."
+                className="pl-10 placeholder:text-muted-foreground sm:placeholder:content-[''] [&::placeholder]:sm:hidden"
+                aria-label="Buscar producto o código"
               />
+              <span className="pointer-events-none absolute inset-y-0 left-10 hidden items-center text-muted-foreground sm:flex">
+                <span className="sr-only">Buscar producto o código...</span>
+              </span>
             </div>
             <Button
               variant="outline"
@@ -159,6 +184,16 @@ export function Venta() {
               aria-label="Escanear código"
             >
               <Camera className="size-5" />
+            </Button>
+            {/* Mobile: toggle quick amount */}
+            <Button
+              variant="outline"
+              className="h-11 shrink-0 px-3 lg:hidden"
+              onClick={() => setShowQuickAmount((v) => !v)}
+              aria-label="Monto rápido"
+            >
+              <Plus className="size-4" />
+              <span className="ml-1 text-xs font-medium">Monto</span>
             </Button>
           </div>
 
@@ -181,8 +216,8 @@ export function Venta() {
             ))}
           </div>
 
-          {/* quick amount */}
-          <div className="flex items-center gap-2 rounded-xl border border-dashed border-border bg-card px-3 py-2">
+          {/* quick amount — always visible on desktop, collapsible on mobile */}
+          <div className={cn('flex items-center gap-2 rounded-xl border border-dashed border-border bg-card px-3 py-2', 'hidden lg:flex', showQuickAmount && '!flex')}>
             <span className="text-sm font-medium text-muted-foreground">Monto rápido</span>
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
@@ -231,7 +266,7 @@ export function Venta() {
                       <Badge tone="muted">{p.stock} u.</Badge>
                     )}
                   </div>
-                  <p className="mt-2 line-clamp-2 min-h-10 text-sm font-medium leading-tight">{p.name}</p>
+                  <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight">{p.name}</p>
                   <p className="mt-1 font-heading text-lg font-bold text-primary">{money(p.price)}</p>
                 </button>
               )
@@ -300,7 +335,7 @@ export function Venta() {
       {cartCount > 0 && !mobileCartOpen && (
         <button
           onClick={() => setMobileCartOpen(true)}
-          className="fixed bottom-20 right-4 z-30 flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 font-semibold text-primary-foreground shadow-lg lg:hidden"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-30 flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 font-semibold text-primary-foreground shadow-lg lg:hidden"
         >
           <ShoppingCart className="size-5" />
           <span>{cartCount}</span>
@@ -431,7 +466,7 @@ function CartPanel({
       </div>
 
       {/* Footer */}
-      <div className="border-t border-border p-4">
+      <div className="border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Total</span>
           <span className="font-heading text-2xl font-bold tabular-nums">{money(total)}</span>

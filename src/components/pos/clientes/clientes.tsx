@@ -46,7 +46,7 @@ export function Clientes() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 p-4 lg:p-6">
+    <div className="mx-auto max-w-4xl space-y-5 p-4 sm:px-4 lg:p-6">
       <PageHeader
         title="Fiar / Clientes"
         description="Cuentas corrientes de clientes."
@@ -78,7 +78,7 @@ export function Clientes() {
               <button
                 key={c.id}
                 onClick={() => setSelectedId(c.id)}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-primary/50 hover:shadow-sm"
+                className="flex min-h-[44px] items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-primary/50 hover:shadow-sm"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary font-heading font-bold text-secondary-foreground">
@@ -159,10 +159,10 @@ function CustomerDetail({
   const entries = [...customer.entries].sort((a, b) => +new Date(b.date) - +new Date(a.date))
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-4 lg:p-6">
+    <div className="mx-auto max-w-3xl space-y-5 p-4 sm:px-4 lg:p-6">
       <button
         onClick={onBack}
-        className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+        className="flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Volver a clientes
@@ -285,7 +285,7 @@ function CustomerDetail({
           <div className="flex gap-2">
             <button
               onClick={() => setAmount(String(balance))}
-              className="flex-1 rounded-full border border-border bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground hover:bg-muted"
+              className="flex min-h-[44px] flex-1 items-center justify-center rounded-full border border-border bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground hover:bg-muted"
             >
               Pagar todo ({money(balance)})
             </button>

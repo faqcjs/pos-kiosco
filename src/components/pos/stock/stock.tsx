@@ -86,7 +86,7 @@ export function Stock() {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre o código de barras..."
+          placeholder="Buscar..."
           className="pl-10"
         />
       </div>
@@ -153,7 +153,7 @@ export function Stock() {
                   <button
                     disabled={!isAdmin}
                     onClick={() => adjustStock(p.id, -1)}
-                    className="flex size-7 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex size-9 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed sm:size-7"
                     aria-label="Restar stock"
                   >
                     <Minus className="size-3.5" />
@@ -169,7 +169,7 @@ export function Stock() {
                   <button
                     disabled={!isAdmin}
                     onClick={() => adjustStock(p.id, 1)}
-                    className="flex size-7 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex size-9 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed sm:size-7"
                     aria-label="Sumar stock"
                   >
                     <Plus className="size-3.5" />

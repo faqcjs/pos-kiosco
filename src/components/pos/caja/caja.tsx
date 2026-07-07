@@ -156,7 +156,9 @@ function OpenShiftView({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Badge tone="success">
           <span className="size-2 animate-pulse rounded-full bg-success" />
-          Turno abierto por {shift.openedBy || 'Desconocido'} desde {formatTime(shift.openedAt)}
+          Turno abierto por{' '}
+          <span className="max-w-[12ch] truncate inline-block align-bottom">{shift.openedBy || 'Desconocido'}</span>{' '}
+          desde {formatTime(shift.openedAt)}
         </Badge>
         <Button variant="destructive" onClick={() => setCloseOpen(true)}>
           <Lock className="size-4" />
@@ -166,16 +168,17 @@ function OpenShiftView({
 
       {/* metrics */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard label="Apertura" value={money(shift.openingAmount)} icon={<Wallet className="size-4" />} />
-        <StatCard label="Ventas efectivo" value={money(cashSales)} tone="success" sub="+ ingresos por ventas" />
-        <StatCard label="Ventas QR/Transferencia" value={money(qrSales)} tone="success" sub="Dinero digital en cuenta" />
-        <StatCard label="Ingresos manuales" value={money(manualIn)} tone="success" />
-        <StatCard label="Egresos / retiros" value={money(manualOut)} tone="danger" />
+        <StatCard label="Apertura" value={money(shift.openingAmount)} icon={<Wallet className="size-4" />} className="p-3" />
+        <StatCard label="Ventas efectivo" value={money(cashSales)} tone="success" sub="+ ingresos por ventas" className="p-3" />
+        <StatCard label="Ventas QR/Transferencia" value={money(qrSales)} tone="success" sub="Dinero digital en cuenta" className="p-3" />
+        <StatCard label="Ingresos manuales" value={money(manualIn)} tone="success" className="p-3" />
+        <StatCard label="Egresos / retiros" value={money(manualOut)} tone="danger" className="p-3" />
         <StatCard
           label="Total teórico"
           value={money(theoretical)}
           tone="accent"
           sub="Saldo estimado en caja"
+          className="p-3"
         />
       </div>
 
@@ -217,7 +220,7 @@ function OpenShiftView({
               placeholder="Ej: pago delivery"
             />
           </div>
-          <Button className="h-11" onClick={submitMovement}>
+          <Button className="h-11 w-full sm:w-auto" onClick={submitMovement}>
             Registrar
           </Button>
         </div>
@@ -257,7 +260,7 @@ function OpenShiftView({
                   </div>
                   <span
                     className={cn(
-                      'text-sm font-bold tabular-nums',
+                      'shrink-0 text-sm font-bold tabular-nums',
                       positive ? 'text-success' : 'text-destructive',
                     )}
                   >

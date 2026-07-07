@@ -44,7 +44,7 @@ function CajaStatus({ compact = false }: { compact?: boolean }) {
       <div
         title={open ? 'Caja abierta' : 'Caja cerrada'}
         className={cn(
-          'mx-auto flex size-8 shrink-0 items-center justify-center rounded-lg border',
+          'mx-auto flex size-9 shrink-0 items-center justify-center rounded-lg border',
           open
             ? 'border-success/30 bg-success/10 text-success'
             : 'border-destructive/30 bg-destructive/10 text-destructive',
@@ -127,6 +127,8 @@ export function AppShell({
       return next
     })
   }
+
+  const activeLabel = NAV.find((n) => n.id === active)?.label ?? 'Kiosko POS'
 
   return (
     <div className="flex min-h-dvh bg-background">
@@ -228,12 +230,12 @@ export function AppShell({
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur lg:hidden">
           <div className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Store className="size-4.5" />
             </div>
-            <span className="font-heading text-base font-bold">Kiosko POS</span>
+            <span className="font-heading text-base font-bold">{activeLabel}</span>
           </div>
           <div className="flex items-center gap-2">
             <CajaStatus compact />
@@ -241,10 +243,10 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>
+        <main className="min-w-0 flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</main>
 
         {/* Mobile bottom nav */}
-        <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-border bg-background/95 backdrop-blur lg:hidden">
+        <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
           {NAV.map((item) => {
             const Icon = item.icon
             const isActive = active === item.id
@@ -253,12 +255,15 @@ export function AppShell({
                 key={item.id}
                 onClick={() => onChange(item.id)}
                 className={cn(
-                  'flex flex-col items-center gap-0.5 py-2 text-[0.65rem] font-medium transition-colors',
+                  'relative flex flex-col items-center gap-0.5 py-2.5 text-[0.7rem] font-medium transition-colors',
                   isActive ? 'text-primary' : 'text-muted-foreground',
                 )}
               >
                 <Icon className="size-5" />
                 {item.short}
+                {isActive && (
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-[3px] w-4 rounded-full bg-primary" />
+                )}
               </button>
             )
           })}

@@ -133,9 +133,19 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+  /* iOS scroll lock fix — overflow:hidden on body doesn't work in iOS Safari */
+  body.modal-open {
+    position: fixed;
+    width: 100%;
+    overflow-y: scroll;
   }
 }
 
@@ -158,4 +168,15 @@
 
 .animate-scanline {
   animation: scanline 2s ease-in-out infinite alternate;
+}
+
+/* Safe area utilities for iPhone notch / home indicator */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
 }

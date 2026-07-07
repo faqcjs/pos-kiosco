@@ -192,6 +192,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       change?: number
     }) => {
       setState((s) => {
+        if (!s.currentShift || s.currentShift.status !== 'open') {
+          return s
+        }
         const total = args.items.reduce((sum, i) => sum + i.price * i.qty, 0)
         // compute cost of goods
         let cost = 0

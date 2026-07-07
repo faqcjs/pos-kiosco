@@ -36,7 +36,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
       <input
         ref={ref}
         className={cn(
-          'flex h-11 w-full rounded-xl border border-input bg-background px-3.5 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-11 w-full rounded-xl border border-input bg-background px-3.5 text-[16px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
         {...props}
@@ -131,10 +131,11 @@ export function Modal({
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
-    document.body.style.overflow = 'hidden'
+    // iOS Safari fix: use class instead of overflow:hidden
+    document.body.classList.add('modal-open')
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
+      document.body.classList.remove('modal-open')
     }
   }, [open, onClose])
 
@@ -155,6 +156,12 @@ export function Modal({
             : 'm-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-lg rounded-3xl',
         )}
       >
+        {/* Drag handle for sheet variant on mobile */}
+        {variant === 'sheet' && (
+          <div className="flex justify-center pt-3 sm:hidden">
+            <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+          </div>
+        )}
         {title && (
           <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-4">
             <h2 className="font-heading text-lg font-bold text-balance">{title}</h2>
@@ -168,7 +175,14 @@ export function Modal({
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="shrink-0 border-t border-border px-5 py-4">{footer}</div>}
+        {footer && (
+          <div className={cn(
+            'shrink-0 border-t border-border px-5 py-4',
+            variant === 'sheet' && 'pb-[max(1rem,env(safe-area-inset-bottom))]',
+          )}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -198,12 +212,14 @@ export function StatCard({
   sub,
   tone = 'default',
   icon,
+  className,
 }: {
   label: string
   value: string
   sub?: ReactNode
   tone?: 'default' | 'success' | 'warning' | 'danger' | 'accent'
   icon?: ReactNode
+  className?: string
 }) {
   const tones: Record<string, string> = {
     default: 'text-foreground',
@@ -213,12 +229,12 @@ export function StatCard({
     accent: 'text-accent',
   }
   return (
-    <Card className="p-4">
+    <Card className={cn('p-3 sm:p-4', className)}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
         {icon && <span className="text-muted-foreground">{icon}</span>}
       </div>
-      <p className={cn('mt-2 font-heading text-2xl font-bold tabular-nums', tones[tone])}>{value}</p>
+      <p className={cn('mt-1.5 font-heading text-xl sm:text-2xl font-bold tabular-nums truncate', tones[tone])}>{value}</p>
       {sub && <div className="mt-1 text-xs text-muted-foreground">{sub}</div>}
     </Card>
   )

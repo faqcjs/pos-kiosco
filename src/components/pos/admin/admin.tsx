@@ -123,7 +123,7 @@ export function Admin() {
   const hasData = state.sales.length > 0
 
   return (
-    <div className="mx-auto max-w-6xl min-h-[80vh] flex flex-col justify-center py-6 space-y-5">
+    <div className="mx-auto max-w-6xl min-h-[80vh] flex flex-col justify-center py-6 space-y-5 px-0 sm:px-4">
       <PageHeader
         title="Panel de administración"
         description="Resumen del negocio en tiempo real"
@@ -142,6 +142,7 @@ export function Admin() {
           sub={`${stats.salesTodayCount} operaciones`}
           tone="success"
           icon={<DollarSign className="size-4" />}
+          className="p-3"
         />
         <StatCard
           label="Ganancia de hoy"
@@ -149,6 +150,7 @@ export function Admin() {
           sub="Margen bruto"
           tone="accent"
           icon={<TrendingUp className="size-4" />}
+          className="p-3"
         />
         <StatCard
           label="Por cobrar (fiado)"
@@ -156,6 +158,7 @@ export function Admin() {
           sub={`${state.customers.length} clientes`}
           tone="warning"
           icon={<Users className="size-4" />}
+          className="p-3"
         />
         <StatCard
           label="A pagar (prov.)"
@@ -163,6 +166,7 @@ export function Admin() {
           sub={`${state.suppliers.length} proveedores`}
           tone="danger"
           icon={<ReceiptText className="size-4" />}
+          className="p-3"
         />
       </div>
 
@@ -305,24 +309,26 @@ export function Admin() {
         {recentSales.length === 0 ? (
           <EmptyState title="Sin ventas registradas" />
         ) : (
-          <div className="divide-y divide-border">
-            {recentSales.map((s) => {
-              const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[s.method]
-              const tone = s.method === 'efectivo' ? 'success' : s.method === 'qr' ? 'default' : 'warning'
-              return (
-                <div key={s.id} className="flex items-center gap-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {s.items.length} art. · {s.items.map((i) => i.name).slice(0, 2).join(', ')}
-                      {s.items.length > 2 ? '…' : ''}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{formatDate(s.date)}</p>
+          <div className="overflow-x-auto -mx-5 px-5">
+            <div className="divide-y divide-border min-w-[480px]">
+              {recentSales.map((s) => {
+                const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[s.method]
+                const tone = s.method === 'efectivo' ? 'success' : s.method === 'qr' ? 'default' : 'warning'
+                return (
+                  <div key={s.id} className="flex items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {s.items.length} art. · {s.items.map((i) => i.name).slice(0, 2).join(', ')}
+                        {s.items.length > 2 ? '…' : ''}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{formatDate(s.date)}</p>
+                    </div>
+                    <Badge tone={tone as 'success' | 'default' | 'warning'}>{label}</Badge>
+                    <p className="w-24 text-right font-heading text-sm font-bold tabular-nums">{money(s.total)}</p>
                   </div>
-                  <Badge tone={tone as 'success' | 'default' | 'warning'}>{label}</Badge>
-                  <p className="w-24 text-right font-heading text-sm font-bold tabular-nums">{money(s.total)}</p>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         )}
       </Card>

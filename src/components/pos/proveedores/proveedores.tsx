@@ -55,7 +55,7 @@ export function Proveedores() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-5xl p-4 sm:px-4 lg:p-6">
       <PageHeader
         title="Proveedores"
         subtitle="Cuenta corriente con tus proveedores"
@@ -95,7 +95,7 @@ export function Proveedores() {
               <button
                 key={s.id}
                 onClick={() => setSelectedId(s.id)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
+                className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 font-heading text-base font-bold text-primary">
                   {s.name.slice(0, 2).toUpperCase()}
@@ -197,10 +197,10 @@ function SupplierDetail({
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-3xl p-4 sm:px-4 lg:p-6">
       <button
         onClick={onBack}
-        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" /> Volver
       </button>
@@ -345,7 +345,7 @@ function SupplierDetail({
             <button
               type="button"
               onClick={() => setPayAmount(String(balance))}
-              className="mt-1.5 text-xs font-medium text-primary hover:underline"
+              className="mt-1.5 inline-flex min-h-[44px] items-center text-xs font-medium text-primary hover:underline"
             >
               Pagar todo ({money(balance)})
             </button>
