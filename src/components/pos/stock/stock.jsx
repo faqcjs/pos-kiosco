@@ -50,18 +50,17 @@ export function Stock() {
   function handleSelectBarcode(code) {
     setBarcodeSearchOpen(false)
     if (!code) {
-      setDraft(EMPTY)
+      setDraft({ ...EMPTY, stock: 1 })
       setFormOpen(true)
       return
     }
 
     const existing = state.products.find((p) => p.barcode === code)
     if (existing) {
-      setDraft(existing)
-      toast('Producto encontrado. Editando...')
-      setFormOpen(true)
+      adjustStock(existing.id, 1)
+      toast(`Se sumó 1 unidad a ${existing.name} (Stock actual: ${existing.stock + 1})`, 'success')
     } else {
-      setDraft({ ...EMPTY, barcode: code })
+      setDraft({ ...EMPTY, barcode: code, stock: 1 })
       setFormOpen(true)
     }
   }
