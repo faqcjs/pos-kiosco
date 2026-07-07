@@ -18,8 +18,9 @@ const EMPTY = {
   category: 'Varios',
   cost: 0,
   price: 0,
-  stock: 0,
+  stock: 1,
   minStock: 0,
+  unidad: 1,
 }
 
 export function Stock() {
@@ -50,17 +51,18 @@ export function Stock() {
   function handleSelectBarcode(code) {
     setBarcodeSearchOpen(false)
     if (!code) {
-      setDraft({ ...EMPTY, stock: 1 })
+      setDraft({ ...EMPTY, stock: 1, unidad: 1 })
       setFormOpen(true)
       return
     }
 
     const existing = state.products.find((p) => p.barcode === code)
     if (existing) {
-      adjustStock(existing.id, 1)
-      toast(`Se sumó 1 unidad a ${existing.name} (Stock actual: ${existing.stock + 1})`, 'success')
+      const inc = existing.unidad || 1
+      adjustStock(existing.id, inc)
+      toast(`Se sumó ${inc} unidad${inc === 1 ? '' : 'es'} a ${existing.name} (Stock actual: ${existing.stock + inc})`, 'success')
     } else {
-      setDraft({ ...EMPTY, barcode: code, stock: 1 })
+      setDraft({ ...EMPTY, barcode: code, stock: 1, unidad: 1 })
       setFormOpen(true)
     }
   }
@@ -75,11 +77,12 @@ export function Stock() {
       toast('Ingresá el nombre del producto', 'error')
       return
     }
+    const finalProduct = { ...draft, unidad: draft.unidad || 1 }
     if (draft.id) {
-      updateProduct(draft)
+      updateProduct(finalProduct)
       toast('Producto actualizado')
     } else {
-      addProduct(draft)
+      addProduct(finalProduct)
       toast('Producto agregado')
     }
     setFormOpen(false)
@@ -343,7 +346,7 @@ function ProductFormModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <Label htmlFor="stock">Stock inicial</Label>
               <Input
@@ -366,6 +369,22 @@ function ProductFormModal({
                 onChange={(e) => setDraft({ ...draft, minStock: Number(e.target.value) || 0 })}
                 placeholder="0"
                 disabled={Boolean(draft.id && !isAdmin)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="unidad">U. por bulto</Label>
+              <Input
+                id="unidad"
+                type="number"
+                inputMode="numeric"
+                value={draft.unidad || ''}
+                onChange={(e) => {
+                  const val = Number(e.target.value) || 1
+                  // Sync initial stock with box unit size if it's a new product and they haven't manually changed stock from its default
+                  const nextStock = !draft.id && (draft.stock === (draft.unidad || 1)) ? val : draft.stock
+                  setDraft({ ...draft, unidad: val, stock: nextStock })
+                }}
+                placeholder="1"
               />
             </div>
           </div>
