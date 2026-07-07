@@ -273,7 +273,7 @@ export function Admin() {
           sub={isLoading ? <div className="h-3.5 w-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" /> : `${stats.salesTodayCount} oper.`}
           tone="success"
           icon={<DollarSign className="size-4" />}
-          className="p-3"
+          className="p-3 transform-gpu"
         />
         <StatCard
           label="Ganancia de hoy"
@@ -281,7 +281,7 @@ export function Admin() {
           sub={isLoading ? <div className="h-3.5 w-16 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" /> : "Margen bruto"}
           tone="accent"
           icon={<TrendingUp className="size-4" />}
-          className="p-3"
+          className="p-3 transform-gpu"
         />
         <StatCard
           label="Ticket Promedio"
@@ -289,7 +289,7 @@ export function Admin() {
           sub={isLoading ? <div className="h-3.5 w-14 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" /> : "Histórico"}
           tone="default"
           icon={<ReceiptText className="size-4" />}
-          className="p-3"
+          className="p-3 transform-gpu"
         />
         <StatCard
           label="Margen Promedio"
@@ -297,7 +297,7 @@ export function Admin() {
           sub={isLoading ? <div className="h-3.5 w-14 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" /> : "Histórico"}
           tone="accent"
           icon={<Percent className="size-4" />}
-          className="p-3"
+          className="p-3 transform-gpu"
         />
         <StatCard
           label="Por cobrar (fiado)"
@@ -305,7 +305,7 @@ export function Admin() {
           sub={isLoading ? <div className="h-3.5 w-16 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" /> : `${state.customers.length} clientes`}
           tone="warning"
           icon={<Users className="size-4" />}
-          className="p-3"
+          className="p-3 transform-gpu"
         />
         <StatCard
           label="A pagar (prov.)"
@@ -313,12 +313,12 @@ export function Admin() {
           sub={isLoading ? <div className="h-3.5 w-20 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" /> : `${state.suppliers.length} proveedores`}
           tone="danger"
           icon={<ReceiptText className="size-4" />}
-          className="p-3"
+          className="p-3 transform-gpu"
         />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="p-5 lg:col-span-2">
+        <Card className="p-4 sm:p-5 lg:col-span-2 overflow-hidden w-full min-w-0">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-heading font-semibold">Ventas del período</h3>
@@ -372,12 +372,12 @@ export function Admin() {
               <AreaChart data={chartData} margin={{ left: -18, right: 8, top: 4 }}>
                 <defs>
                   <linearGradient id="gVentas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gGanancia" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--chart-3)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="var(--chart-3)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -399,7 +399,7 @@ export function Admin() {
           )}
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5 overflow-hidden w-full min-w-0">
           <h3 className="mb-1 font-heading font-semibold">Medios de pago</h3>
           <p className="mb-2 text-xs text-muted-foreground">Distribución histórica</p>
           {isLoading ? (
@@ -444,7 +444,7 @@ export function Admin() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="p-5 lg:col-span-2">
+        <Card className="p-4 sm:p-5 lg:col-span-2 overflow-hidden w-full min-w-0">
           <h3 className="mb-4 font-heading font-semibold">Productos más vendidos</h3>
           {isLoading ? (
             <div className="h-[220px] flex flex-col justify-between py-2">
@@ -493,7 +493,7 @@ export function Admin() {
         </Card>
 
         <div className="space-y-4">
-          <Card className="p-5">
+          <Card className="p-4 sm:p-5 overflow-hidden w-full min-w-0">
             <div className="flex items-center gap-2">
               <Package className="size-4 text-muted-foreground" />
               <h3 className="font-heading font-semibold">Inventario</h3>
@@ -502,7 +502,7 @@ export function Admin() {
             <p className="font-heading text-2xl font-bold tabular-nums">{money(stats.stockValue)}</p>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 sm:p-5 overflow-hidden w-full min-w-0">
             <div className="mb-2 flex items-center gap-2">
               <AlertTriangle className="size-4 text-warning-foreground" />
               <h3 className="font-heading font-semibold">Stock bajo</h3>
@@ -527,7 +527,7 @@ export function Admin() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="p-5 lg:col-span-2">
+        <Card className="p-4 sm:p-5 lg:col-span-2 overflow-hidden w-full min-w-0">
           <h3 className="mb-3 font-heading font-semibold">Historial de Ventas por Día</h3>
           {isLoading ? (
             <div className="space-y-2">
@@ -543,16 +543,16 @@ export function Admin() {
                 <div
                   key={day.id}
                   onClick={() => setSelectedDay(day)}
-                  className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:bg-muted/80 hover:shadow-sm cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                  className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl border border-border bg-card hover:bg-muted/80 hover:shadow-sm cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <div>
-                    <p className="text-sm font-medium">{formatDayLabel(day.date)}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs sm:text-sm font-medium">{formatDayLabel(day.date)}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       {day.sales.length} {day.sales.length === 1 ? 'operación' : 'operaciones'}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-heading text-sm font-bold tabular-nums">{money(day.total)}</span>
+                    <span className="font-heading text-xs sm:text-sm font-bold tabular-nums">{money(day.total)}</span>
                     <ChevronRight className="size-4 text-muted-foreground" />
                   </div>
                 </div>
@@ -569,7 +569,7 @@ export function Admin() {
           )}
         </Card>
 
-        <Card className="p-5 lg:col-span-1">
+        <Card className="p-4 sm:p-5 lg:col-span-1 overflow-hidden w-full min-w-0">
           <h3 className="mb-3 font-heading font-semibold">Últimas ventas</h3>
           {recentSales.length === 0 ? (
             <EmptyState title="Sin ventas registradas" />
@@ -579,16 +579,16 @@ export function Admin() {
                 const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[s.method]
                 const tone = s.method === 'efectivo' ? 'success' : s.method === 'qr' ? 'default' : 'warning'
                 return (
-                  <div key={s.id} className="flex items-center gap-3 py-2.5">
+                  <div key={s.id} className="flex items-center gap-3 py-2 sm:py-2.5">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
+                      <p className="truncate text-xs sm:text-sm font-medium">
                         {s.items.length} art. · {s.items.map((i) => i.name).slice(0, 1).join(', ')}
                         {s.items.length > 1 ? '…' : ''}
                       </p>
-                      <p className="text-xs text-muted-foreground">{formatDate(s.date)}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">{formatDate(s.date)}</p>
                     </div>
                     <Badge tone={tone}>{label}</Badge>
-                    <p className="w-20 text-right font-heading text-sm font-bold tabular-nums">{money(s.total)}</p>
+                    <p className="min-w-[64px] sm:min-w-[80px] text-right font-heading text-xs sm:text-sm font-bold tabular-nums">{money(s.total)}</p>
                   </div>
                 )
               })}
