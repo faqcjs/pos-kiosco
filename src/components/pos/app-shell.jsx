@@ -16,6 +16,8 @@ import {
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/lib/store'
+import { isMockMode } from '@/lib/supabase'
+import { Badge } from '@/components/ui/kit'
 
 const NAV = [
   { id: 'venta', label: 'Venta', short: 'Venta', icon: ShoppingCart },
@@ -138,7 +140,13 @@ export function AppShell({
               collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
             )}
           >
-            <p className="whitespace-nowrap font-heading text-sm font-bold leading-tight">Kiosko POS</p>
+            <p className="whitespace-nowrap font-heading text-sm font-bold leading-tight flex items-center gap-1.5">
+              Kiosko POS
+              <span
+                className={cn("size-2 rounded-full", isMockMode ? "bg-amber-500" : "bg-green-500")}
+                title={isMockMode ? "Modo Local (Mock)" : "Conectado a Supabase"}
+              />
+            </p>
             <p className="whitespace-nowrap text-xs text-muted-foreground">Sistema v1.2</p>
           </div>
         </div>
@@ -225,6 +233,9 @@ export function AppShell({
             <span className="font-heading text-base font-bold">{activeLabel}</span>
           </div>
           <div className="flex items-center gap-2">
+            <Badge tone={isMockMode ? "warning" : "success"} className="text-[10px] px-1.5 py-0.5">
+              {isMockMode ? "Mock" : "Supabase"}
+            </Badge>
             <CajaStatus compact />
             <ThemeToggle compact />
           </div>
