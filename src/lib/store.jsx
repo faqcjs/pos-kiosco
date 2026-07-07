@@ -1,51 +1,36 @@
-'use client'
-
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { createContext, useContext, useEffect, useMemo, useCallback } from 'react'
+import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import { supabase } from './supabase'
 import { uid } from './format'
-import { SEED_CUSTOMERS, SEED_PRODUCTS, SEED_SUPPLIERS, generateMockSales } from './seed'
+import { SEED_PRODUCTS, SEED_CUSTOMERS, SEED_SUPPLIERS, generateMockSales } from './seed'
 
-const STORAGE_KEY = 'kiosko-pos-state-v1'
-
-function initialState() {
-  return {
-    products: SEED_PRODUCTS,
-    sales: generateMockSales(),
-    customers: SEED_CUSTOMERS,
-    suppliers: SEED_SUPPLIERS,
-    currentShift: null,
-    shiftHistory: [],
-    theme: 'light',
-    adminPassword: 'admin123',
-    isAdminAuthenticated: false,
-  }
-}
-
-// ---------- selectors ----------
+// --- selectors ---
 export function customerBalance(c) {
+  if (!c || !c.entries) return 0
   return c.entries.reduce((sum, e) => sum + (e.type === 'compra' ? e.amount : -e.amount), 0)
 }
 
 export function supplierBalance(s) {
+  if (!s || !s.entries) return 0
   return s.entries.reduce((sum, e) => sum + (e.type === 'factura' ? e.amount : -e.amount), 0)
 }
 
 export function shiftTheoretical(shift) {
-  return shift.openingAmount + shift.movements.reduce((sum, m) => sum + m.amount, 0)
+  if (!shift) return 0
+  return shift.openingAmount + (shift.movements || []).reduce((sum, m) => sum + m.amount, 0)
 }
 
 export function shiftTotals(shift, sales) {
   let cashSales = 0
   let manualIn = 0
   let manualOut = 0
-  for (const m of shift.movements) {
+  
+  if (!shift) return { cashSales, manualIn, manualOut, qrSales: 0 }
+  
+  const movements = shift.movements || []
+  for (const m of movements) {
     if (m.type === 'venta') cashSales += m.amount
     else if (m.type === 'ingreso' || m.type === 'cobro_fiado') manualIn += m.amount
     else if (m.type === 'egreso' || m.type === 'pago_proveedor') manualOut += m.amount
@@ -53,7 +38,7 @@ export function shiftTotals(shift, sales) {
 
   const start = new Date(shift.openedAt).getTime()
   const end = shift.closedAt ? new Date(shift.closedAt).getTime() : Date.now()
-  const qrSales = sales
+  const qrSales = (sales || [])
     .filter((s) => {
       const t = new Date(s.date).getTime()
       return s.method === 'qr' && t >= start && t <= end
@@ -63,151 +48,184 @@ export function shiftTotals(shift, sales) {
   return { cashSales, manualIn, manualOut, qrSales }
 }
 
-// ---------- context ----------
-const StoreContext = createContext(null)
+// --- Zustand UI Store ---
+export const useUIStore = create()(
+  persist(
+    (set) => ({
+      theme: 'light',
+      adminPassword: 'admin123',
+      isAdminAuthenticated: false,
+      
+      toggleTheme: () => set((state) => {
+        const nextTheme = state.theme === 'dark' ? 'light' : 'dark'
+        return { theme: nextTheme }
+      }),
+      loginAdmin: (password) => {
+        let success = false
+        set((state) => {
+          if (password === state.adminPassword) {
+            success = true
+            return { isAdminAuthenticated: true }
+          }
+          return {}
+        })
+        return success
+      },
+      logoutAdmin: () => set({ isAdminAuthenticated: false }),
+      changeAdminPassword: (newPassword) => {
+        if (!newPassword || newPassword.trim().length === 0) return
+        set({ adminPassword: newPassword })
+      },
+    }),
+    {
+      name: 'kiosko-pos-ui-state',
+    }
+  )
+)
+
+// --- Query Client ---
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  },
+})
 
 export function StoreProvider({ children }) {
-  const [state, setState] = useState(initialState)
-  const [hydrated, setHydrated] = useState(false)
-  const firstLoad = useRef(true)
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  )
+}
 
-  // hydrate from localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        setState({ ...initialState(), ...parsed })
-      }
-    } catch {
-      // ignore
-    }
-    setHydrated(true)
-  }, [])
+// --- useStore Unified Hook ---
+export function useStore() {
+  const qc = useQueryClient()
+  
+  // Zustand Local UI state
+  const uiTheme = useUIStore((s) => s.theme)
+  const adminPassword = useUIStore((s) => s.adminPassword)
+  const isAdminAuthenticated = useUIStore((s) => s.isAdminAuthenticated)
+  
+  const toggleTheme = useUIStore((s) => s.toggleTheme)
+  const loginAdmin = useUIStore((s) => s.loginAdmin)
+  const logoutAdmin = useUIStore((s) => s.logoutAdmin)
+  const changeAdminPassword = useUIStore((s) => s.changeAdminPassword)
 
-  // persist
-  useEffect(() => {
-    if (firstLoad.current) {
-      firstLoad.current = false
-      return
-    }
-    if (!hydrated) return
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-    } catch {
-      // ignore
-    }
-  }, [state, hydrated])
-
-  // apply theme class
+  // Apply theme class side effect
   useEffect(() => {
     const root = document.documentElement
-    if (state.theme === 'dark') {
+    if (uiTheme === 'dark') {
       root.classList.add('dark')
       root.classList.remove('light')
     } else {
       root.classList.add('light')
       root.classList.remove('dark')
     }
-  }, [state.theme])
+  }, [uiTheme])
 
-  const toggleTheme = useCallback(() => {
-    setState((s) => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))
-  }, [])
-
-  const addProduct = useCallback((p) => {
-    setState((s) => ({ ...s, products: [...s.products, { ...p, id: uid() }] }))
-  }, [])
-
-  const updateProduct = useCallback((p) => {
-    setState((s) => ({ ...s, products: s.products.map((x) => (x.id === p.id ? p : x)) }))
-  }, [])
-
-  const deleteProduct = useCallback((id) => {
-    setState((s) => ({ ...s, products: s.products.filter((x) => x.id !== id) }))
-  }, [])
-
-  const adjustStock = useCallback((id, delta) => {
-    setState((s) => ({
-      ...s,
-      products: s.products.map((x) =>
-        x.id === id ? { ...x, stock: Math.max(0, x.stock + delta) } : x,
-      ),
-    }))
-  }, [])
-
-  const completeSale = useCallback(
-    (args) => {
-      setState((s) => {
-        if (!s.currentShift || s.currentShift.status !== 'open') {
-          return s
-        }
-        const total = args.items.reduce((sum, i) => sum + i.price * i.qty, 0)
-        // compute cost of goods
-        let cost = 0
-        for (const item of args.items) {
-          if (item.productId) {
-            const prod = s.products.find((p) => p.id === item.productId)
-            if (prod) cost += prod.cost * item.qty
-          }
-        }
-        const sale = {
-          id: uid(),
-          date: new Date().toISOString(),
-          items: args.items,
-          total,
-          method: args.method,
-          customerId: args.customerId,
-          cashReceived: args.cashReceived,
-          change: args.change,
-          cost,
-        }
-
-        // decrement stock
-        const products = s.products.map((p) => {
-          const soldQty = args.items
-            .filter((i) => i.productId === p.id)
-            .reduce((q, i) => q + i.qty, 0)
-          return soldQty ? { ...p, stock: Math.max(0, p.stock - soldQty) } : p
-        })
-
-        let currentShift = s.currentShift
-        let customers = s.customers
-
-        if (args.method === 'efectivo' && currentShift && currentShift.status === 'open') {
-          const mov = {
-            id: uid(),
-            date: sale.date,
-            type: 'venta',
-            amount: total,
-            reason: `Venta en efectivo (${args.items.length} art.)`,
-          }
-          currentShift = { ...currentShift, movements: [...currentShift.movements, mov] }
-        }
-
-        if (args.method === 'fiado' && args.customerId) {
-          const detail = args.items.map((i) => `${i.qty}x ${i.name}`).join(', ')
-          customers = s.customers.map((c) =>
-            c.id === args.customerId
-              ? {
-                  ...c,
-                  entries: [
-                    ...c.entries,
-                    { id: uid(), date: sale.date, type: 'compra', amount: total, detail },
-                  ],
-                }
-              : c,
-          )
-        }
-
-        return { ...s, sales: [sale, ...s.sales], products, currentShift, customers }
-      })
+  // React Query server state queries
+  const { data: products = [], isLoading: loadingProducts } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('products').select('*').order('name')
+      if (error) throw error
+      return data || []
     },
-    [],
-  )
+  })
 
-  const openShift = useCallback((openingAmount, openedBy) => {
-    setState((s) => {
+  const { data: sales = [], isLoading: loadingSales } = useQuery({
+    queryKey: ['sales'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('sales').select('*').order('date')
+      if (error) throw error
+      return data || []
+    },
+  })
+
+  const { data: customers = [], isLoading: loadingCustomers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('customers').select('*').order('name')
+      if (error) throw error
+      return data || []
+    },
+  })
+
+  const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('suppliers').select('*').order('name')
+      if (error) throw error
+      return data || []
+    },
+  })
+
+  const { data: shifts = [], isLoading: loadingShifts } = useQuery({
+    queryKey: ['shifts'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('shifts').select('*').order('openedAt')
+      if (error) throw error
+      return data || []
+    },
+  })
+
+  // Compute shifts states
+  const currentShift = useMemo(() => {
+    return shifts.find((s) => s.status === 'open') || null
+  }, [shifts])
+
+  const shiftHistory = useMemo(() => {
+    return shifts.filter((s) => s.status === 'closed').reverse()
+  }, [shifts])
+
+  const hydrated = !loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts
+
+  // Mutations
+  const addProductMutation = useMutation({
+    mutationFn: async (p) => {
+      const { data, error } = await supabase.from('products').insert([p]).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+
+  const updateProductMutation = useMutation({
+    mutationFn: async (p) => {
+      const { data, error } = await supabase.from('products').update(p).eq('id', p.id).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('products').delete().eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+
+  const adjustStockMutation = useMutation({
+    mutationFn: async ({ id, delta }) => {
+      const prod = products.find((x) => x.id === id)
+      if (!prod) throw new Error('Product not found')
+      const newStock = Math.max(0, prod.stock + delta)
+      const { data, error } = await supabase.from('products').update({ stock: newStock }).eq('id', id).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+
+  const openShiftMutation = useMutation({
+    mutationFn: async ({ openingAmount, openedBy }) => {
       const shift = {
         id: uid(),
         openedAt: new Date().toISOString(),
@@ -216,16 +234,19 @@ export function StoreProvider({ children }) {
         status: 'open',
         openedBy,
       }
-      return { ...s, currentShift: shift }
-    })
-  }, [])
+      const { data, error } = await supabase.from('shifts').insert([shift]).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
+  })
 
-  const closeShift = useCallback((counted, closedBy) => {
-    setState((s) => {
-      if (!s.currentShift) return s
-      const theoretical = shiftTheoretical(s.currentShift)
+  const closeShiftMutation = useMutation({
+    mutationFn: async ({ counted, closedBy }) => {
+      if (!currentShift) return
+      const theoretical = shiftTheoretical(currentShift)
       const closed = {
-        ...s.currentShift,
+        ...currentShift,
         closedAt: new Date().toISOString(),
         closingCounted: counted,
         closingTheoretical: theoretical,
@@ -233,215 +254,346 @@ export function StoreProvider({ children }) {
         status: 'closed',
         closedBy,
       }
-      return { ...s, currentShift: null, shiftHistory: [closed, ...s.shiftHistory] }
-    })
-  }, [])
+      const { data, error } = await supabase.from('shifts').update(closed).eq('id', currentShift.id).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
+  })
 
-  const addMovement = useCallback((type, amount, reason) => {
-    setState((s) => {
-      if (!s.currentShift) return s
+  const addMovementMutation = useMutation({
+    mutationFn: async ({ type, amount, reason }) => {
+      if (!currentShift) return
       const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
       const mov = { id: uid(), date: new Date().toISOString(), type, amount: signed, reason }
-      return {
-        ...s,
-        currentShift: { ...s.currentShift, movements: [...s.currentShift.movements, mov] },
+      const updated = {
+        ...currentShift,
+        movements: [...(currentShift.movements || []), mov],
       }
-    })
-  }, [])
+      const { data, error } = await supabase.from('shifts').update(updated).eq('id', currentShift.id).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
+  })
 
-  const addCustomer = useCallback((name, phone) => {
-    const customer = { id: uid(), name, phone, entries: [] }
-    setState((s) => ({ ...s, customers: [...s.customers, customer] }))
-    return customer
-  }, [])
+  const addCustomerMutation = useMutation({
+    mutationFn: async (cust) => {
+      const { data, error } = await supabase.from('customers').insert([cust]).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+  })
 
-  const registerCustomerPayment = useCallback((customerId, amount) => {
-    setState((s) => {
+  const registerCustomerPaymentMutation = useMutation({
+    mutationFn: async ({ customerId, amount }) => {
       const date = new Date().toISOString()
-      const customers = s.customers.map((c) =>
-        c.id === customerId
-          ? {
-              ...c,
-              entries: [...c.entries, { id: uid(), date, type: 'pago', amount, detail: 'Pago de deuda' }],
-            }
-          : c,
-      )
-      let currentShift = s.currentShift
-      if (currentShift && currentShift.status === 'open') {
-        const cust = s.customers.find((c) => c.id === customerId)
+      const customer = customers.find((c) => c.id === customerId)
+      if (!customer) throw new Error('Customer not found')
+      const updated = {
+        ...customer,
+        entries: [...(customer.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago de deuda' }],
+      }
+      await supabase.from('customers').update(updated).eq('id', customerId)
+
+      if (currentShift) {
         const mov = {
           id: uid(),
           date,
           type: 'cobro_fiado',
           amount: Math.abs(amount),
-          reason: `Cobro de fiado${cust ? ` - ${cust.name}` : ''}`,
+          reason: `Cobro de fiado - ${customer.name}`,
         }
-        currentShift = { ...currentShift, movements: [...currentShift.movements, mov] }
+        const updatedShift = {
+          ...currentShift,
+          movements: [...(currentShift.movements || []), mov],
+        }
+        await supabase.from('shifts').update(updatedShift).eq('id', currentShift.id)
       }
-      return { ...s, customers, currentShift }
-    })
-  }, [])
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      qc.invalidateQueries({ queryKey: ['shifts'] })
+    },
+  })
+
+  const addSupplierMutation = useMutation({
+    mutationFn: async (sup) => {
+      const { data, error } = await supabase.from('suppliers').insert([sup]).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+  })
+
+  const receiveGoodsMutation = useMutation({
+    mutationFn: async ({ supplierId, amount, detail, paidCash }) => {
+      const date = new Date().toISOString()
+      const supplier = suppliers.find((x) => x.id === supplierId)
+      if (!supplier) throw new Error('Supplier not found')
+
+      let entries = [...(supplier.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash }]
+      if (paidCash) {
+        entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
+      }
+
+      await supabase.from('suppliers').update({ entries }).eq('id', supplierId)
+
+      if (paidCash && currentShift) {
+        const mov = {
+          id: uid(),
+          date,
+          type: 'pago_proveedor',
+          amount: -Math.abs(amount),
+          reason: `Pago contado - ${supplier.name}`,
+        }
+        const updatedShift = {
+          ...currentShift,
+          movements: [...(currentShift.movements || []), mov],
+        }
+        await supabase.from('shifts').update(updatedShift).eq('id', currentShift.id)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['suppliers'] })
+      qc.invalidateQueries({ queryKey: ['shifts'] })
+    },
+  })
+
+  const registerSupplierPaymentMutation = useMutation({
+    mutationFn: async ({ supplierId, amount, fromCash }) => {
+      const date = new Date().toISOString()
+      const supplier = suppliers.find((x) => x.id === supplierId)
+      if (!supplier) throw new Error('Supplier not found')
+
+      const updated = {
+        ...supplier,
+        entries: [...(supplier.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor' }],
+      }
+      await supabase.from('suppliers').update(updated).eq('id', supplierId)
+
+      if (fromCash && currentShift) {
+        const mov = {
+          id: uid(),
+          date,
+          type: 'pago_proveedor',
+          amount: -Math.abs(amount),
+          reason: `Pago a proveedor - ${supplier.name}`,
+        }
+        const updatedShift = {
+          ...currentShift,
+          movements: [...(currentShift.movements || []), mov],
+        }
+        await supabase.from('shifts').update(updatedShift).eq('id', currentShift.id)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['suppliers'] })
+      qc.invalidateQueries({ queryKey: ['shifts'] })
+    },
+  })
+
+  const completeSaleMutation = useMutation({
+    mutationFn: async (args) => {
+      if (!currentShift) return
+
+      const date = new Date().toISOString()
+      const total = args.items.reduce((sum, i) => sum + i.price * i.qty, 0)
+      
+      let cost = 0
+      for (const item of args.items) {
+        if (item.productId) {
+          const prod = products.find((p) => p.id === item.productId)
+          if (prod) cost += prod.cost * item.qty
+        }
+      }
+
+      const sale = {
+        id: uid(),
+        date,
+        items: args.items,
+        total,
+        method: args.method,
+        customerId: args.customerId,
+        cashReceived: args.cashReceived,
+        change: args.change,
+        cost,
+      }
+
+      // 1. Insert sale
+      await supabase.from('sales').insert([sale])
+
+      // 2. Decrement stocks
+      for (const item of args.items) {
+        if (item.productId) {
+          const prod = products.find((p) => p.id === item.productId)
+          if (prod) {
+            const newStock = Math.max(0, prod.stock - item.qty)
+            await supabase.from('products').update({ stock: newStock }).eq('id', item.productId)
+          }
+        }
+      }
+
+      // 3. Register cash shift movement if paid in cash
+      if (args.method === 'efectivo' && currentShift) {
+        const mov = {
+          id: uid(),
+          date,
+          type: 'venta',
+          amount: total,
+          reason: `Venta en efectivo (${args.items.length} art.)`,
+        }
+        const updatedShift = {
+          ...currentShift,
+          movements: [...(currentShift.movements || []), mov],
+        }
+        await supabase.from('shifts').update(updatedShift).eq('id', currentShift.id)
+      }
+
+      // 4. Update customer balance if credit ("fiado")
+      if (args.method === 'fiado' && args.customerId) {
+        const customer = customers.find((c) => c.id === args.customerId)
+        if (customer) {
+          const detail = args.items.map((i) => `${i.qty}x ${i.name}`).join(', ')
+          const updated = {
+            ...customer,
+            entries: [...(customer.entries || []), { id: uid(), date, type: 'compra', amount: total, detail }],
+          }
+          await supabase.from('customers').update(updated).eq('id', args.customerId)
+        }
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sales'] })
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['shifts'] })
+      qc.invalidateQueries({ queryKey: ['customers'] })
+    },
+  })
+
+  const resetDataMutation = useMutation({
+    mutationFn: async () => {
+      await supabase.from('products').delete().eq('1', '1')
+      await supabase.from('sales').delete().eq('1', '1')
+      await supabase.from('customers').delete().eq('1', '1')
+      await supabase.from('suppliers').delete().eq('1', '1')
+      await supabase.from('shifts').delete().eq('1', '1')
+
+      await supabase.from('products').insert(SEED_PRODUCTS)
+      await supabase.from('sales').insert(generateMockSales())
+      await supabase.from('customers').insert(SEED_CUSTOMERS)
+      await supabase.from('suppliers').insert(SEED_SUPPLIERS)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries()
+    },
+  })
+
+  // Callback wrapper definitions to preserve component APIs
+  const addProduct = useCallback((p) => {
+    addProductMutation.mutate({ ...p, id: uid() })
+  }, [addProductMutation])
+
+  const updateProduct = useCallback((p) => {
+    updateProductMutation.mutate(p)
+  }, [updateProductMutation])
+
+  const deleteProduct = useCallback((id) => {
+    deleteProductMutation.mutate(id)
+  }, [deleteProductMutation])
+
+  const adjustStock = useCallback((id, delta) => {
+    adjustStockMutation.mutate({ id, delta })
+  }, [adjustStockMutation])
+
+  const openShift = useCallback((openingAmount, openedBy) => {
+    openShiftMutation.mutate({ openingAmount, openedBy })
+  }, [openShiftMutation])
+
+  const closeShift = useCallback((counted, closedBy) => {
+    closeShiftMutation.mutate({ counted, closedBy })
+  }, [closeShiftMutation])
+
+  const addMovement = useCallback((type, amount, reason) => {
+    addMovementMutation.mutate({ type, amount, reason })
+  }, [addMovementMutation])
+
+  const addCustomer = useCallback((name, phone) => {
+    const cust = { id: uid(), name, phone, entries: [] }
+    addCustomerMutation.mutate(cust)
+    return cust
+  }, [addCustomerMutation])
+
+  const registerCustomerPayment = useCallback((customerId, amount) => {
+    registerCustomerPaymentMutation.mutate({ customerId, amount })
+  }, [registerCustomerPaymentMutation])
 
   const addSupplier = useCallback((name) => {
-    const supplier = { id: uid(), name, entries: [] }
-    setState((s) => ({ ...s, suppliers: [...s.suppliers, supplier] }))
-    return supplier
-  }, [])
+    const sup = { id: uid(), name, entries: [] }
+    addSupplierMutation.mutate(sup)
+    return sup
+  }, [addSupplierMutation])
 
-  const receiveGoods = useCallback(
-    (supplierId, amount, detail, paidCash) => {
-      setState((s) => {
-        const date = new Date().toISOString()
-        let suppliers = s.suppliers.map((sup) =>
-          sup.id === supplierId
-            ? {
-                ...sup,
-                entries: [
-                  ...sup.entries,
-                  { id: uid(), date, type: 'factura', amount, detail, paidCash },
-                ],
-              }
-            : sup,
-        )
-        let currentShift = s.currentShift
-        if (paidCash) {
-          // if paid cash, also register the payment entry so balance stays 0 for this invoice
-          suppliers = suppliers.map((sup) =>
-            sup.id === supplierId
-              ? {
-                  ...sup,
-                  entries: [
-                    ...sup.entries,
-                    { id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` },
-                  ],
-                }
-              : sup,
-          )
-          if (currentShift && currentShift.status === 'open') {
-            const sup = s.suppliers.find((x) => x.id === supplierId)
-            const mov = {
-              id: uid(),
-              date,
-              type: 'pago_proveedor',
-              amount: -Math.abs(amount),
-              reason: `Pago contado${sup ? ` - ${sup.name}` : ''}`,
-            }
-            currentShift = { ...currentShift, movements: [...currentShift.movements, mov] }
-          }
-        }
-        return { ...s, suppliers, currentShift }
-      })
-    },
-    [],
-  )
+  const receiveGoods = useCallback((supplierId, amount, detail, paidCash) => {
+    receiveGoodsMutation.mutate({ supplierId, amount, detail, paidCash })
+  }, [receiveGoodsMutation])
 
-  const registerSupplierPayment = useCallback(
-    (supplierId, amount, fromCash) => {
-      setState((s) => {
-        const date = new Date().toISOString()
-        const suppliers = s.suppliers.map((sup) =>
-          sup.id === supplierId
-            ? {
-                ...sup,
-                entries: [...sup.entries, { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor' }],
-              }
-            : sup,
-        )
-        let currentShift = s.currentShift
-        if (fromCash && currentShift && currentShift.status === 'open') {
-          const sup = s.suppliers.find((x) => x.id === supplierId)
-          const mov = {
-            id: uid(),
-            date,
-            type: 'pago_proveedor',
-            amount: -Math.abs(amount),
-            reason: `Pago a proveedor${sup ? ` - ${sup.name}` : ''}`,
-          }
-          currentShift = { ...currentShift, movements: [...currentShift.movements, mov] }
-        }
-        return { ...s, suppliers, currentShift }
-      })
-    },
-    [],
-  )
+  const registerSupplierPayment = useCallback((supplierId, amount, fromCash) => {
+    registerSupplierPaymentMutation.mutate({ supplierId, amount, fromCash })
+  }, [registerSupplierPaymentMutation])
+
+  const completeSale = useCallback((args) => {
+    completeSaleMutation.mutate(args)
+  }, [completeSaleMutation])
 
   const resetData = useCallback(() => {
-    setState((s) => ({ ...initialState(), theme: s.theme }))
-  }, [])
+    resetDataMutation.mutate()
+  }, [resetDataMutation])
 
-  const loginAdmin = useCallback((password) => {
-    let success = false
-    setState((s) => {
-      if (password === (s.adminPassword || 'admin123')) {
-        success = true
-        return { ...s, isAdminAuthenticated: true }
-      }
-      return s
-    })
-    return success
-  }, [])
+  // Combine query and Zustand states
+  const state = useMemo(() => ({
+    products,
+    sales,
+    customers,
+    suppliers,
+    currentShift,
+    shiftHistory,
+    theme: uiTheme,
+    adminPassword,
+    isAdminAuthenticated,
+  }), [
+    products,
+    sales,
+    customers,
+    suppliers,
+    currentShift,
+    shiftHistory,
+    uiTheme,
+    adminPassword,
+    isAdminAuthenticated,
+  ])
 
-  const logoutAdmin = useCallback(() => {
-    setState((s) => ({ ...s, isAdminAuthenticated: false }))
-  }, [])
-
-  const changeAdminPassword = useCallback((newPassword) => {
-    if (!newPassword || newPassword.trim().length === 0) return
-    setState((s) => ({ ...s, adminPassword: newPassword }))
-  }, [])
-
-  const value = useMemo(
-    () => ({
-      state,
-      hydrated,
-      toggleTheme,
-      addProduct,
-      updateProduct,
-      deleteProduct,
-      adjustStock,
-      completeSale,
-      openShift,
-      closeShift,
-      addMovement,
-      addCustomer,
-      registerCustomerPayment,
-      addSupplier,
-      receiveGoods,
-      registerSupplierPayment,
-      resetData,
-      loginAdmin,
-      logoutAdmin,
-      changeAdminPassword,
-    }),
-    [
-      state,
-      hydrated,
-      toggleTheme,
-      addProduct,
-      updateProduct,
-      deleteProduct,
-      adjustStock,
-      completeSale,
-      openShift,
-      closeShift,
-      addMovement,
-      addCustomer,
-      registerCustomerPayment,
-      addSupplier,
-      receiveGoods,
-      registerSupplierPayment,
-      resetData,
-      loginAdmin,
-      logoutAdmin,
-      changeAdminPassword,
-    ],
-  )
-
-  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
-}
-
-export function useStore() {
-  const ctx = useContext(StoreContext)
-  if (!ctx) throw new Error('useStore must be used within StoreProvider')
-  return ctx
+  return {
+    state,
+    hydrated,
+    toggleTheme,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    adjustStock,
+    completeSale,
+    openShift,
+    closeShift,
+    addMovement,
+    addCustomer,
+    registerCustomerPayment,
+    addSupplier,
+    receiveGoods,
+    registerSupplierPayment,
+    resetData,
+    loginAdmin,
+    logoutAdmin,
+    changeAdminPassword,
+  }
 }

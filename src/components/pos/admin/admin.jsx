@@ -45,7 +45,13 @@ function startOfDay(d) {
 }
 
 export function Admin() {
-  const { state, logoutAdmin } = useStore()
+  const { state, logoutAdmin, resetData } = useStore()
+
+  const handleReset = () => {
+    if (window.confirm('¿Estás seguro de que querés resetear todos los datos? Se borrarán todos los registros de la base de datos y se restaurarán los datos de prueba iniciales.')) {
+      resetData()
+    }
+  }
   const [range, setRange] = useState('Semana') // "Hoy", "Semana", "Mes", "6 Meses"
   const [visibleDays, setVisibleDays] = useState(10)
   const [selectedDay, setSelectedDay] = useState(null)
@@ -259,10 +265,19 @@ export function Admin() {
         title="Panel de administración"
         description="Resumen del negocio en tiempo real"
         action={
-          <Button variant="destructive" onClick={logoutAdmin}>
-            <Lock className="size-4" />
-            Cerrar sesión
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              className="border-destructive text-destructive hover:bg-destructive/10"
+            >
+              Resetear Datos
+            </Button>
+            <Button variant="destructive" onClick={logoutAdmin}>
+              <Lock className="size-4" />
+              Cerrar sesión
+            </Button>
+          </div>
         }
       />
 
