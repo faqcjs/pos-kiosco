@@ -620,8 +620,8 @@ export function useStore() {
     setCurrentUser(null)
   }, [setCurrentUser])
 
-  const createUser = useCallback((username, password, name, role) => {
-    addUserMutation.mutate({ username, password, name, role })
+  const createUser = useCallback((username, password, name, role, options) => {
+    addUserMutation.mutate({ username, password, name, role }, options)
   }, [addUserMutation])
 
   // Combine query and Zustand states

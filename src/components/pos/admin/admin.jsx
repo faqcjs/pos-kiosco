@@ -29,6 +29,7 @@ import {
 import { Badge, Card, EmptyState, StatCard, Modal, Input, Label, Select } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/pos/page-header'
+import { useToast } from '@/components/ui/toast'
 import { customerBalance, supplierBalance, useStore } from '@/lib/store'
 import { formatDate, formatTime, money, moneyShort } from '@/lib/format'
 
@@ -696,10 +697,12 @@ export function Admin() {
 }
 
 function UsersTab({ state, createUser }) {
+  const toast = useToast()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('cajero')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const activeUsers = useMemo(() => {
     return (state.users || []).filter((u) => u.role !== 'administrador')
@@ -741,11 +744,22 @@ function UsersTab({ state, createUser }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!name.trim() || !username.trim() || !password.trim()) return
-    createUser(username.trim(), password.trim(), name.trim(), role)
-    setName('')
-    setUsername('')
-    setPassword('')
-    setRole('cajero')
+    setIsSubmitting(true)
+    createUser(username.trim(), password.trim(), name.trim(), role, {
+      onSuccess: () => {
+        toast('Usuario creado con éxito', 'success')
+        setName('')
+        setUsername('')
+        setPassword('')
+        setRole('cajero')
+        setIsSubmitting(false)
+      },
+      onError: (err) => {
+        console.error('Error al crear usuario:', err)
+        toast(`Error al crear usuario: ${err.message || 'Intenta con otro usuario'}`, 'error')
+        setIsSubmitting(false)
+      }
+    })
   }
 
   return (
@@ -860,8 +874,8 @@ function UsersTab({ state, createUser }) {
               <option value="repositor">Repositor</option>
             </Select>
           </div>
-          <Button type="submit" className="w-full h-11 font-bold">
-            Registrar Usuario
+          <Button type="submit" disabled={isSubmitting} className="w-full h-11 font-bold">
+            {isSubmitting ? 'Registrando...' : 'Registrar Usuario'}
           </Button>
         </form>
       </Card>
