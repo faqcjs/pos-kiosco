@@ -8,6 +8,7 @@ import {
   Lock,
   LockOpen,
   Wallet,
+  ShoppingCart,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -116,8 +117,29 @@ function OpenShiftView({
   const [closeOpen, setCloseOpen] = useState(false)
   const [counted, setCounted] = useState('')
   const [closedBy, setClosedBy] = useState('')
+  const [selectedSale, setSelectedSale] = useState(null)
 
-  const history = [...shift.movements].reverse()
+  const shiftSales = useMemo(() => {
+    if (!shift) return []
+    const start = new Date(shift.openedAt).getTime()
+    return (state.sales || []).filter((s) => {
+      const t = new Date(s.date).getTime()
+      return t >= start
+    })
+  }, [shift, state.sales])
+
+  const timeline = useMemo(() => {
+    if (!shift) return []
+    const movs = (shift.movements || []).map((m) => ({
+      ...m,
+      isMovement: true,
+    }))
+    const sls = shiftSales.map((s) => ({
+      ...s,
+      isSale: true,
+    }))
+    return [...movs, ...sls].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [shift, shiftSales])
 
   function submitMovement() {
     const n = Number(movAmount)
@@ -213,49 +235,130 @@ function OpenShiftView({
       <Card className="p-4">
         <h3 className="font-heading text-base font-bold">Historial del turno</h3>
         <div className="mt-3 space-y-2">
-          {history.length === 0 ? (
+          {timeline.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Sin movimientos aún.</p>
           ) : (
-            history.map((m) => {
-              const positive = m.amount >= 0
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5"
-                >
-                  <span
-                    className={cn(
-                      'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                      positive ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive',
-                    )}
+            timeline.map((item) => {
+              if (item.isMovement) {
+                const positive = item.amount >= 0
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5"
                   >
-                    {positive ? (
-                      <ArrowUpCircle className="size-4.5" />
-                    ) : (
-                      <ArrowDownCircle className="size-4.5" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{m.reason}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {MOV_LABEL[m.type]} · {formatTime(m.date)}
-                    </p>
+                    <span
+                      className={cn(
+                        'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                        positive ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive',
+                      )}
+                    >
+                      {positive ? (
+                        <ArrowUpCircle className="size-4.5" />
+                      ) : (
+                        <ArrowDownCircle className="size-4.5" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{item.reason}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {MOV_LABEL[item.type]} · {formatTime(item.date)}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        'shrink-0 text-sm font-bold tabular-nums',
+                        positive ? 'text-success' : 'text-destructive',
+                      )}
+                    >
+                      {positive ? '+' : '-'}
+                      {money(Math.abs(item.amount))}
+                    </span>
                   </div>
-                  <span
-                    className={cn(
-                      'shrink-0 text-sm font-bold tabular-nums',
-                      positive ? 'text-success' : 'text-destructive',
-                    )}
+                )
+              } else {
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedSale(item)}
+                    className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 hover:bg-muted/50 cursor-pointer transition-all active:scale-[0.99]"
                   >
-                    {positive ? '+' : '-'}
-                    {money(Math.abs(m.amount))}
-                  </span>
-                </div>
-              )
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <ShoppingCart className="size-4.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">Venta #{item.id.slice(-4).toUpperCase()}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.items.length} {item.items.length === 1 ? 'artículo' : 'artículos'} · {formatTime(item.date)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm font-bold tabular-nums text-success">
+                      +{money(item.total)}
+                    </span>
+                  </div>
+                )
+              }
             })
           )}
         </div>
       </Card>
+
+      <Modal
+        open={!!selectedSale}
+        onClose={() => setSelectedSale(null)}
+        title={selectedSale ? `Detalle de Venta #${selectedSale.id.slice(-4).toUpperCase()}` : ''}
+        variant="center"
+      >
+        {selectedSale && (
+          <div className="space-y-4">
+            <div className="space-y-1.5 text-center pb-4 border-b border-border">
+              <p className="text-2xl font-bold tracking-tight text-foreground font-heading">
+                {money(selectedSale.total)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {formatDateTime(selectedSale.date)} · Vía {selectedSale.method.toUpperCase()}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Productos</p>
+              <div className="divide-y divide-border/60 max-h-40 overflow-y-auto pr-1 font-sans">
+                {selectedSale.items.map((it, idx) => (
+                  <div key={idx} className="flex justify-between py-2 text-sm">
+                    <div>
+                      <span className="font-medium text-foreground">{it.name}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">x{it.qty}</span>
+                    </div>
+                    <span className="font-mono tabular-nums text-muted-foreground">{money(it.price * it.qty)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-3 space-y-2 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Método de pago:</span>
+                <span className="font-medium text-foreground capitalize">{selectedSale.method}</span>
+              </div>
+              {selectedSale.method === 'efectivo' && (
+                <>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Efectivo recibido:</span>
+                    <span className="font-mono tabular-nums text-foreground">{money(selectedSale.cashReceived || 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Vuelto:</span>
+                    <span className="font-mono tabular-nums text-foreground">{money(selectedSale.change || 0)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between text-muted-foreground">
+                <span>Registrado por:</span>
+                <span className="font-medium text-foreground">{selectedSale.soldBy || 'Administrador'}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* close modal */}
       <Modal

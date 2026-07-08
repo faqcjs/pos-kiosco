@@ -1,6 +1,6 @@
 'use client'
 
-import { Camera, Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle, PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { Camera, Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle, PanelRightClose, PanelRightOpen, Flame } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input } from '@/components/ui/kit'
@@ -12,8 +12,14 @@ import { cn } from '@/lib/utils'
 import { PaymentModal } from './payment-modal'
 import { ScannerModal } from './scanner-modal'
 
+const LOCAL_CATEGORIES = ['Todos', 'Más Vendidos', ...CATEGORIES]
+const LOCAL_CATEGORY_ICON = {
+  ...CATEGORY_ICON,
+  'Más Vendidos': '🔥'
+}
+
 export function Venta() {
-  const { state, completeSale } = useStore()
+  const { state, completeSale, toggleMostSold } = useStore()
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Todos')
@@ -54,30 +60,48 @@ export function Venta() {
     }
   }, [])
 
+  const salesCount = useMemo(() => {
+    const counts = {}
+    for (const sale of state.sales || []) {
+      for (const item of sale.items || []) {
+        if (item.productId) {
+          counts[item.productId] = (counts[item.productId] || 0) + item.qty
+        }
+      }
+    }
+    return counts
+  }, [state.sales])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = state.products.filter((p) => {
-      const matchesCat = category === 'Todos' || p.category === category
+      const matchesCat =
+        category === 'Todos' ||
+        (category === 'Más Vendidos' && p.isMostSold) ||
+        p.category === category
       const matchesQ = !q || p.name.toLowerCase().includes(q) || p.barcode.includes(q)
       return matchesCat && matchesQ
     })
 
-    if (!q && category === 'Todos') {
-      const salesCount = {}
-      for (const sale of state.sales) {
-        for (const item of sale.items) {
-          if (item.productId) {
-            salesCount[item.productId] = (salesCount[item.productId] || 0) + item.qty
-          }
+    if (category === 'Más Vendidos') {
+      return [...matches].sort((a, b) => {
+        const countA = salesCount[a.id] || 0
+        const countB = salesCount[b.id] || 0
+        if (countB !== countA) {
+          return countB - countA
         }
-      }
+        return a.name.localeCompare(b.name)
+      })
+    }
+
+    if (!q && category === 'Todos') {
       return [...matches]
         .sort((a, b) => (salesCount[b.id] || 0) - (salesCount[a.id] || 0))
         .slice(0, 12)
     }
 
     return matches
-  }, [state.products, state.sales, query, category])
+  }, [state.products, salesCount, query, category])
 
   const total = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart])
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart])
@@ -216,7 +240,7 @@ export function Venta() {
 
             {/* category filters */}
             <div ref={categoryContainerRef} className="no-scrollbar -mx-1.5 lg:-mx-6 flex flex-row flex-nowrap gap-2 overflow-x-auto px-1.5 lg:px-6 pb-1 touch-pan-x select-none">
-              {['Todos', ...CATEGORIES].map((c) => (
+              {LOCAL_CATEGORIES.map((c) => (
                 <button
                   key={c}
                   onClick={() => setCategory(c)}
@@ -227,7 +251,7 @@ export function Venta() {
                       : 'border-border bg-card text-muted-foreground hover:bg-muted',
                   )}
                 >
-                  {c !== 'Todos' && <span>{CATEGORY_ICON[c]}</span>}
+                  {c !== 'Todos' && <span>{LOCAL_CATEGORY_ICON[c]}</span>}
                   {c}
                 </button>
               ))}
@@ -264,30 +288,45 @@ export function Venta() {
                 const low = p.stock <= p.minStock
                 const out = p.stock <= 0
                 return (
-                  <button
+                  <div
                     key={p.id}
-                    onClick={() => addProductToCart(p)}
-                    disabled={out}
+                    onClick={() => !out && addProductToCart(p)}
                     className={cn(
-                      'flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all hover:border-primary/50 hover:shadow-sm disabled:opacity-50',
+                      'flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all select-none',
+                      out ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50 hover:shadow-sm'
                     )}
                   >
-                    <div className="flex items-start justify-between">
-                      <span className="text-2xl">{CATEGORY_ICON[p.category]}</span>
-                      {out ? (
-                        <Badge tone="danger">Sin stock</Badge>
-                      ) : low ? (
-                        <Badge tone="warning">
-                          <AlertTriangle className="size-3" />
-                          {p.stock}
-                        </Badge>
-                      ) : (
-                        <Badge tone="muted">{p.stock} u.</Badge>
-                      )}
+                    <div className="flex items-start justify-between w-full">
+                      <span className="text-2xl">{LOCAL_CATEGORY_ICON[p.category] || CATEGORY_ICON[p.category]}</span>
+                      <div className="flex items-center gap-1.5">
+                        {out ? (
+                          <Badge tone="danger">Sin stock</Badge>
+                        ) : low ? (
+                          <Badge tone="warning">
+                            <AlertTriangle className="size-3" />
+                            {p.stock}
+                          </Badge>
+                        ) : (
+                          <Badge tone="muted">{p.stock} u.</Badge>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleMostSold(p.id, !p.isMostSold)
+                          }}
+                          className={cn(
+                            "rounded-full p-1 transition-colors hover:bg-muted active:scale-95",
+                            p.isMostSold ? "text-orange-500 hover:text-orange-600" : "text-muted-foreground/30 hover:text-muted-foreground/60"
+                          )}
+                          title={p.isMostSold ? "Quitar de más vendidos" : "Marcar como más vendido"}
+                        >
+                          <Flame className="size-4.5 fill-current" />
+                        </button>
+                      </div>
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight">{p.name}</p>
                     <p className="mt-1 font-heading text-lg font-bold text-primary">{money(p.price)}</p>
-                  </button>
+                  </div>
                 )
               })}
               {filtered.length === 0 && (

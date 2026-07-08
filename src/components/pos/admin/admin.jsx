@@ -25,6 +25,7 @@ import {
   Lock,
   Percent,
   ChevronRight,
+  Trash2,
 } from 'lucide-react'
 import { Badge, Card, EmptyState, StatCard, Modal, Input, Label, Select } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
@@ -46,7 +47,7 @@ function startOfDay(d) {
 }
 
 export function Admin() {
-  const { state, logout, resetData, createUser } = useStore()
+  const { state, logout, resetData, createUser, deleteUser } = useStore()
 
   const handleReset = () => {
     if (window.confirm('¿Estás seguro de que querés resetear todos los datos? Se borrarán todos los registros de la base de datos y se restaurarán los datos de prueba iniciales.')) {
@@ -307,7 +308,7 @@ export function Admin() {
       </div>
 
       {adminTab === 'cajeros' ? (
-        <UsersTab state={state} createUser={createUser} />
+        <UsersTab state={state} createUser={createUser} deleteUser={deleteUser} />
       ) : (
         <>
 
@@ -696,7 +697,7 @@ export function Admin() {
   )
 }
 
-function UsersTab({ state, createUser }) {
+function UsersTab({ state, createUser, deleteUser }) {
   const toast = useToast()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
@@ -786,6 +787,7 @@ function UsersTab({ state, createUser }) {
                   <th className="py-2.5 text-right">Ventas</th>
                   <th className="py-2.5 text-right">Operac.</th>
                   <th className="py-2.5 text-right">Diff. Caja</th>
+                  <th className="py-2.5 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -811,6 +813,23 @@ function UsersTab({ state, createUser }) {
                       </td>
                       <td className={`py-3 text-right tabular-nums ${isRepo ? 'text-muted-foreground' : diffColor}`}>
                         {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
+                      </td>
+                      <td className="py-3 text-right">
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`¿Estás seguro de que querés eliminar el usuario "${c.name}"?`)) {
+                              deleteUser(c.id, {
+                                onSuccess: () => toast('Usuario eliminado', 'info'),
+                                onError: (err) => toast(`Error: ${err.message || 'No se pudo eliminar'}`, 'error')
+                              })
+                            }
+                          }}
+                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition-all inline-flex items-center justify-center"
+                          title="Eliminar usuario"
+                          aria-label="Eliminar usuario"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
                       </td>
                     </tr>
                   )

@@ -15,7 +15,8 @@ function sanitizeProduct(p) {
     cost: Number(p.cost) || 0,
     price: Number(p.price) || 0,
     stock: Number(p.stock) || 0,
-    "minStock": Number(p.minStock) || 0
+    "minStock": Number(p.minStock) || 0,
+    isMostSold: !!p.isMostSold
   }
 }
 
@@ -144,6 +145,20 @@ export function useStore() {
     }
   }, [uiTheme])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        console.log('Realtime change received:', payload)
+        qc.invalidateQueries()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [qc])
+
   // React Query server state queries
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ['products'],
@@ -247,6 +262,15 @@ export function useStore() {
       if (!prod) throw new Error('Product not found')
       const newStock = Math.max(0, prod.stock + delta)
       const { data, error } = await supabase.from('products').update({ stock: newStock }).eq('id', id).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+
+  const toggleMostSoldMutation = useMutation({
+    mutationFn: async ({ id, isMostSold }) => {
+      const { data, error } = await supabase.from('products').update({ isMostSold }).eq('id', id).select()
       if (error) throw error
       return data[0]
     },
@@ -542,6 +566,15 @@ export function useStore() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   })
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('users').delete().eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+
   // Callback wrapper definitions to preserve component APIs
   const addProduct = useCallback((p) => {
     addProductMutation.mutate({ ...p, id: uid() })
@@ -558,6 +591,10 @@ export function useStore() {
   const adjustStock = useCallback((id, delta) => {
     adjustStockMutation.mutate({ id, delta })
   }, [adjustStockMutation])
+
+  const toggleMostSold = useCallback((id, isMostSold) => {
+    toggleMostSoldMutation.mutate({ id, isMostSold })
+  }, [toggleMostSoldMutation])
 
   const openShift = useCallback((openingAmount, openedBy) => {
     openShiftMutation.mutate({ openingAmount, openedBy })
@@ -624,6 +661,10 @@ export function useStore() {
     addUserMutation.mutate({ username, password, name, role }, options)
   }, [addUserMutation])
 
+  const deleteUser = useCallback((id, options) => {
+    deleteUserMutation.mutate(id, options)
+  }, [deleteUserMutation])
+
   // Combine query and Zustand states
   const state = useMemo(() => ({
     products,
@@ -675,5 +716,7 @@ export function useStore() {
     login,
     logout,
     createUser,
+    deleteUser,
+    toggleMostSold,
   }
 }

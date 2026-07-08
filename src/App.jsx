@@ -140,6 +140,77 @@ function BlockScreen({ currentShift, logout }) {
   )
 }
 
+function SkeletonLoader() {
+  return (
+    <div className="flex h-screen w-screen overflow-hidden bg-background">
+      {/* Sidebar Skeleton (desktop) */}
+      <aside className="hidden h-full w-60 shrink-0 flex-col border-r border-border bg-card p-4 space-y-6 lg:flex animate-pulse">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-muted" />
+          <div className="space-y-1.5 flex-1">
+            <div className="h-4 w-2/3 rounded bg-muted" />
+            <div className="h-3 w-1/2 rounded bg-muted" />
+          </div>
+        </div>
+        <div className="h-9 w-full rounded-full bg-muted" />
+        <nav className="space-y-3 flex-1">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-10 w-full rounded-xl bg-muted" />
+          ))}
+        </nav>
+        <div className="h-12 w-full rounded-xl bg-muted" />
+      </aside>
+
+      {/* Main Area Skeleton */}
+      <div className="flex flex-1 flex-col overflow-hidden animate-pulse">
+        {/* Header Skeleton */}
+        <header className="h-14 border-b border-border bg-card/50 flex items-center justify-between px-4 lg:px-8">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded bg-muted lg:hidden" />
+            <div className="h-5 w-32 rounded bg-muted" />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="h-6 w-16 rounded-full bg-muted" />
+            <div className="h-8 w-8 rounded-xl bg-muted" />
+          </div>
+        </header>
+
+        {/* Content Area Skeleton */}
+        <main className="flex-1 overflow-y-auto p-4 space-y-6 lg:p-8">
+          <div className="flex justify-between items-center pb-2">
+            <div className="space-y-2">
+              <div className="h-7 w-48 rounded bg-muted" />
+              <div className="h-4 w-72 rounded bg-muted" />
+            </div>
+            <div className="h-10 w-28 rounded-xl bg-muted" />
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 rounded-2xl border border-border bg-card/40 p-4 space-y-3">
+                <div className="flex justify-between">
+                  <div className="h-4 w-20 rounded bg-muted" />
+                  <div className="h-7 w-7 rounded bg-muted" />
+                </div>
+                <div className="h-7 w-28 rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card/30 p-6 space-y-4">
+            <div className="h-5 w-36 rounded bg-muted" />
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-12 w-full rounded-xl bg-muted/65" />
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
 function Screen({ active, setActive }) {
   const { state } = useStore()
   const isAdmin = state.currentUser?.role === 'administrador'
@@ -183,11 +254,7 @@ function Shell() {
   }, [userRole])
 
   if (!hydrated) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="size-10 animate-spin rounded-full border-2 border-muted border-t-primary" />
-      </div>
-    )
+    return <SkeletonLoader />
   }
 
   if (!state.currentUser) {
