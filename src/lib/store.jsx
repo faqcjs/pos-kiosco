@@ -163,6 +163,29 @@ export function useStore() {
     }
   }, [uiTheme])
 
+  // Sync Supabase auth state with Zustand's currentUser
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        if (!currentUser || currentUser.id !== session.user.id) {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle()
+          if (!error && data) {
+            setCurrentUser(data)
+          }
+        }
+      } else {
+        if (currentUser) {
+          setCurrentUser(null)
+        }
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [currentUser, setCurrentUser])
+
   // React Query server state queries
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ['products'],
@@ -532,22 +555,16 @@ export function useStore() {
 
   const resetDataMutation = useMutation({
     mutationFn: async () => {
-      await supabase.from('products').delete().eq('1', '1')
-      await supabase.from('sales').delete().eq('1', '1')
-      await supabase.from('customers').delete().eq('1', '1')
-      await supabase.from('suppliers').delete().eq('1', '1')
-      await supabase.from('shifts').delete().eq('1', '1')
-      await supabase.from('users').delete().eq('1', '1')
+      await supabase.from('products').delete().neq('id', '_none_')
+      await supabase.from('sales').delete().neq('id', '_none_')
+      await supabase.from('customers').delete().neq('id', '_none_')
+      await supabase.from('suppliers').delete().neq('id', '_none_')
+      await supabase.from('shifts').delete().neq('id', '_none_')
 
       await supabase.from('products').insert(SEED_PRODUCTS)
       await supabase.from('sales').insert(generateMockSales())
       await supabase.from('customers').insert(SEED_CUSTOMERS)
       await supabase.from('suppliers').insert(SEED_SUPPLIERS)
-      await supabase.from('users').insert([
-        { id: 'u-admin', username: 'admin', password: 'admin123', role: 'administrador', name: 'Administrador' },
-        { id: 'u-cajero', username: 'cajero', password: '123', role: 'cajero', name: 'Juan Cajero' },
-        { id: 'u-repositor', username: 'repo', password: '123', role: 'repositor', name: 'Pedro Repositor' },
-      ])
     },
     onSuccess: () => {
       qc.invalidateQueries()
@@ -556,23 +573,27 @@ export function useStore() {
 
   const addUserMutation = useMutation({
     mutationFn: async ({ username, password, name, role }) => {
-      const user = {
-        id: uid(),
-        username,
-        password,
-        role: role || 'cajero',
-        name,
-      }
-      const { data, error } = await supabase.from('users').insert([user]).select()
+      const { data, error } = await supabase.rpc('create_user', {
+        p_username: username.toLowerCase().trim(),
+        p_password: password,
+        p_name: name,
+        p_role: role || 'cajero',
+      })
       if (error) throw error
-      return data[0]
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data)
+        .single()
+      if (profileError) throw profileError
+      return profile
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   })
 
   const deleteUserMutation = useMutation({
     mutationFn: async (id) => {
-      const { error } = await supabase.from('users').delete().eq('id', id)
+      const { error } = await supabase.rpc('delete_user', { user_id: id })
       if (error) throw error
       return id
     },
@@ -645,19 +666,33 @@ export function useStore() {
   }, [resetDataMutation])
 
   const login = useCallback(async (username, password) => {
-    const { data, error } = await supabase.from('users').select('*').eq('username', username).eq('password', password)
-    if (error) {
-      console.error(error)
+    const email = `${username.toLowerCase().trim()}@kiosko.com`
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    if (authError) {
+      console.error(authError)
       return false
     }
-    if (data && data.length > 0) {
-      setCurrentUser(data[0])
+    if (authData?.user) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single()
+      if (error) {
+        console.error(error)
+        return false
+      }
+      setCurrentUser(data)
       return true
     }
     return false
   }, [setCurrentUser])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut()
     setCurrentUser(null)
   }, [setCurrentUser])
 
