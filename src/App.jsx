@@ -298,7 +298,7 @@ function Shell() {
 
   return (
     <AppShell active={active} onChange={handleRouteChange}>
-      <div className="px-1.5 py-2.5 sm:px-6 lg:px-8 lg:py-8">
+      <div className="flex flex-col flex-1 min-h-0 px-1.5 py-2.5 sm:px-6 lg:px-8 lg:py-8">
         <Screen active={active} />
       </div>
     </AppShell>

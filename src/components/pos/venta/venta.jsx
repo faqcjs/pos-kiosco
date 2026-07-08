@@ -197,9 +197,9 @@ export function Venta() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100dvh-9.5rem)] lg:h-[calc(100dvh-4rem)] overflow-hidden">
+    <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
       {/* Left: products */}
-      <div className="flex min-w-0 flex-1 flex-col p-1.5 lg:p-6 h-full overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col p-1.5 lg:p-6 min-h-0 overflow-hidden">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 flex-1 min-h-0">
           
           {/* Header section (Fixed at top) */}

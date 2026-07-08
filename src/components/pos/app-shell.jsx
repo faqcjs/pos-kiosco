@@ -261,7 +261,7 @@ export function AppShell({
       </aside>
 
       {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile header */}
         <header className="sticky top-0 z-30 flex flex-col gap-2 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur lg:hidden">
           <div className="flex items-center justify-between gap-3">
@@ -298,7 +298,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</main>
+        <main className="min-w-0 flex-1 overflow-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0 flex flex-col">{children}</main>
 
         {/* Mobile bottom nav */}
         <nav className={cn(
