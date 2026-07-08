@@ -130,7 +130,7 @@ export function AppShell({
     })
   }
 
-  const activeLabel = filteredNav.find((n) => n.id === active)?.label ?? 'Kiosko POS'
+  const activeLabel = filteredNav.find((n) => n.id === active)?.label ?? 'eKiosco'
 
   return (
     <div className="flex min-h-dvh bg-background">
@@ -154,7 +154,7 @@ export function AppShell({
             )}
           >
             <p className="whitespace-nowrap font-heading text-sm font-bold leading-tight flex items-center gap-1.5">
-              Kiosko POS
+              eKiosco
               <span
                 className={cn("size-2 rounded-full", isMockMode ? "bg-amber-500" : "bg-green-500")}
                 title={isMockMode ? "Modo Local (Mock)" : "Conectado a Supabase"}

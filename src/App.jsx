@@ -38,7 +38,7 @@ function LoginScreen() {
             🛒
           </div>
           <h2 className="mt-6 text-3xl font-bold tracking-tight font-heading text-foreground">
-            Kiosko POS
+            eKiosco
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Iniciá sesión para acceder al sistema
@@ -211,18 +211,24 @@ function SkeletonLoader() {
   )
 }
 
-function Screen({ active, setActive }) {
+const getHashRoute = () => {
+  const hash = window.location.hash.replace('#/', '')
+  const valid = ['venta', 'caja', 'stock', 'fiar', 'proveedores', 'admin']
+  return valid.includes(hash) ? hash : 'venta'
+}
+
+function Screen({ active }) {
   const { state } = useStore()
   const isAdmin = state.currentUser?.role === 'administrador'
   const isRepositor = state.currentUser?.role === 'repositor'
 
   useEffect(() => {
     if (isRepositor && active !== 'stock' && active !== 'proveedores') {
-      setActive('stock')
+      window.location.hash = '#/stock'
     } else if (active === 'admin' && !isAdmin) {
-      setActive('venta')
+      window.location.hash = '#/venta'
     }
-  }, [active, isAdmin, isRepositor, setActive])
+  }, [active, isAdmin, isRepositor])
 
   switch (active) {
     case 'venta':
@@ -243,15 +249,30 @@ function Screen({ active, setActive }) {
 }
 
 function Shell() {
-  const [active, setActive] = useState('venta')
+  const [active, setActive] = useState(getHashRoute)
   const { state, hydrated, logout } = useStore()
   const userRole = state.currentUser?.role
 
   useEffect(() => {
-    if (userRole === 'repositor') {
-      setActive('stock')
+    const handleHashChange = () => {
+      setActive(getHashRoute())
     }
-  }, [userRole])
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
+  useEffect(() => {
+    if (state.currentUser) {
+      if (userRole === 'repositor') {
+        const route = getHashRoute()
+        if (route !== 'stock' && route !== 'proveedores') {
+          window.location.hash = '#/stock'
+        }
+      } else if (!window.location.hash) {
+        window.location.hash = '#/venta'
+      }
+    }
+  }, [userRole, state.currentUser])
 
   if (!hydrated) {
     return <SkeletonLoader />
@@ -270,10 +291,15 @@ function Shell() {
     return <BlockScreen currentShift={state.currentShift} logout={logout} />
   }
 
+  const handleRouteChange = (route) => {
+    window.location.hash = `#/${route}`
+    setActive(route)
+  }
+
   return (
-    <AppShell active={active} onChange={setActive}>
+    <AppShell active={active} onChange={handleRouteChange}>
       <div className="px-1.5 py-2.5 sm:px-6 lg:px-8 lg:py-8">
-        <Screen active={active} setActive={setActive} />
+        <Screen active={active} />
       </div>
     </AppShell>
   )
