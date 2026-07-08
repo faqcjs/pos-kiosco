@@ -518,6 +518,7 @@ export function useStore() {
       await supabase.from('users').insert([
         { id: 'u-admin', username: 'admin', password: 'admin123', role: 'administrador', name: 'Administrador' },
         { id: 'u-cajero', username: 'cajero', password: '123', role: 'cajero', name: 'Juan Cajero' },
+        { id: 'u-repositor', username: 'repo', password: '123', role: 'repositor', name: 'Pedro Repositor' },
       ])
     },
     onSuccess: () => {
@@ -526,12 +527,12 @@ export function useStore() {
   })
 
   const addUserMutation = useMutation({
-    mutationFn: async ({ username, password, name }) => {
+    mutationFn: async ({ username, password, name, role }) => {
       const user = {
         id: uid(),
         username,
         password,
-        role: 'cajero',
+        role: role || 'cajero',
         name,
       }
       const { data, error } = await supabase.from('users').insert([user]).select()
@@ -619,8 +620,8 @@ export function useStore() {
     setCurrentUser(null)
   }, [setCurrentUser])
 
-  const createUser = useCallback((username, password, name) => {
-    addUserMutation.mutate({ username, password, name })
+  const createUser = useCallback((username, password, name, role) => {
+    addUserMutation.mutate({ username, password, name, role })
   }, [addUserMutation])
 
   // Combine query and Zustand states

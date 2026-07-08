@@ -26,7 +26,7 @@ import {
   Percent,
   ChevronRight,
 } from 'lucide-react'
-import { Badge, Card, EmptyState, StatCard, Modal, Input, Label } from '@/components/ui/kit'
+import { Badge, Card, EmptyState, StatCard, Modal, Input, Label, Select } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/pos/page-header'
 import { customerBalance, supplierBalance, useStore } from '@/lib/store'
@@ -699,18 +699,19 @@ function UsersTab({ state, createUser }) {
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [role, setRole] = useState('cajero')
 
-  const cashiers = useMemo(() => {
-    return (state.users || []).filter((u) => u.role === 'cajero')
+  const activeUsers = useMemo(() => {
+    return (state.users || []).filter((u) => u.role !== 'administrador')
   }, [state.users])
 
-  // Calculate metrics for each cashier
-  const cashierMetrics = useMemo(() => {
+  // Calculate metrics for each user
+  const userMetrics = useMemo(() => {
     const metrics = {}
     
     // Initialize
-    for (const c of cashiers) {
-      metrics[c.username] = {
+    for (const u of activeUsers) {
+      metrics[u.username] = {
         totalSales: 0,
         salesCount: 0,
         totalDiff: 0,
@@ -727,8 +728,6 @@ function UsersTab({ state, createUser }) {
     }
     
     // Sum shift differences.
-    // Shift closedBy matches c.name (the complete name).
-    // Let's match by name.
     for (const shift of state.shiftHistory || []) {
       const closedByUser = (state.users || []).find((u) => u.name === shift.closedBy)
       if (closedByUser && metrics[closedByUser.username]) {
@@ -737,15 +736,16 @@ function UsersTab({ state, createUser }) {
     }
     
     return metrics
-  }, [cashiers, state.sales, state.shiftHistory, state.users])
+  }, [activeUsers, state.sales, state.shiftHistory, state.users])
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!name.trim() || !username.trim() || !password.trim()) return
-    createUser(username.trim(), password.trim(), name.trim())
+    createUser(username.trim(), password.trim(), name.trim(), role)
     setName('')
     setUsername('')
     setPassword('')
+    setRole('cajero')
   }
 
   return (
@@ -753,13 +753,13 @@ function UsersTab({ state, createUser }) {
       {/* List */}
       <Card className="p-5 md:col-span-2 space-y-4">
         <div>
-          <h3 className="font-heading font-semibold text-lg">Cajeros Registrados</h3>
+          <h3 className="font-heading font-semibold text-lg">Usuarios Registrados</h3>
           <p className="text-xs text-muted-foreground">
-            Lista de cuentas de cajeros y métricas de desempeño acumuladas.
+            Lista de cuentas de usuarios y métricas de desempeño acumuladas.
           </p>
         </div>
-        {cashiers.length === 0 ? (
-          <EmptyState title="Sin cajeros" description="No hay cajeros registrados todavía." />
+        {activeUsers.length === 0 ? (
+          <EmptyState title="Sin usuarios" description="No hay usuarios registrados todavía." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm border-collapse">
@@ -768,24 +768,35 @@ function UsersTab({ state, createUser }) {
                   <th className="py-2.5">Nombre</th>
                   <th className="py-2.5">Usuario</th>
                   <th className="py-2.5">Contraseña</th>
+                  <th className="py-2.5">Rol</th>
                   <th className="py-2.5 text-right">Ventas</th>
                   <th className="py-2.5 text-right">Operac.</th>
                   <th className="py-2.5 text-right">Diff. Caja</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {cashiers.map((c) => {
-                  const m = cashierMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
+                {activeUsers.map((c) => {
+                  const isRepo = c.role === 'repositor'
+                  const m = userMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
                   const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
                   return (
                     <tr key={c.id} className="hover:bg-muted/10 transition-colors">
                       <td className="py-3 font-medium text-foreground">{c.name}</td>
                       <td className="py-3 text-muted-foreground">{c.username}</td>
                       <td className="py-3 text-muted-foreground font-mono">{c.password}</td>
-                      <td className="py-3 text-right font-semibold tabular-nums text-foreground">{money(m.totalSales)}</td>
-                      <td className="py-3 text-right tabular-nums text-muted-foreground">{m.salesCount}</td>
-                      <td className={`py-3 text-right tabular-nums ${diffColor}`}>
-                        {m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff)}
+                      <td className="py-3">
+                        <Badge tone={c.role === 'repositor' ? 'accent' : 'muted'} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
+                          {c.role === 'repositor' ? 'Repositor' : 'Cajero'}
+                        </Badge>
+                      </td>
+                      <td className="py-3 text-right font-semibold tabular-nums text-foreground">
+                        {isRepo ? '—' : money(m.totalSales)}
+                      </td>
+                      <td className="py-3 text-right tabular-nums text-muted-foreground">
+                        {isRepo ? '—' : m.salesCount}
+                      </td>
+                      <td className={`py-3 text-right tabular-nums ${isRepo ? 'text-muted-foreground' : diffColor}`}>
+                        {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
                       </td>
                     </tr>
                   )
@@ -799,9 +810,9 @@ function UsersTab({ state, createUser }) {
       {/* Form */}
       <Card className="p-5 h-fit space-y-4">
         <div>
-          <h3 className="font-heading font-semibold text-lg">Nuevo Cajero</h3>
+          <h3 className="font-heading font-semibold text-lg">Nuevo Usuario</h3>
           <p className="text-xs text-muted-foreground">
-            Crear una nueva cuenta de cajero.
+            Crear una nueva cuenta de cajero o repositor.
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -838,8 +849,19 @@ function UsersTab({ state, createUser }) {
               placeholder="Contraseña de acceso"
             />
           </div>
+          <div>
+            <Label htmlFor="cashier-role">Rol</Label>
+            <Select
+              id="cashier-role"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
+              <option value="cajero">Cajero</option>
+              <option value="repositor">Repositor</option>
+            </Select>
+          </div>
           <Button type="submit" className="w-full h-11 font-bold">
-            Registrar Cajero
+            Registrar Usuario
           </Button>
         </form>
       </Card>

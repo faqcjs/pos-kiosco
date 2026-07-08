@@ -143,34 +143,44 @@ function BlockScreen({ currentShift, logout }) {
 function Screen({ active, setActive }) {
   const { state } = useStore()
   const isAdmin = state.currentUser?.role === 'administrador'
+  const isRepositor = state.currentUser?.role === 'repositor'
 
   useEffect(() => {
-    if (active === 'admin' && !isAdmin) {
+    if (isRepositor && active !== 'stock' && active !== 'proveedores') {
+      setActive('stock')
+    } else if (active === 'admin' && !isAdmin) {
       setActive('venta')
     }
-  }, [active, isAdmin, setActive])
+  }, [active, isAdmin, isRepositor, setActive])
 
   switch (active) {
     case 'venta':
-      return <Venta />
+      return isRepositor ? <Stock /> : <Venta />
     case 'caja':
-      return <Caja />
+      return isRepositor ? <Stock /> : <Caja />
     case 'stock':
       return <Stock />
     case 'fiar':
-      return <Clientes />
+      return isRepositor ? <Stock /> : <Clientes />
     case 'proveedores':
       return <Proveedores />
     case 'admin':
-      return isAdmin ? <Admin /> : <Venta />
+      return isAdmin ? <Admin /> : (isRepositor ? <Stock /> : <Venta />)
     default:
-      return <Venta />
+      return isRepositor ? <Stock /> : <Venta />
   }
 }
 
 function Shell() {
   const [active, setActive] = useState('venta')
   const { state, hydrated, logout } = useStore()
+  const userRole = state.currentUser?.role
+
+  useEffect(() => {
+    if (userRole === 'repositor') {
+      setActive('stock')
+    }
+  }, [userRole])
 
   if (!hydrated) {
     return (
@@ -187,24 +197,10 @@ function Shell() {
   // Shift block checking
   const isShiftActive = !!state.currentShift
   const isShiftOwner = state.currentUser?.name === state.currentShift?.openedBy
-  const isAdmin = state.currentUser?.role === 'administrador'
+  const isBlocked = state.currentUser?.role === 'cajero' && isShiftActive && !isShiftOwner
 
-  if (isShiftActive && !isShiftOwner) {
-    if (!isAdmin) {
-      // Cashiers are completely blocked
-      return <BlockScreen currentShift={state.currentShift} logout={logout} />
-    } else {
-      // Admins are allowed to view/use 'admin' tab, but blocked on other screens
-      if (active !== 'admin') {
-        return (
-          <AppShell active={active} onChange={setActive}>
-            <div className="px-1.5 py-2.5 sm:px-6 lg:px-8 lg:py-8">
-              <BlockScreen currentShift={state.currentShift} logout={logout} />
-            </div>
-          </AppShell>
-        )
-      }
-    }
+  if (isBlocked) {
+    return <BlockScreen currentShift={state.currentShift} logout={logout} />
   }
 
   return (

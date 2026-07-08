@@ -28,6 +28,7 @@ function getMockDB() {
     users: [
       { id: 'u-admin', username: 'admin', password: 'admin123', role: 'administrador', name: 'Administrador' },
       { id: 'u-cajero', username: 'cajero', password: '123', role: 'cajero', name: 'Juan Cajero' },
+      { id: 'u-repositor', username: 'repo', password: '123', role: 'repositor', name: 'Pedro Repositor' },
     ],
   }
   localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(initial))

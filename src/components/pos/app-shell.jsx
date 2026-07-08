@@ -112,8 +112,12 @@ export function AppShell({
   const { state, logout } = useStore()
 
   const filteredNav = NAV.filter((item) => {
+    const role = state.currentUser?.role
+    if (role === 'repositor') {
+      return item.id === 'stock' || item.id === 'proveedores'
+    }
     if (item.id === 'admin') {
-      return state.currentUser?.role !== 'cajero'
+      return role !== 'cajero'
     }
     return true
   })
@@ -216,8 +220,8 @@ export function AppShell({
             <div className="flex flex-col gap-1 text-xs">
               <span className="font-semibold text-foreground truncate">{state.currentUser?.name}</span>
               <div className="flex items-center gap-1">
-                <Badge tone={state.currentUser?.role === 'administrador' ? 'default' : 'muted'} className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
-                  {state.currentUser?.role === 'administrador' ? 'Administrador' : 'Cajero'}
+                <Badge tone={state.currentUser?.role === 'administrador' ? 'default' : (state.currentUser?.role === 'repositor' ? 'accent' : 'muted')} className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
+                  {state.currentUser?.role === 'administrador' ? 'Administrador' : (state.currentUser?.role === 'repositor' ? 'Repositor' : 'Cajero')}
                 </Badge>
               </div>
             </div>
@@ -278,8 +282,8 @@ export function AppShell({
           <div className="flex items-center justify-between border-t border-border/50 pt-2 text-xs">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-foreground">{state.currentUser?.name}</span>
-              <Badge tone={state.currentUser?.role === 'administrador' ? 'default' : 'muted'} className="text-[9px] px-1.5 py-0.5">
-                {state.currentUser?.role === 'administrador' ? 'Administrador' : 'Cajero'}
+              <Badge tone={state.currentUser?.role === 'administrador' ? 'default' : (state.currentUser?.role === 'repositor' ? 'accent' : 'muted')} className="text-[9px] px-1.5 py-0.5">
+                {state.currentUser?.role === 'administrador' ? 'Administrador' : (state.currentUser?.role === 'repositor' ? 'Repositor' : 'Cajero')}
               </Badge>
             </div>
             <button
@@ -299,7 +303,7 @@ export function AppShell({
         {/* Mobile bottom nav */}
         <nav className={cn(
           "fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden",
-          filteredNav.length === 5 ? "grid-cols-5" : "grid-cols-6"
+          filteredNav.length === 2 ? "grid-cols-2" : (filteredNav.length === 5 ? "grid-cols-5" : "grid-cols-6")
         )}>
           {filteredNav.map((item) => {
             const Icon = item.icon
