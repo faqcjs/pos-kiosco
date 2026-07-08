@@ -109,9 +109,27 @@ const queryClient = new QueryClient({
   },
 })
 
+function RealtimeSync() {
+  const qc = useQueryClient()
+  useEffect(() => {
+    const channel = supabase
+      .channel('pos-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        qc.invalidateQueries()
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return null
+}
+
 export function StoreProvider({ children }) {
   return (
     <QueryClientProvider client={queryClient}>
+      <RealtimeSync />
       {children}
     </QueryClientProvider>
   )
@@ -144,22 +162,6 @@ export function useStore() {
       root.classList.remove('dark')
     }
   }, [uiTheme])
-
-  useEffect(() => {
-    const channelName = `schema-db-changes-${Date.now()}`
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        qc.invalidateQueries()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  // qc is a stable QueryClient singleton — intentionally omitted from deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // React Query server state queries
   const { data: products = [], isLoading: loadingProducts } = useQuery({
