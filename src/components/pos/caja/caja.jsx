@@ -159,37 +159,37 @@ function OpenShiftView({
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Badge tone="success">
+        <Badge tone="success" className="text-xs">
           <span className="size-2 animate-pulse rounded-full bg-success" />
           Turno abierto por{' '}
           <span className="max-w-[12ch] truncate inline-block align-bottom">{shift.openedBy || 'Desconocido'}</span>{' '}
           desde {formatTime(shift.openedAt)}
         </Badge>
-        <Button variant="destructive" onClick={() => setCloseOpen(true)}>
+        <Button variant="destructive" size="sm" onClick={() => setCloseOpen(true)}>
           <Lock className="size-4" />
           Cerrar caja
         </Button>
       </div>
 
       {/* metrics */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard label="Apertura" value={money(shift.openingAmount)} icon={<Wallet className="size-4" />} className="p-3" />
-        <StatCard label="Ventas efectivo" value={money(cashSales)} tone="success" sub="+ ingresos por ventas" className="p-3" />
-        <StatCard label="Ventas QR/Transferencia" value={money(qrSales)} tone="success" sub="Dinero digital en cuenta" className="p-3" />
-        <StatCard label="Ingresos manuales" value={money(manualIn)} tone="success" className="p-3" />
-        <StatCard label="Egresos / retiros" value={money(manualOut)} tone="danger" className="p-3" />
+        <StatCard label="Ventas efectivo" value={money(cashSales)} tone="success" sub="Ventas en caja" className="p-3" />
+        <StatCard label="Ventas QR/Trans." value={money(qrSales)} tone="success" sub="Dinero digital" className="p-3" />
+        <StatCard label="Ingresos" value={money(manualIn)} tone="success" className="p-3" />
+        <StatCard label="Egresos" value={money(manualOut)} tone="danger" className="p-3" />
         <StatCard
           label="Total teórico"
           value={money(theoretical)}
           tone="accent"
-          sub="Saldo estimado en caja"
+          sub="Saldo estimado"
           className="p-3"
         />
       </div>
 
       {/* register movement */}
       <Card className="p-4">
-        <h3 className="font-heading text-base font-bold">Registrar movement</h3>
+        <h3 className="font-heading text-base font-bold">Registrar movimiento</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-[140px_1fr_1fr_auto] sm:items-end">
           <div>
             <Label htmlFor="movtype">Tipo</Label>

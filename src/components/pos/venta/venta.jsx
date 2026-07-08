@@ -197,7 +197,12 @@ export function Venta() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+    <>
+    <style>{`
+      .venta-root { height: calc(100svh - 9.5rem); }
+      @media (min-width: 1024px) { .venta-root { height: calc(100svh - 4rem); } }
+    `}</style>
+    <div className="venta-root flex flex-col lg:flex-row overflow-hidden" style={{ minHeight: 0 }}>
       {/* Left: products */}
       <div className="flex min-w-0 flex-1 flex-col p-1.5 lg:p-6 min-h-0 overflow-hidden">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 flex-1 min-h-0">
@@ -440,6 +445,7 @@ export function Venta() {
         onConfirm={handleConfirmSale}
       />
     </div>
+    </>
   )
 }
 
