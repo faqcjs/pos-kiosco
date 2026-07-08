@@ -146,10 +146,10 @@ export function useStore() {
   }, [uiTheme])
 
   useEffect(() => {
+    const channelName = `schema-db-changes-${Date.now()}`
     const channel = supabase
-      .channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        console.log('Realtime change received:', payload)
+      .channel(channelName)
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
         qc.invalidateQueries()
       })
       .subscribe()
@@ -157,7 +157,9 @@ export function useStore() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [qc])
+  // qc is a stable QueryClient singleton — intentionally omitted from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // React Query server state queries
   const { data: products = [], isLoading: loadingProducts } = useQuery({
