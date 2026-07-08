@@ -102,3 +102,30 @@ CREATE POLICY "Allow public read access" ON public.shifts FOR SELECT USING (true
 CREATE POLICY "Allow public insert access" ON public.shifts FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update access" ON public.shifts FOR UPDATE USING (true);
 CREATE POLICY "Allow public delete access" ON public.shifts FOR DELETE USING (true);
+
+
+-- 6. Create Users Table
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('cajero', 'administrador', 'repositor')),
+    name TEXT NOT NULL
+);
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access" ON public.users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access" ON public.users FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access" ON public.users FOR DELETE USING (true);
+
+-- Insert default seed users
+INSERT INTO public.users (id, username, password, role, name)
+VALUES 
+  ('u-admin', 'admin', 'admin123', 'administrador', 'Administrador'),
+  ('u-cajero', 'cajero', '123', 'cajero', 'Juan Cajero'),
+  ('u-repositor', 'repo', '123', 'repositor', 'Pedro Repositor')
+ON CONFLICT (username) DO NOTHING;
+
