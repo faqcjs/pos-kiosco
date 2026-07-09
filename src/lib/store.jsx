@@ -150,6 +150,7 @@ export function StoreProvider({ children }) {
 // --- useStore Unified Hook ---
 export function useStore() {
   const qc = useQueryClient()
+  const isOnline = typeof navigator !== 'undefined' && navigator.onLine
   
   // Zustand Local UI state
   const uiTheme = useUIStore((s) => s.theme)
@@ -400,7 +401,6 @@ export function useStore() {
     return shifts.filter((s) => s.status === 'closed')
   }, [shifts])
 
-  const isOnline = typeof navigator !== 'undefined' && navigator.onLine
   const hydrated = !isOnline || (!loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts && (currentUser?.role === 'administrador' ? !loadingUsers : true))
 
   // Mutations
