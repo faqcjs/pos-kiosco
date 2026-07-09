@@ -9,6 +9,8 @@ import {
   LockOpen,
   Wallet,
   ShoppingCart,
+  NotebookPen,
+  QrCode,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -297,22 +299,46 @@ function OpenShiftView({
                   </div>
                 )
               } else {
+                const isFiado = item.method === 'fiado'
+                const isQr = item.method === 'qr'
                 return (
                   <div
                     key={item.id}
                     onClick={() => setSelectedSale(item)}
                     className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 hover:bg-muted/50 cursor-pointer transition-all active:scale-[0.99]"
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <ShoppingCart className="size-4.5" />
+                    <span
+                      className={cn(
+                        "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                        isFiado
+                          ? "bg-blue-500/10 text-blue-500"
+                          : isQr
+                          ? "bg-purple-500/10 text-purple-500"
+                          : "bg-primary/10 text-primary"
+                      )}
+                    >
+                      {isFiado ? (
+                        <NotebookPen className="size-4.5" />
+                      ) : isQr ? (
+                        <QrCode className="size-4.5" />
+                      ) : (
+                        <ShoppingCart className="size-4.5" />
+                      )}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">Venta #{item.id.slice(-4).toUpperCase()}</p>
+                      <p className="truncate text-sm font-medium">
+                        {isFiado ? 'Fiado' : isQr ? 'Venta QR/Transf.' : 'Venta'} #{item.id.slice(-4).toUpperCase()}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {item.items.length} {item.items.length === 1 ? 'artículo' : 'artículos'} · {formatTime(item.date)}
                       </p>
                     </div>
-                    <span className="shrink-0 text-sm font-bold tabular-nums text-success">
+                    <span
+                      className={cn(
+                        "shrink-0 text-sm font-bold tabular-nums",
+                        isFiado ? "text-blue-500" : isQr ? "text-purple-500" : "text-success"
+                      )}
+                    >
                       +{money(item.total)}
                     </span>
                   </div>

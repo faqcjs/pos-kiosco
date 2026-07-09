@@ -41,24 +41,32 @@ export function shiftTotals(shift, sales) {
   let cashSales = 0
   let manualIn = 0
   let manualOut = 0
+  let qrSales = 0
   
   if (!shift) return { cashSales, manualIn, manualOut, qrSales: 0 }
   
   const movements = shift.movements || []
+  let hasQrMovements = false
   for (const m of movements) {
     if (m.type === 'venta') cashSales += m.amount
+    else if (m.type === 'venta_qr') {
+      qrSales += m.amount
+      hasQrMovements = true
+    }
     else if (m.type === 'ingreso' || m.type === 'cobro_fiado') manualIn += m.amount
     else if (m.type === 'egreso' || m.type === 'pago_proveedor') manualOut += m.amount
   }
 
-  const start = new Date(shift.openedAt).getTime()
-  const end = shift.closedAt ? new Date(shift.closedAt).getTime() : Date.now()
-  const qrSales = (sales || [])
-    .filter((s) => {
-      const t = new Date(s.date).getTime()
-      return s.method === 'qr' && t >= start && t <= end
-    })
-    .reduce((sum, s) => sum + s.total, 0)
+  if (!hasQrMovements) {
+    const start = new Date(shift.openedAt).getTime()
+    const end = shift.closedAt ? new Date(shift.closedAt).getTime() : Date.now()
+    qrSales = (sales || [])
+      .filter((s) => {
+        const t = new Date(s.date).getTime()
+        return s.method === 'qr' && t >= start && t <= end
+      })
+      .reduce((sum, s) => sum + s.total, 0)
+  }
 
   return { cashSales, manualIn, manualOut, qrSales }
 }
@@ -550,6 +558,7 @@ export function useStore() {
   const updateProductMutation = useMutation({
     mutationFn: async (p) => {
       const sanitized = sanitizeProduct(p)
+      delete sanitized.id
       const { data, error } = await supabase.from('products').update(sanitized).eq('id', p.id).select()
       if (error) throw error
       return data[0]
@@ -996,10 +1005,12 @@ export function useStore() {
         qc.setQueryData(['shifts'], (oldShifts = []) => {
           return oldShifts.map((s) => {
             if (s.id === currentShift.id) {
-              return {
+              const updatedShift = {
                 ...s,
                 movements: [...(s.movements || []), mov]
               }
+              setCurrentShiftCache(updatedShift)
+              return updatedShift
             }
             return s
           })
@@ -1064,10 +1075,12 @@ export function useStore() {
         qc.setQueryData(['shifts'], (oldShifts = []) => {
           return oldShifts.map((s) => {
             if (s.id === currentShift.id) {
-              return {
+              const updatedShift = {
                 ...s,
                 movements: [...(s.movements || []), mov]
               }
+              setCurrentShiftCache(updatedShift)
+              return updatedShift
             }
             return s
           })
@@ -1120,10 +1133,12 @@ export function useStore() {
         qc.setQueryData(['shifts'], (oldShifts = []) => {
           return oldShifts.map((s) => {
             if (s.id === currentShift.id) {
-              return {
+              const updatedShift = {
                 ...s,
                 movements: [...(s.movements || []), mov]
               }
+              setCurrentShiftCache(updatedShift)
+              return updatedShift
             }
             return s
           })
@@ -1178,22 +1193,26 @@ export function useStore() {
         })
       })
 
-      // Register cash shift movement locally
-      if (args.method === 'efectivo' && currentShift) {
+      // Register shift movement locally
+      if ((args.method === 'efectivo' || args.method === 'qr') && currentShift) {
         const mov = {
           id: uid(),
           date,
-          type: 'venta',
+          type: args.method === 'efectivo' ? 'venta' : 'venta_qr',
           amount: total,
-          reason: `Venta en efectivo (${args.items.length} art.)`,
+          reason: args.method === 'efectivo' 
+            ? `Venta en efectivo (${args.items.length} art.)` 
+            : `Venta QR / Transf. (${args.items.length} art.)`,
         }
         qc.setQueryData(['shifts'], (oldShifts = []) => {
           return oldShifts.map((s) => {
             if (s.id === currentShift.id) {
-              return {
+              const updatedShift = {
                 ...s,
                 movements: [...(s.movements || []), mov]
               }
+              setCurrentShiftCache(updatedShift)
+              return updatedShift
             }
             return s
           })

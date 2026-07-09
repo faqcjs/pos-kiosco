@@ -196,29 +196,25 @@ export function Stock() {
                   </button>
                 </div>
                 <div className="flex items-center justify-end gap-1">
-                  {role !== 'cajero' && (
-                    <>
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        aria-label="Editar"
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`¿Estás seguro de que querés eliminar el producto "${p.name}"?`)) {
-                            deleteProduct(p.id)
-                            toast('Producto eliminado', 'info')
-                          }
-                        }}
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        aria-label="Eliminar"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Editar"
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`¿Estás seguro de que querés eliminar el producto "${p.name}"?`)) {
+                        deleteProduct(p.id)
+                        toast('Producto eliminado', 'info')
+                      }
+                    }}
+                    className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    aria-label="Eliminar"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
                 </div>
               </div>
             )

@@ -302,17 +302,17 @@ BEGIN
     INSERT INTO public.sales (id, date, created_at, items, total, method, "customerId", "cashReceived", change, cost, "soldBy", "shiftId")
     VALUES (p_sale_id, p_date, p_date, p_items, v_total, p_method, p_customer_id, p_cash_received, p_change, p_cost, p_sold_by, p_shift_id);
 
-    -- 4. Log cash shift movement and retroactively adjust closed shift totals
-    IF p_method = 'efectivo' THEN
+    -- 4. Log shift movement and retroactively adjust closed shift totals
+    IF p_method = 'efectivo' OR p_method = 'qr' THEN
         UPDATE public.shifts
         SET 
             movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
                 jsonb_build_object(
                     'id', extensions.gen_random_uuid()::text,
                     'date', p_date,
-                    'type', 'venta',
+                    'type', CASE WHEN p_method = 'efectivo' THEN 'venta' ELSE 'venta_qr' END,
                     'amount', v_total,
-                    'reason', 'Venta en efectivo (' || jsonb_array_length(p_items) || ' art.)'
+                    'reason', CASE WHEN p_method = 'efectivo' THEN 'Venta en efectivo' ELSE 'Venta QR / Transf.' END || ' (' || jsonb_array_length(p_items) || ' art.)'
                 )
             ),
             "closingTheoretical" = CASE 
@@ -618,18 +618,18 @@ DROP POLICY IF EXISTS "Allow insert products for admin, repositor and cajero" ON
 DROP POLICY IF EXISTS "Allow update products for admin and repositor" ON public.products;
 DROP POLICY IF EXISTS "Allow delete products for admin and repositor" ON public.products;
 
-CREATE POLICY "Allow insert products for admin and repositor" 
+CREATE POLICY "Allow insert products for admin, repositor and cajero" 
     ON public.products FOR INSERT TO authenticated 
-    WITH CHECK (public.has_role('administrador', 'repositor'));
+    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
 
-CREATE POLICY "Allow update products for admin and repositor" 
+CREATE POLICY "Allow update products for admin, repositor and cajero" 
     ON public.products FOR UPDATE TO authenticated 
-    USING (public.has_role('administrador', 'repositor'))
-    WITH CHECK (public.has_role('administrador', 'repositor'));
+    USING (public.has_role('administrador', 'repositor', 'cajero'))
+    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
 
-CREATE POLICY "Allow delete products for admin and repositor" 
+CREATE POLICY "Allow delete products for admin, repositor and cajero" 
     ON public.products FOR DELETE TO authenticated 
-    USING (public.has_role('administrador', 'repositor'));
+    USING (public.has_role('administrador', 'repositor', 'cajero'));
 
 -- 3. Sales Policies
 CREATE POLICY "Allow select sales for authenticated users" 
