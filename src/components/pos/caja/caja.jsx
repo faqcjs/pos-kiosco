@@ -86,7 +86,7 @@ function ClosedShiftView({
         onClick={() => {
           const n = Number(amount)
           if (n < 0 || Number.isNaN(n)) return
-          onOpen(n, cashierName)
+          onOpen(n, currentUser?.username || 'admin')
           toast('Caja abierta')
           setAmount('')
         }}
@@ -110,6 +110,7 @@ function OpenShiftView({
     [shift, state.sales]
   )
   const theoretical = useMemo(() => shiftTheoretical(shift), [shift])
+  const shiftOpName = shift.openedBy === state.currentUser?.username ? state.currentUser?.name : shift.openedBy
 
   const [movType, setMovType] = useState('ingreso')
   const [movAmount, setMovAmount] = useState('')
@@ -164,7 +165,7 @@ function OpenShiftView({
         <Badge tone="success" className="text-xs">
           <span className="size-2 animate-pulse rounded-full bg-success" />
           Turno abierto por{' '}
-          <span className="max-w-[12ch] truncate inline-block align-bottom">{shift.openedBy || 'Desconocido'}</span>{' '}
+          <span className="max-w-[12ch] truncate inline-block align-bottom">{shiftOpName || 'Desconocido'}</span>{' '}
           desde {formatTime(shift.openedAt)}
         </Badge>
         <Button variant="destructive" size="sm" onClick={() => setCloseOpen(true)}>

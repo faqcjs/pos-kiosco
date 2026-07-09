@@ -128,7 +128,10 @@ export const useUIStore = create()(
         failedActionsQueue: state.failedActionsQueue.filter(a => a.id !== actionId)
       })),
       clearFailedActionsQueue: () => set({ failedActionsQueue: [] }),
-      setCart: (cart) => set({ cart }),
+      setCart: (updater) => set((state) => {
+        const nextCart = typeof updater === 'function' ? updater(state.cart) : updater
+        return { cart: nextCart }
+      }),
     }),
     {
       name: 'kiosko-pos-ui-state',
