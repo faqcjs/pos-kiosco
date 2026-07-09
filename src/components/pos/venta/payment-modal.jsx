@@ -1,6 +1,6 @@
 'use client'
 
-import { Banknote, QrCode, NotebookPen, Plus, UserPlus } from 'lucide-react'
+import { Banknote, QrCode, NotebookPen, UserPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Modal, Select } from '@/components/ui/kit'
@@ -8,7 +8,7 @@ import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
-const QUICK_BILLS = [2000, 10000, 20000]
+// Quick bill buttons replace the input value of cash received and options are dynamic
 
 export function PaymentModal({
   open,
@@ -23,6 +23,21 @@ export function PaymentModal({
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
+
+  const dynamicBills = useMemo(() => {
+    if (total < 20000) {
+      return [1000, 2000, 5000, 10000, 20000].filter((b) => b >= total)
+    } else {
+      const m10_1 = Math.ceil(total / 10000) * 10000
+      const m10_2 = m10_1 + 10000
+      const m20_1 = Math.ceil(total / 20000) * 20000
+      const m20_2 = m20_1 + 20000
+      return Array.from(new Set([m10_1, m10_2, m20_1, m20_2]))
+        .filter((b) => b >= total)
+        .sort((a, b) => a - b)
+        .slice(0, 3)
+    }
+  }, [total])
 
   const change = useMemo(() => Math.max(0, cash - total), [cash, total])
   const canPayCash = cash >= total
@@ -116,13 +131,12 @@ export function PaymentModal({
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              {QUICK_BILLS.map((b) => (
+              {dynamicBills.map((b) => (
                 <button
                   key={b}
-                  onClick={() => setCash((c) => c + b)}
-                  className="flex items-center gap-1 rounded-full border border-border bg-secondary px-3 py-1.5 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-muted"
+                  onClick={() => setCash(b)}
+                  className="rounded-full border border-border bg-secondary px-3 py-1.5 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-muted"
                 >
-                  <Plus className="size-3.5" />
                   {money(b)}
                 </button>
               ))}

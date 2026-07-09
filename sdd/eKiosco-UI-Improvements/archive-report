@@ -1,0 +1,47 @@
+# Archive Report: eKiosco-UI-Improvements
+
+- **Change Name**: `eKiosco-UI-Improvements`
+- **Date**: 2026-07-09
+- **Status**: Completed & Verified
+- **Target Project**: `pos-kiosco`
+
+---
+
+## 1. Executive Summary
+This report documents the archiving of the `eKiosco-UI-Improvements` task. All requirements have been successfully implemented, verified via visual inspection of code components, and built successfully for production.
+
+---
+
+## 2. Implemented Features
+1. **Quick Bills & Payment Modal**:
+   - File: [payment-modal.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/venta/payment-modal.jsx)
+   - Quick bill buttons replace the cash input value directly instead of accumulating.
+   - Dynamic recommendation of bills based on the total sale value (e.g., bills higher than or equal to the total).
+   - Removed unused `Plus` icon import and usage.
+2. **Product Cards Stock Style**:
+   - File: [venta.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/venta/venta.jsx)
+   - Out-of-stock products (stock <= 0) render with `grayscale opacity-40 cursor-not-allowed` styles.
+   - Click interactions are disabled for out-of-stock products to prevent adding them to the cart.
+3. **Admin Empleados & Responsive Table**:
+   - File: [admin.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/admin/admin.jsx)
+   - Renamed user-facing and state references of "Cajeros"/"Cajero" to "Empleados"/"Empleado" (leaving internal role DB string as `"cajero"` for compatibility with database constraints).
+   - Refactored the registered users list to use a responsive grid layout of cards on small screens (`md:hidden`) and a structured table on medium and larger screens (`md:table`).
+
+---
+
+## 3. Linked Observations
+The following memories from Engram have been linked to this archive:
+- **Observation #7 (manual)**: `eKiosco UI Improvements Progress`
+  - *Description*: Summarizes the implemented features and reasons.
+- **Observation #8 (decision)**: `Verification Report: UI/UX Improvements`
+  - *Description*: Verifies all checklists and evidence of code components.
+
+---
+
+## 4. Verification Details
+- **Verification Result**: PASS
+- **Build Status**: PASS (`npm run build` compiled successfully without errors)
+- **Modified Files**:
+  - [payment-modal.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/venta/payment-modal.jsx)
+  - [venta.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/venta/venta.jsx)
+  - [admin.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/admin/admin.jsx)

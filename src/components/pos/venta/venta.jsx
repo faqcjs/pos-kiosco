@@ -303,7 +303,7 @@ export function Venta() {
                     onClick={() => !out && addProductToCart(p)}
                     className={cn(
                       'flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all select-none',
-                      out ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50 hover:shadow-sm'
+                      out ? 'grayscale opacity-40 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50 hover:shadow-sm'
                     )}
                   >
                     <div className="flex items-start justify-between w-full">

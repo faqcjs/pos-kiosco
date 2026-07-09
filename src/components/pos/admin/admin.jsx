@@ -54,7 +54,7 @@ export function Admin() {
       resetData()
     }
   }
-  const [adminTab, setAdminTab] = useState('stats') // "stats" / "cajeros"
+  const [adminTab, setAdminTab] = useState('stats') // "stats" / "empleados"
   const [range, setRange] = useState('Semana') // "Hoy", "Semana", "Mes", "6 Meses"
   const [visibleDays, setVisibleDays] = useState(10)
   const [selectedDay, setSelectedDay] = useState(null)
@@ -296,18 +296,18 @@ export function Admin() {
           Estadísticas
         </button>
         <button
-          onClick={() => setAdminTab('cajeros')}
+          onClick={() => setAdminTab('empleados')}
           className={`flex-1 text-center rounded-md py-1 text-xs font-medium transition-all duration-200 ease-out ${
-            adminTab === 'cajeros'
+            adminTab === 'empleados'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Cajeros
+          Empleados
         </button>
       </div>
 
-      {adminTab === 'cajeros' ? (
+      {adminTab === 'empleados' ? (
         <UsersTab state={state} createUser={createUser} deleteUser={deleteUser} />
       ) : (
         <>
@@ -776,45 +776,24 @@ function UsersTab({ state, createUser, deleteUser }) {
         {activeUsers.length === 0 ? (
           <EmptyState title="Sin usuarios" description="No hay usuarios registrados todavía." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-border text-muted-foreground font-semibold">
-                  <th className="py-2.5">Nombre</th>
-                  <th className="py-2.5">Usuario</th>
-                  <th className="py-2.5">Contraseña</th>
-                  <th className="py-2.5">Rol</th>
-                  <th className="py-2.5 text-right">Ventas</th>
-                  <th className="py-2.5 text-right">Operac.</th>
-                  <th className="py-2.5 text-right">Diff. Caja</th>
-                  <th className="py-2.5 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {activeUsers.map((c) => {
-                  const isRepo = c.role === 'repositor'
-                  const m = userMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
-                  const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
-                  return (
-                    <tr key={c.id} className="hover:bg-muted/10 transition-colors">
-                      <td className="py-3 font-medium text-foreground">{c.name}</td>
-                      <td className="py-3 text-muted-foreground">{c.username}</td>
-                      <td className="py-3 text-muted-foreground font-mono">{c.password}</td>
-                      <td className="py-3">
+          <div className="space-y-4">
+            {/* Mobile layout (cards) - visible on < md */}
+            <div className="grid gap-3 md:hidden">
+              {activeUsers.map((c) => {
+                const isRepo = c.role === 'repositor'
+                const m = userMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
+                const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
+                return (
+                  <div key={c.id} className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-foreground text-base">{c.name}</h4>
+                        <p className="text-xs text-muted-foreground">@{c.username} · <span className="font-mono">{c.password}</span></p>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <Badge tone={c.role === 'repositor' ? 'accent' : 'muted'} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
-                          {c.role === 'repositor' ? 'Repositor' : 'Cajero'}
+                          {c.role === 'repositor' ? 'Repositor' : 'Empleado'}
                         </Badge>
-                      </td>
-                      <td className="py-3 text-right font-semibold tabular-nums text-foreground">
-                        {isRepo ? '—' : money(m.totalSales)}
-                      </td>
-                      <td className="py-3 text-right tabular-nums text-muted-foreground">
-                        {isRepo ? '—' : m.salesCount}
-                      </td>
-                      <td className={`py-3 text-right tabular-nums ${isRepo ? 'text-muted-foreground' : diffColor}`}>
-                        {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
-                      </td>
-                      <td className="py-3 text-right">
                         <button
                           onClick={() => {
                             if (window.confirm(`¿Estás seguro de que querés eliminar el usuario "${c.name}"?`)) {
@@ -830,12 +809,96 @@ function UsersTab({ state, createUser, deleteUser }) {
                         >
                           <Trash2 className="size-4" />
                         </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border text-center text-xs">
+                      <div>
+                        <p className="text-muted-foreground font-medium">Ventas</p>
+                        <p className="font-semibold text-foreground mt-0.5">
+                          {isRepo ? '—' : money(m.totalSales)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground font-medium">Operac.</p>
+                        <p className="font-semibold text-foreground mt-0.5">
+                          {isRepo ? '—' : m.salesCount}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground font-medium">Diff. Caja</p>
+                        <p className={`font-semibold mt-0.5 ${isRepo ? 'text-muted-foreground' : diffColor}`}>
+                          {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop layout (table) - visible on >= md */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground font-semibold">
+                    <th className="py-2.5">Nombre</th>
+                    <th className="py-2.5">Usuario</th>
+                    <th className="py-2.5">Contraseña</th>
+                    <th className="py-2.5">Rol</th>
+                    <th className="py-2.5 text-right">Ventas</th>
+                    <th className="py-2.5 text-right">Operac.</th>
+                    <th className="py-2.5 text-right">Diff. Caja</th>
+                    <th className="py-2.5 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {activeUsers.map((c) => {
+                    const isRepo = c.role === 'repositor'
+                    const m = userMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
+                    const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
+                    return (
+                      <tr key={c.id} className="hover:bg-muted/10 transition-colors">
+                        <td className="py-3 font-medium text-foreground">{c.name}</td>
+                        <td className="py-3 text-muted-foreground">{c.username}</td>
+                        <td className="py-3 text-muted-foreground font-mono">{c.password}</td>
+                        <td className="py-3">
+                          <Badge tone={c.role === 'repositor' ? 'accent' : 'muted'} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
+                            {c.role === 'repositor' ? 'Repositor' : 'Empleado'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 text-right font-semibold tabular-nums text-foreground">
+                          {isRepo ? '—' : money(m.totalSales)}
+                        </td>
+                        <td className="py-3 text-right tabular-nums text-muted-foreground">
+                          {isRepo ? '—' : m.salesCount}
+                        </td>
+                        <td className={`py-3 text-right tabular-nums ${isRepo ? 'text-muted-foreground' : diffColor}`}>
+                          {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
+                        </td>
+                        <td className="py-3 text-right">
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`¿Estás seguro de que querés eliminar el usuario "${c.name}"?`)) {
+                                deleteUser(c.id, {
+                                  onSuccess: () => toast('Usuario eliminado', 'info'),
+                                  onError: (err) => toast(`Error: ${err.message || 'No se pudo eliminar'}`, 'error')
+                                })
+                              }
+                            }}
+                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition-all inline-flex items-center justify-center"
+                            title="Eliminar usuario"
+                            aria-label="Eliminar usuario"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </Card>
@@ -845,14 +908,14 @@ function UsersTab({ state, createUser, deleteUser }) {
         <div>
           <h3 className="font-heading font-semibold text-lg">Nuevo Usuario</h3>
           <p className="text-xs text-muted-foreground">
-            Crear una nueva cuenta de cajero o repositor.
+            Crear una nueva cuenta de empleado o repositor.
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="cashier-name">Nombre Completo</Label>
+            <Label htmlFor="employee-name">Nombre Completo</Label>
             <Input
-              id="cashier-name"
+              id="employee-name"
               type="text"
               required
               value={name}
@@ -861,20 +924,20 @@ function UsersTab({ state, createUser, deleteUser }) {
             />
           </div>
           <div>
-            <Label htmlFor="cashier-username">Usuario</Label>
+            <Label htmlFor="employee-username">Usuario</Label>
             <Input
-              id="cashier-username"
+              id="employee-username"
               type="text"
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Ej. juan.cajero"
+              placeholder="Ej. juan.empleado"
             />
           </div>
           <div>
-            <Label htmlFor="cashier-password">Contraseña</Label>
+            <Label htmlFor="employee-password">Contraseña</Label>
             <Input
-              id="cashier-password"
+              id="employee-password"
               type="text"
               required
               value={password}
@@ -883,13 +946,13 @@ function UsersTab({ state, createUser, deleteUser }) {
             />
           </div>
           <div>
-            <Label htmlFor="cashier-role">Rol</Label>
+            <Label htmlFor="employee-role">Rol</Label>
             <Select
-              id="cashier-role"
+              id="employee-role"
               value={role}
               onChange={(e) => setRole(e.target.value)}
             >
-              <option value="cajero">Cajero</option>
+              <option value="cajero">Empleado</option>
               <option value="repositor">Repositor</option>
             </Select>
           </div>
