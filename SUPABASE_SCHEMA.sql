@@ -237,9 +237,9 @@ CREATE POLICY "Allow delete users for administrators"
 CREATE POLICY "Allow select products for authenticated users" 
     ON public.products FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Allow insert products for admin and repositor" 
+CREATE POLICY "Allow insert products for admin, repositor and cajero" 
     ON public.products FOR INSERT TO authenticated 
-    WITH CHECK (public.has_role('administrador', 'repositor'));
+    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
 
 CREATE POLICY "Allow update products for admin and repositor" 
     ON public.products FOR UPDATE TO authenticated 

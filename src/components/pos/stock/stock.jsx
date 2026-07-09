@@ -95,12 +95,10 @@ export function Stock() {
         title="Stock"
         description="Catálogo e inventario de productos."
         action={
-          role !== 'cajero' && (
-            <Button onClick={openNew}>
-              <Plus className="size-4" />
-              Nuevo producto
-            </Button>
-          )
+          <Button onClick={openNew}>
+            <Plus className="size-4" />
+            Nuevo producto
+          </Button>
         }
       />
 
