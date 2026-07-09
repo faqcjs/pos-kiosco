@@ -73,6 +73,7 @@ export const useUIStore = create()(
       currentUser: null,
       offlineSalesQueue: [],
       productsCache: [],
+      currentShiftCache: null,
       
       toggleTheme: () => set((state) => {
         const nextTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -102,6 +103,7 @@ export const useUIStore = create()(
         offlineSalesQueue: state.offlineSalesQueue.filter(s => s.id !== saleId)
       })),
       setProductsCache: (products) => set({ productsCache: products }),
+      setCurrentShiftCache: (shift) => set({ currentShiftCache: shift }),
     }),
     {
       name: 'kiosko-pos-ui-state',
@@ -156,6 +158,7 @@ export function useStore() {
   const currentUser = useUIStore((s) => s.currentUser)
   const offlineSalesQueue = useUIStore((s) => s.offlineSalesQueue)
   const productsCache = useUIStore((s) => s.productsCache)
+  const currentShiftCache = useUIStore((s) => s.currentShiftCache)
   
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const loginAdmin = useUIStore((s) => s.loginAdmin)
@@ -165,6 +168,7 @@ export function useStore() {
   const enqueueOfflineSale = useUIStore((s) => s.enqueueOfflineSale)
   const dequeueOfflineSale = useUIStore((s) => s.dequeueOfflineSale)
   const setProductsCache = useUIStore((s) => s.setProductsCache)
+  const setCurrentShiftCache = useUIStore((s) => s.setCurrentShiftCache)
 
   // Apply theme class side effect
   useEffect(() => {
@@ -373,10 +377,24 @@ export function useStore() {
     }
   }, [syncOfflineSales, offlineSalesQueue.length])
 
+  // Sync shifts query results with currentShiftCache
+  useEffect(() => {
+    if (shifts && shifts.length > 0) {
+      const openShift = shifts.find((s) => s.status === 'open') || null
+      setCurrentShiftCache(openShift)
+    } else if (shifts && shifts.length === 0 && isOnline) {
+      setCurrentShiftCache(null)
+    }
+  }, [shifts, setCurrentShiftCache, isOnline])
+
   // Compute shifts states
   const currentShift = useMemo(() => {
-    return shifts.find((s) => s.status === 'open') || null
-  }, [shifts])
+    const queryOpenShift = shifts.find((s) => s.status === 'open') || null
+    if (!isOnline) {
+      return currentShiftCache
+    }
+    return queryOpenShift
+  }, [shifts, currentShiftCache, isOnline])
 
   const shiftHistory = useMemo(() => {
     return shifts.filter((s) => s.status === 'closed')
