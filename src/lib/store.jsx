@@ -71,6 +71,8 @@ export const useUIStore = create()(
       adminPassword: 'admin123',
       isAdminAuthenticated: false,
       currentUser: null,
+      offlineSalesQueue: [],
+      productsCache: [],
       
       toggleTheme: () => set((state) => {
         const nextTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -93,6 +95,13 @@ export const useUIStore = create()(
         set({ adminPassword: newPassword })
       },
       setCurrentUser: (user) => set({ currentUser: user }),
+      enqueueOfflineSale: (sale) => set((state) => ({
+        offlineSalesQueue: [...state.offlineSalesQueue, sale]
+      })),
+      dequeueOfflineSale: (saleId) => set((state) => ({
+        offlineSalesQueue: state.offlineSalesQueue.filter(s => s.id !== saleId)
+      })),
+      setProductsCache: (products) => set({ productsCache: products }),
     }),
     {
       name: 'kiosko-pos-ui-state',
@@ -145,12 +154,17 @@ export function useStore() {
   const adminPassword = useUIStore((s) => s.adminPassword)
   const isAdminAuthenticated = useUIStore((s) => s.isAdminAuthenticated)
   const currentUser = useUIStore((s) => s.currentUser)
+  const offlineSalesQueue = useUIStore((s) => s.offlineSalesQueue)
+  const productsCache = useUIStore((s) => s.productsCache)
   
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const loginAdmin = useUIStore((s) => s.loginAdmin)
   const logoutAdmin = useUIStore((s) => s.logoutAdmin)
   const changeAdminPassword = useUIStore((s) => s.changeAdminPassword)
   const setCurrentUser = useUIStore((s) => s.setCurrentUser)
+  const enqueueOfflineSale = useUIStore((s) => s.enqueueOfflineSale)
+  const dequeueOfflineSale = useUIStore((s) => s.dequeueOfflineSale)
+  const setProductsCache = useUIStore((s) => s.setProductsCache)
 
   // Apply theme class side effect
   useEffect(() => {
@@ -242,6 +256,122 @@ export function useStore() {
     },
     enabled: currentUser?.role === 'administrador',
   })
+
+  // Sync products query results with productsCache
+  useEffect(() => {
+    if (products && products.length > 0) {
+      setProductsCache(products)
+    }
+  }, [products, setProductsCache])
+
+  const displayedProducts = useMemo(() => {
+    if (!products || products.length === 0) {
+      return productsCache || []
+    }
+    return products
+  }, [products, productsCache])
+
+  // Background offline sales synchronization function
+  const syncOfflineSales = useCallback(async () => {
+    if (offlineSalesQueue.length === 0) return
+
+    console.log(`Syncing ${offlineSalesQueue.length} offline sales...`)
+    const queueToProcess = [...offlineSalesQueue]
+
+    for (const sale of queueToProcess) {
+      try {
+        const { isOfflinePending, ...saleToInsert } = sale
+        // 1. Insert sale on server
+        const { error: saleError } = await supabase.from('sales').insert([saleToInsert])
+        if (saleError) throw saleError
+
+        // 2. Decrement stock on server
+        for (const item of sale.items) {
+          if (item.productId) {
+            const { data: prod, error: prodError } = await supabase
+              .from('products')
+              .select('stock')
+              .eq('id', item.productId)
+              .single()
+            if (!prodError && prod) {
+              const newStock = Math.max(0, prod.stock - item.qty)
+              await supabase.from('products').update({ stock: newStock }).eq('id', item.productId)
+            }
+          }
+        }
+
+        // 3. Register cash shift movement on server
+        if (sale.method === 'efectivo') {
+          const { data: activeShift, error: shiftError } = await supabase
+            .from('shifts')
+            .select('*')
+            .eq('status', 'open')
+            .maybeSingle()
+          
+          if (!shiftError && activeShift) {
+            const mov = {
+              id: uid(),
+              date: sale.date,
+              type: 'venta',
+              amount: sale.total,
+              reason: `Venta en efectivo (${sale.items.length} art.) [Sincronizada]`,
+            }
+            const updatedShift = {
+              ...activeShift,
+              movements: [...(activeShift.movements || []), mov]
+            }
+            await supabase.from('shifts').update(updatedShift).eq('id', activeShift.id)
+          }
+        }
+
+        // 4. Update customer balance if credit ("fiado")
+        if (sale.method === 'fiado' && sale.customerId) {
+          const { data: customer, error: custError } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', sale.customerId)
+            .single()
+          
+          if (!custError && customer) {
+            const detail = sale.items.map((i) => `${i.qty}x ${i.name}`).join(', ')
+            const updated = {
+              ...customer,
+              entries: [...(customer.entries || []), { id: uid(), date: sale.date, type: 'compra', amount: sale.total, detail }],
+            }
+            await supabase.from('customers').update(updated).eq('id', sale.customerId)
+          }
+        }
+
+        // Remove successfully synced sale from queue
+        dequeueOfflineSale(sale.id)
+        console.log(`Synced offline sale: ${sale.id}`)
+      } catch (err) {
+        console.error(`Failed to sync sale ${sale.id}:`, err)
+        break // Stop processing queue to maintain order
+      }
+    }
+    qc.invalidateQueries()
+  }, [offlineSalesQueue, dequeueOfflineSale, qc])
+
+  // Sync effect when regaining connectivity
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleOnline = () => {
+      console.log('App regained connection. Syncing offline sales...')
+      syncOfflineSales()
+    }
+
+    window.addEventListener('online', handleOnline)
+
+    if (navigator.onLine && offlineSalesQueue.length > 0) {
+      handleOnline()
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [syncOfflineSales, offlineSalesQueue.length])
 
   // Compute shifts states
   const currentShift = useMemo(() => {
@@ -659,8 +789,81 @@ export function useStore() {
   }, [registerSupplierPaymentMutation])
 
   const completeSale = useCallback((args) => {
-    completeSaleMutation.mutate(args)
-  }, [completeSaleMutation])
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
+
+    if (!isOnline) {
+      const date = new Date().toISOString()
+      const total = args.items.reduce((sum, i) => sum + i.price * i.qty, 0)
+      
+      let cost = 0
+      for (const item of args.items) {
+        if (item.productId) {
+          const prod = displayedProducts.find((p) => p.id === item.productId)
+          if (prod) cost += prod.cost * item.qty
+        }
+      }
+
+      const sale = {
+        id: `off-${uid()}`,
+        date,
+        items: args.items,
+        total,
+        method: args.method,
+        customerId: args.customerId,
+        cashReceived: args.cashReceived,
+        change: args.change,
+        cost,
+        soldBy: currentUser?.username || 'admin',
+        isOfflinePending: true,
+      }
+
+      enqueueOfflineSale(sale)
+
+      // Decrement stock locally in cache
+      qc.setQueryData(['products'], (oldProducts = []) => {
+        return oldProducts.map((p) => {
+          const cartItem = args.items.find((item) => item.productId === p.id)
+          if (cartItem) {
+            return { ...p, stock: Math.max(0, p.stock - cartItem.qty) }
+          }
+          return p
+        })
+      })
+
+      // Register cash shift movement locally
+      if (args.method === 'efectivo' && currentShift) {
+        const mov = {
+          id: uid(),
+          date,
+          type: 'venta',
+          amount: total,
+          reason: `Venta en efectivo (${args.items.length} art.)`,
+        }
+        qc.setQueryData(['shifts'], (oldShifts = []) => {
+          return oldShifts.map((s) => {
+            if (s.id === currentShift.id) {
+              return {
+                ...s,
+                movements: [...(s.movements || []), mov]
+              }
+            }
+            return s
+          })
+        })
+      }
+
+      // Add to sales cache locally
+      qc.setQueryData(['sales'], (oldSales = []) => {
+        return [sale, ...oldSales]
+      })
+
+      if (typeof window !== 'undefined' && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('offline-sale-registered', { detail: sale }))
+      }
+    } else {
+      completeSaleMutation.mutate(args)
+    }
+  }, [completeSaleMutation, displayedProducts, currentUser, enqueueOfflineSale, currentShift, qc])
 
   const resetData = useCallback(() => {
     resetDataMutation.mutate()
@@ -707,7 +910,7 @@ export function useStore() {
 
   // Combine query and Zustand states
   const state = useMemo(() => ({
-    products,
+    products: displayedProducts,
     sales,
     customers,
     suppliers,
@@ -719,7 +922,7 @@ export function useStore() {
     currentUser,
     users,
   }), [
-    products,
+    displayedProducts,
     sales,
     customers,
     suppliers,

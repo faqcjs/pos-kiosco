@@ -187,10 +187,15 @@ export function Venta() {
   }
 
   function handleConfirmSale(args) {
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
     completeSale({ items: cart, ...args })
     const label =
       args.method === 'efectivo' ? 'Efectivo' : args.method === 'qr' ? 'QR/Transferencia' : 'Fiado'
-    toast(`Venta registrada (${label}): ${money(total)}`)
+    if (!isOnline) {
+      toast(`Venta registrada localmente (Modo Offline) (${label}): ${money(total)}`, 'warning')
+    } else {
+      toast(`Venta registrada (${label}): ${money(total)}`)
+    }
     setCart([])
     setPayOpen(false)
     setMobileCartOpen(false)
