@@ -237,25 +237,23 @@ export function useStore() {
   // Sync Supabase auth state with Zustand's currentUser
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        if (!currentUser || currentUser.id !== session.user.id) {
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null)
+      } else if (session?.user) {
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
           const { data, error } = await supabase
             .from('users')
             .select('*')
             .eq('id', session.user.id)
-            .maybeSingle()
+            .single()
           if (!error && data) {
             setCurrentUser(data)
           }
         }
-      } else {
-        if (currentUser) {
-          setCurrentUser(null)
-        }
       }
     })
     return () => subscription.unsubscribe()
-  }, [currentUser, setCurrentUser])
+  }, [setCurrentUser])
 
   // React Query server state queries
   const { data: products = [], isLoading: loadingProducts } = useQuery({

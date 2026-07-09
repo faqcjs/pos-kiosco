@@ -27,9 +27,12 @@ const USER_DISPLAY_NAMES = {
 
 export function getCashierDisplayName(openedBy, currentUser) {
   if (!openedBy) return 'Desconocido'
-  if (openedBy === currentUser?.username) return currentUser?.name || openedBy
-  if (openedBy === currentUser?.name) return currentUser?.name
-  return USER_DISPLAY_NAMES[openedBy] || openedBy
+  const normalizedOpenedBy = openedBy.toLowerCase().trim()
+  const normalizedUsername = currentUser?.username?.toLowerCase()?.trim()
+  const normalizedName = currentUser?.name?.toLowerCase()?.trim()
+  if (normalizedOpenedBy === normalizedUsername) return currentUser?.name || openedBy
+  if (normalizedOpenedBy === normalizedName) return currentUser?.name
+  return USER_DISPLAY_NAMES[normalizedOpenedBy] || openedBy
 }
 
 const MOV_LABEL = {
