@@ -177,8 +177,8 @@ export function AppShell({
           </div>
           <div
             className={cn(
-              'overflow-hidden transition-all duration-300 ease-in-out',
-              collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
+              'transition-all duration-300 ease-in-out',
+              collapsed ? 'max-w-0 opacity-0 overflow-hidden' : 'max-w-[180px] opacity-100',
             )}
           >
             <p className="whitespace-nowrap font-heading text-sm font-bold leading-tight flex items-center gap-1.5">
@@ -224,8 +224,8 @@ export function AppShell({
                 onClick={() => onChange(item.id)}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  'group relative flex items-center rounded-xl transition-all duration-150',
-                  collapsed ? 'h-10 w-10 mx-auto justify-center' : 'gap-3 px-3 py-2.5',
+                  'group relative flex items-center rounded-xl transition-all duration-300 ease-in-out',
+                  collapsed ? 'h-10 w-10 mx-auto justify-center px-0' : 'h-10 w-full justify-start px-3 gap-3 hover:translate-x-1',
                   isActive
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent',
@@ -234,8 +234,8 @@ export function AppShell({
                 <Icon className={cn('shrink-0', collapsed ? 'size-[18px]' : 'size-5')} />
                 <span
                   className={cn(
-                    'whitespace-nowrap text-sm font-medium overflow-hidden transition-all duration-300 ease-in-out',
-                    collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
+                    'whitespace-nowrap text-sm font-medium transition-all duration-300 ease-in-out',
+                    collapsed ? 'max-w-0 opacity-0 overflow-hidden' : 'max-w-[180px] opacity-100',
                   )}
                 >
                   {item.label}
@@ -252,31 +252,41 @@ export function AppShell({
         </nav>
 
         {/* Footer */}
-        <div className={cn('flex flex-col gap-3 border-t border-sidebar-border px-3 pt-3 pb-2', collapsed && 'items-center px-2')}>
-          {!collapsed && (
-            <div className="flex flex-col gap-1 text-xs">
-              <span className="font-semibold text-foreground truncate">{state.currentUser?.name}</span>
-              <div className="flex items-center gap-1">
-                <Badge tone={state.currentUser?.role === 'administrador' ? 'default' : (state.currentUser?.role === 'repositor' ? 'accent' : 'muted')} className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
-                  {state.currentUser?.role === 'administrador' ? 'Administrador' : (state.currentUser?.role === 'repositor' ? 'Repositor' : 'Cajero')}
-                </Badge>
-              </div>
+        <div className={cn('flex flex-col gap-3 border-t border-sidebar-border px-3 pt-3 pb-2 transition-all duration-300 ease-in-out', collapsed && 'items-center px-2')}>
+          <div
+            className={cn(
+              "flex flex-col gap-1 text-xs transition-all duration-300 ease-in-out origin-top",
+              collapsed ? "max-h-0 opacity-0 overflow-hidden" : "max-h-16 opacity-100"
+            )}
+          >
+            <span className="font-semibold text-foreground truncate">{state.currentUser?.name}</span>
+            <div className="flex items-center gap-1">
+              <Badge tone={state.currentUser?.role === 'administrador' ? 'default' : (state.currentUser?.role === 'repositor' ? 'accent' : 'muted')} className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
+                {state.currentUser?.role === 'administrador' ? 'Administrador' : (state.currentUser?.role === 'repositor' ? 'Repositor' : 'Cajero')}
+              </Badge>
             </div>
-          )}
-          <div className={cn("flex items-center justify-between gap-2", collapsed && "flex-col w-full")}>
+          </div>
+          <div className={cn("flex items-center justify-between gap-2 transition-all duration-300 ease-in-out", collapsed && "flex-col w-full")}>
             <ThemeToggle compact={collapsed} />
             <button
               onClick={logout}
               title="Cerrar sesión"
               className={cn(
-                "flex items-center justify-center rounded-xl border border-border bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-colors",
-                collapsed ? "size-10" : "px-3 py-2.5 text-xs font-semibold gap-1.5 flex-1"
+                "flex items-center justify-center rounded-xl border border-border bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-all duration-300 ease-in-out",
+                collapsed ? "size-10 px-0" : "h-10 px-3 py-2.5 text-xs font-semibold gap-1.5 flex-1"
               )}
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="size-4 shrink-0">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
               </svg>
-              {!collapsed && <span className="truncate">Cerrar sesión</span>}
+              <span
+                className={cn(
+                  "truncate transition-all duration-300 ease-in-out",
+                  collapsed ? "max-w-0 opacity-0 overflow-hidden" : "max-w-[100px] opacity-100"
+                )}
+              >
+                Cerrar sesión
+              </span>
             </button>
           </div>
         </div>

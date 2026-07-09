@@ -1,0 +1,50 @@
+# Archive Report: eKiosco-UI-Improvements-V2
+
+- **Change Name**: `eKiosco-UI-Improvements-V2`
+- **Date**: 2026-07-09
+- **Status**: Completed & Verified
+- **Target Project**: `pos-kiosco`
+
+---
+
+## 1. Executive Summary
+This report documents the archiving of the `eKiosco-UI-Improvements-V2` task (Animations Phase). All requirements (CSS animations, navigation sidebar transitions, and right-docked cart sidebar improvements with flying click effects) have been successfully implemented, verified via build compilation and code review, and are ready for staging.
+
+---
+
+## 2. Implemented Features
+1. **CSS Keyframes & Utilities**:
+   - File: [index.css](file:///C:/Users/facu/kiosko-pos/src/index.css)
+   - Added custom keyframes: `floatUpFade` (upward translation, scaling, and fade-out) and `pulseSubtle` (glow pulse for active badges).
+   - Mapped these keyframes to `.animate-float-up-fade` and `.animate-pulse-subtle` classes.
+
+2. **Left Navigation Sidebar Transitions**:
+   - File: [app-shell.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/app-shell.jsx)
+   - Sidebar width transitions smoothly using `transition-[width]`.
+   - Text visibility, user block height, and logout button transition constraints (e.g. `max-w` and `max-h`) were adjusted to prevent layout jumps.
+   - Hover effects (`translate-x-1`) are applied dynamically when the sidebar is expanded.
+
+3. **Right-Docked Cart Sidebar & Add-to-Cart Flying Effects**:
+   - File: [venta.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/venta/venta.jsx)
+   - The cart sidebar transitions smoothly to a collapsed control panel (`w-[72px]`) showing the `ShoppingCart` icon with an `animate-pulse-subtle` notification badge and a vertical rotated price tag.
+   - Click interactions on product cards triggers a floating `+1` text indicator with the `.animate-float-up-fade` animation class, centered on the clicked product card.
+   - Added click tactile feedback (`active:scale-[0.97]`) on product cards.
+
+---
+
+## 3. Linked Observations
+The following memories from Engram have been linked to this archive:
+- **Observation #12 (manual)**: `eKiosco UI Improvements V2 Progress`
+  - *Description*: Logs the details of implemented tasks (Animations Phase).
+- **Observation #8 (manual)**: `UI/UX Animation Improvements Verification Report`
+  - *Description*: Verifies all checklists, transitions, animations, and the production build check status.
+
+---
+
+## 4. Verification Details
+- **Verification Result**: PASS
+- **Build Status**: PASS (`npm run build` compiled successfully without errors)
+- **Modified Files**:
+  - [index.css](file:///C:/Users/facu/kiosko-pos/src/index.css)
+  - [app-shell.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/app-shell.jsx)
+  - [venta.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/venta/venta.jsx)

@@ -32,6 +32,7 @@ export function Venta() {
   const [cartCollapsed, setCartCollapsed] = useState(() => {
     return localStorage.getItem('pos-cart-collapsed') === 'true'
   })
+  const [floatingEffects, setFloatingEffects] = useState([])
 
   const toggleCartCollapsed = () => {
     setCartCollapsed((c) => {
@@ -131,6 +132,13 @@ export function Venta() {
       toast(`Sin stock: ${p.name}`, 'error')
       return
     }
+
+    const effectId = `${Date.now()}-${Math.random()}`
+    setFloatingEffects((prev) => [...prev, { id: effectId, productId: p.id }])
+    setTimeout(() => {
+      setFloatingEffects((prev) => prev.filter((eff) => eff.id !== effectId))
+    }, 850)
+
     setCart((c) => {
       const existing = c.find((i) => i.productId === p.id)
       if (existing) {
@@ -297,15 +305,27 @@ export function Venta() {
               {filtered.map((p) => {
                 const low = p.stock <= p.minStock
                 const out = p.stock <= 0
+                const cardEffects = floatingEffects.filter((eff) => eff.productId === p.id)
                 return (
                   <div
                     key={p.id}
                     onClick={() => !out && addProductToCart(p)}
                     className={cn(
-                      'flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all select-none',
-                      out ? 'grayscale opacity-40 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50 hover:shadow-sm'
+                      'relative flex flex-col rounded-2xl border border-border bg-card p-3 text-left transition-all select-none',
+                      out ? 'grayscale opacity-40 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50 hover:shadow-sm active:scale-[0.97]'
                     )}
                   >
+                    {/* Floating "+1" notifications */}
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20 overflow-hidden rounded-2xl">
+                      {cardEffects.map((eff) => (
+                        <span
+                          key={eff.id}
+                          className="pointer-events-none flex size-8 items-center justify-center rounded-full bg-success text-xs font-bold text-success-foreground shadow-md animate-float-up-fade"
+                        >
+                          +1
+                        </span>
+                      ))}
+                    </div>
                     <div className="flex items-start justify-between w-full">
                       <span className="text-2xl">{LOCAL_CATEGORY_ICON[p.category] || CATEGORY_ICON[p.category]}</span>
                       <div className="flex items-center gap-1.5">
@@ -363,29 +383,46 @@ export function Venta() {
             <button
               onClick={toggleCartCollapsed}
               aria-label="Expandir carrito"
-              title="Expandir carrito"
-              className="relative flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              className="group relative flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20 hover:scale-105 active:scale-95 transition-all duration-300 ease-in-out"
             >
               <ShoppingCart className="size-5" />
               {cartCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex size-[18px] items-center justify-center rounded-full bg-primary text-[9px] font-bold leading-none text-primary-foreground">
+                <span className="absolute -right-1 -top-1 flex size-[18px] items-center justify-center rounded-full bg-primary text-[9px] font-bold leading-none text-primary-foreground animate-pulse-subtle">
                   {cartCount}
                 </span>
               )}
+              {/* Tooltip */}
+              <span className="pointer-events-none absolute right-full mr-3 whitespace-nowrap rounded-lg bg-popover px-2.5 py-1.5 text-xs font-semibold text-popover-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 z-50">
+                Ver carrito ({cartCount} prod.)
+              </span>
             </button>
             {cartCount > 0 && (
-              <p className="[writing-mode:vertical-lr] rotate-180 text-xs font-bold tabular-nums text-primary select-none">
-                {money(total)}
-              </p>
+              <div className="group relative">
+                <div
+                  onClick={toggleCartCollapsed}
+                  className="flex items-center justify-center [writing-mode:vertical-lr] rotate-180 px-2.5 py-4 rounded-full bg-success/15 border border-success/35 text-success hover:bg-success/25 hover:shadow-md cursor-pointer transition-all duration-300"
+                >
+                  <p className="text-xs font-bold tabular-nums select-none tracking-wide">
+                    {money(total)}
+                  </p>
+                </div>
+                {/* Tooltip */}
+                <span className="pointer-events-none absolute right-full mr-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-popover px-2.5 py-1.5 text-xs font-semibold text-popover-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 z-50">
+                  Total: {money(total)}
+                </span>
+              </div>
             )}
             <div className="flex-1" />
             <button
               onClick={toggleCartCollapsed}
               aria-label="Expandir carrito"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              title="Expandir carrito"
+              className="group relative flex size-10 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted hover:scale-105 active:scale-95 transition-all duration-300 ease-in-out"
             >
               <PanelRightOpen className="size-4" />
+              {/* Tooltip */}
+              <span className="pointer-events-none absolute right-full mr-3 whitespace-nowrap rounded-lg bg-popover px-2.5 py-1.5 text-xs font-semibold text-popover-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 z-50">
+                Expandir panel
+              </span>
             </button>
           </div>
         ) : (

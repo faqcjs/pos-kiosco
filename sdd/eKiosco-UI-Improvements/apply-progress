@@ -1,0 +1,36 @@
+# Implementation Progress: eKiosco-UI-Improvements (Animations Phase)
+
+- **Change Name**: `eKiosco-UI-Improvements`
+- **Date**: 2026-07-09
+- **Status**: Implemented & Pending Verification Build
+
+---
+
+## 1. Task Progress Details
+
+### Task 1: CSS Animations & Utility Classes
+- **File**: `src/index.css`
+- **Details**:
+  - Added `@keyframes floatUpFade` and the utility class `.animate-float-up-fade` for smooth upward translation, scaling, and opacity fade out.
+  - Added `@keyframes pulseSubtle` and the utility class `.animate-pulse-subtle` for a premium glow / soft pulse on active badges.
+
+### Task 2: Left Navigation Sidebar Transitions
+- **File**: `src/components/pos/app-shell.jsx`
+- **Details**:
+  - Refactored text visibility transitions for the logo and navigation links using `max-w-0 opacity-0 overflow-hidden` to `max-w-[180px] opacity-100` instead of `w-0` to `w-auto`.
+  - Updated nav buttons to transition padding and layout smoothly with a subtle `hover:translate-x-1` translation when expanded.
+  - Refactored the bottom user block and logout button to transition smoothly using `max-h` and `max-w` constraints to eliminate layout jumps.
+
+### Task 3: Right Docked Cart Sidebar & Add-to-Cart Flying Effects
+- **File**: `src/components/pos/venta/venta.jsx`
+- **Details**:
+  - Redesigned the compact cart sidebar (`cartCollapsed === true`) into a premium control panel.
+  - Wrapped the vertical price in a pill badge with sleek success indicator styling and tooltips.
+  - Added premium hover scale transitions and custom tooltips on action buttons in the compact sidebar.
+  - Added local `floatingEffects` state array and trigger logic inside `addProductToCart(p)` to render absolute-positioned "+1" flying indicators centered on the product card.
+  - Applied `active:scale-[0.97]` click tactile feedback class to product cards.
+
+---
+
+## 2. Verification
+- Build task triggered: `npm run build`.
