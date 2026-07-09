@@ -79,7 +79,8 @@ export function Stock() {
       return
     }
     if (draft.id) {
-      const finalProduct = { ...draft, unidad: draft.unidad || 1 }
+      const u = draft.unidad || 1
+      const finalProduct = { ...draft, stock: draft.stock + u, unidad: u }
       updateProduct(finalProduct)
       toast('Producto actualizado')
     } else {
