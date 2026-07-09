@@ -210,6 +210,268 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- =========================================================================
+-- TRANSACTIONAL RPC FUNCTIONS FOR PRODUCTION READINESS
+-- =========================================================================
+
+-- 1. Función atómica para registro de ventas y decremento de stock
+CREATE OR REPLACE FUNCTION public.complete_sale_rpc(
+    p_sale_id TEXT,
+    p_items JSONB,
+    p_method TEXT,
+    p_customer_id TEXT,
+    p_cash_received NUMERIC,
+    p_change NUMERIC,
+    p_cost NUMERIC,
+    p_sold_by TEXT,
+    p_date TIMESTAMPTZ
+) RETURNS VOID AS $$
+DECLARE
+    item RECORD;
+    v_total NUMERIC := 0;
+    active_shift RECORD;
+    detail_desc TEXT;
+BEGIN
+    -- Validar que cada ítem tenga stock suficiente y acumular total
+    FOR item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(id TEXT, "productId" TEXT, name TEXT, price NUMERIC, qty NUMERIC)
+    LOOP
+        v_total := v_total + (item.price * item.qty);
+        
+        -- Si tiene un ID de producto, validar stock y descontarlo de forma atómica
+        IF item."productId" IS NOT NULL THEN
+            IF NOT EXISTS (
+                SELECT 1 FROM public.products 
+                WHERE id = item."productId" AND stock >= item.qty
+            ) THEN
+                RAISE EXCEPTION 'Stock insuficiente para el producto: %', item.name;
+            END IF;
+            
+            UPDATE public.products 
+            SET stock = GREATEST(0, stock - item.qty) 
+            WHERE id = item."productId";
+        END IF;
+    END LOOP;
+
+    -- Insertar la venta
+    INSERT INTO public.sales (id, date, created_at, items, total, method, "customerId", "cashReceived", change, cost, "soldBy")
+    VALUES (p_sale_id, p_date, p_date, p_items, v_total, p_method, p_customer_id, p_cash_received, p_change, p_cost, p_sold_by);
+
+    -- Registrar movimiento en el turno de caja activo (efectivo)
+    IF p_method = 'efectivo' THEN
+        SELECT * INTO active_shift FROM public.shifts WHERE status = 'open' LIMIT 1;
+        IF active_shift IS NULL THEN
+            RAISE EXCEPTION 'No hay una caja abierta para registrar la venta en efectivo.';
+        END IF;
+        
+        UPDATE public.shifts
+        SET movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
+            jsonb_build_object(
+                'id', extensions.gen_random_uuid()::text,
+                'date', p_date,
+                'type', 'venta',
+                'amount', v_total,
+                'reason', 'Venta en efectivo (' || jsonb_array_length(p_items) || ' art.)'
+            )
+        )
+        WHERE id = active_shift.id;
+    END IF;
+
+    -- Registrar deuda de cliente si la venta es fiada
+    IF p_method = 'fiado' AND p_customer_id IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM public.customers WHERE id = p_customer_id) THEN
+            RAISE EXCEPTION 'Cliente no encontrado.';
+        END IF;
+        
+        SELECT string_agg(qty || 'x ' || name, ', ') INTO detail_desc
+        FROM jsonb_to_recordset(p_items) AS x(name TEXT, qty NUMERIC);
+        
+        UPDATE public.customers
+        SET entries = COALESCE(entries, '[]'::jsonb) || jsonb_build_array(
+            jsonb_build_object(
+                'id', extensions.gen_random_uuid()::text,
+                'date', p_date,
+                'type', 'compra',
+                'amount', v_total,
+                'detail', detail_desc
+            )
+        )
+        WHERE id = p_customer_id;
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Revocar ejecución pública de la función y habilitarla solo para autenticados
+REVOKE EXECUTE ON FUNCTION public.complete_sale_rpc FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.complete_sale_rpc TO authenticated;
+
+-- 2. Función atómica para registro de pagos de clientes
+CREATE OR REPLACE FUNCTION public.register_customer_payment_rpc(
+    p_customer_id TEXT,
+    p_amount NUMERIC,
+    p_date TIMESTAMPTZ
+) RETURNS VOID AS $$
+DECLARE
+    customer_name TEXT;
+    active_shift RECORD;
+BEGIN
+    SELECT name INTO customer_name FROM public.customers WHERE id = p_customer_id;
+    IF customer_name IS NULL THEN
+        RAISE EXCEPTION 'Cliente no encontrado.';
+    END IF;
+
+    UPDATE public.customers
+    SET entries = COALESCE(entries, '[]'::jsonb) || jsonb_build_array(
+        jsonb_build_object(
+            'id', extensions.gen_random_uuid()::text,
+            'date', p_date,
+            'type', 'pago',
+            'amount', p_amount,
+            'detail', 'Pago de deuda'
+        )
+    )
+    WHERE id = p_customer_id;
+
+    SELECT * INTO active_shift FROM public.shifts WHERE status = 'open' LIMIT 1;
+    IF active_shift IS NOT NULL THEN
+        UPDATE public.shifts
+        SET movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
+            jsonb_build_object(
+                'id', extensions.gen_random_uuid()::text,
+                'date', p_date,
+                'type', 'cobro_fiado',
+                'amount', ABS(p_amount),
+                'reason', 'Cobro de fiado - ' || customer_name
+            )
+        )
+        WHERE id = active_shift.id;
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+REVOKE EXECUTE ON FUNCTION public.register_customer_payment_rpc FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.register_customer_payment_rpc TO authenticated;
+
+-- 3. Función atómica para mercadería de proveedores
+CREATE OR REPLACE FUNCTION public.receive_goods_rpc(
+    p_supplier_id TEXT,
+    p_amount NUMERIC,
+    p_detail TEXT,
+    p_paid_cash BOOLEAN,
+    p_date TIMESTAMPTZ
+) RETURNS VOID AS $$
+DECLARE
+    supplier_name TEXT;
+    active_shift RECORD;
+    v_entries JSONB;
+BEGIN
+    SELECT name INTO supplier_name FROM public.suppliers WHERE id = p_supplier_id;
+    IF supplier_name IS NULL THEN
+        RAISE EXCEPTION 'Proveedor no encontrado.';
+    END IF;
+
+    v_entries := jsonb_build_array(
+        jsonb_build_object(
+            'id', extensions.gen_random_uuid()::text,
+            'date', p_date,
+            'type', 'factura',
+            'amount', p_amount,
+            'detail', p_detail,
+            'paidCash', p_paid_cash
+        )
+    );
+    
+    IF p_paid_cash THEN
+        v_entries := v_entries || jsonb_build_array(
+            jsonb_build_object(
+                'id', extensions.gen_random_uuid()::text,
+                'date', p_date,
+                'type', 'pago',
+                'amount', p_amount,
+                'detail', 'Pago contado: ' || p_detail
+            )
+        );
+    END IF;
+
+    UPDATE public.suppliers
+    SET entries = COALESCE(entries, '[]'::jsonb) || v_entries
+    WHERE id = p_supplier_id;
+
+    IF p_paid_cash THEN
+        SELECT * INTO active_shift FROM public.shifts WHERE status = 'open' LIMIT 1;
+        IF active_shift IS NULL THEN
+            RAISE EXCEPTION 'No hay una caja abierta para registrar el egreso por pago al proveedor.';
+        END IF;
+
+        UPDATE public.shifts
+        SET movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
+            jsonb_build_object(
+                'id', extensions.gen_random_uuid()::text,
+                'date', p_date,
+                'type', 'pago_proveedor',
+                'amount', -ABS(p_amount),
+                'reason', 'Pago contado - ' || supplier_name
+            )
+        )
+        WHERE id = active_shift.id;
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+REVOKE EXECUTE ON FUNCTION public.receive_goods_rpc FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.receive_goods_rpc TO authenticated;
+
+-- 4. Función atómica para pagos directos a proveedores
+CREATE OR REPLACE FUNCTION public.register_supplier_payment_rpc(
+    p_supplier_id TEXT,
+    p_amount NUMERIC,
+    p_from_cash BOOLEAN,
+    p_date TIMESTAMPTZ
+) RETURNS VOID AS $$
+DECLARE
+    supplier_name TEXT;
+    active_shift RECORD;
+BEGIN
+    SELECT name INTO supplier_name FROM public.suppliers WHERE id = p_supplier_id;
+    IF supplier_name IS NULL THEN
+        RAISE EXCEPTION 'Proveedor no encontrado.';
+    END IF;
+
+    UPDATE public.suppliers
+    SET entries = COALESCE(entries, '[]'::jsonb) || jsonb_build_array(
+        jsonb_build_object(
+            'id', extensions.gen_random_uuid()::text,
+            'date', p_date,
+            'type', 'pago',
+            'amount', p_amount,
+            'detail', 'Pago a proveedor'
+        )
+    )
+    WHERE id = p_supplier_id;
+
+    IF p_from_cash THEN
+        SELECT * INTO active_shift FROM public.shifts WHERE status = 'open' LIMIT 1;
+        IF active_shift IS NULL THEN
+            RAISE EXCEPTION 'No hay una caja abierta para registrar el egreso por pago al proveedor.';
+        END IF;
+
+        UPDATE public.shifts
+        SET movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
+            jsonb_build_object(
+                'id', extensions.gen_random_uuid()::text,
+                'date', p_date,
+                'type', 'pago_proveedor',
+                'amount', -ABS(p_amount),
+                'reason', 'Pago a proveedor - ' || supplier_name
+            )
+        )
+        WHERE id = active_shift.id;
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+REVOKE EXECUTE ON FUNCTION public.register_supplier_payment_rpc FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.register_supplier_payment_rpc TO authenticated;
+
 
 -- =========================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -239,14 +501,18 @@ CREATE POLICY "Allow delete users for administrators"
 CREATE POLICY "Allow select products for authenticated users" 
     ON public.products FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Allow insert products for admin, repositor and cajero" 
+DROP POLICY IF EXISTS "Allow insert products for admin, repositor and cajero" ON public.products;
+DROP POLICY IF EXISTS "Allow update products for admin and repositor" ON public.products;
+DROP POLICY IF EXISTS "Allow delete products for admin and repositor" ON public.products;
+
+CREATE POLICY "Allow insert products for admin and repositor" 
     ON public.products FOR INSERT TO authenticated 
-    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
+    WITH CHECK (public.has_role('administrador', 'repositor'));
 
 CREATE POLICY "Allow update products for admin and repositor" 
     ON public.products FOR UPDATE TO authenticated 
-    USING (public.has_role('administrador', 'repositor', 'cajero'))
-    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
+    USING (public.has_role('administrador', 'repositor'))
+    WITH CHECK (public.has_role('administrador', 'repositor'));
 
 CREATE POLICY "Allow delete products for admin and repositor" 
     ON public.products FOR DELETE TO authenticated 
@@ -267,25 +533,64 @@ CREATE POLICY "Allow delete sales for administrators"
 CREATE POLICY "Allow select customers for authenticated users" 
     ON public.customers FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Allow write customers for authenticated users" 
-    ON public.customers FOR ALL TO authenticated 
-    USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow write customers for authenticated users" ON public.customers;
+
+CREATE POLICY "Allow insert customers for authenticated users" 
+    ON public.customers FOR INSERT TO authenticated 
+    WITH CHECK (true);
+
+CREATE POLICY "Allow update customers for admin and repositor" 
+    ON public.customers FOR UPDATE TO authenticated 
+    USING (public.has_role('administrador', 'repositor'))
+    WITH CHECK (public.has_role('administrador', 'repositor'));
+
+CREATE POLICY "Allow delete customers for administrators only" 
+    ON public.customers FOR DELETE TO authenticated 
+    USING (public.has_role('administrador'));
 
 -- 5. Suppliers Policies
 CREATE POLICY "Allow select suppliers for authenticated users" 
     ON public.suppliers FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Allow write suppliers for authenticated users" 
-    ON public.suppliers FOR ALL TO authenticated 
-    USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow write suppliers for authenticated users" ON public.suppliers;
+
+CREATE POLICY "Allow insert suppliers for authenticated users" 
+    ON public.suppliers FOR INSERT TO authenticated 
+    WITH CHECK (true);
+
+CREATE POLICY "Allow update suppliers for admin and repositor" 
+    ON public.suppliers FOR UPDATE TO authenticated 
+    USING (public.has_role('administrador', 'repositor'))
+    WITH CHECK (public.has_role('administrador', 'repositor'));
+
+CREATE POLICY "Allow delete suppliers for administrators only" 
+    ON public.suppliers FOR DELETE TO authenticated 
+    USING (public.has_role('administrador'));
 
 -- 6. Shifts Policies
 CREATE POLICY "Allow select shifts for authenticated users" 
     ON public.shifts FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Allow write shifts for authenticated users" 
-    ON public.shifts FOR ALL TO authenticated 
-    USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow write shifts for authenticated users" ON public.shifts;
+
+CREATE POLICY "Allow insert shifts for authenticated users" 
+    ON public.shifts FOR INSERT TO authenticated 
+    WITH CHECK (true);
+
+CREATE POLICY "Allow update shifts for administrators or shift creator" 
+    ON public.shifts FOR UPDATE TO authenticated 
+    USING (
+        public.has_role('administrador') OR 
+        "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid())
+    )
+    WITH CHECK (
+        public.has_role('administrador') OR 
+        "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Allow delete shifts for administrators only" 
+    ON public.shifts FOR DELETE TO authenticated 
+    USING (public.has_role('administrador'));
 
 -- =========================================================================
 -- ENABLE REALTIME REPLICATION FOR ALL TABLES

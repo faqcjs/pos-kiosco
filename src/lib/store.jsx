@@ -300,67 +300,18 @@ export function useStore() {
 
     for (const sale of queueToProcess) {
       try {
-        const { isOfflinePending, ...saleToInsert } = sale
-        // 1. Insert sale on server
-        const { error: saleError } = await supabase.from('sales').insert([saleToInsert])
-        if (saleError) throw saleError
-
-        // 2. Decrement stock on server
-        for (const item of sale.items) {
-          if (item.productId) {
-            const { data: prod, error: prodError } = await supabase
-              .from('products')
-              .select('stock')
-              .eq('id', item.productId)
-              .single()
-            if (!prodError && prod) {
-              const newStock = Math.max(0, prod.stock - item.qty)
-              await supabase.from('products').update({ stock: newStock }).eq('id', item.productId)
-            }
-          }
-        }
-
-        // 3. Register cash shift movement on server
-        if (sale.method === 'efectivo') {
-          const { data: activeShift, error: shiftError } = await supabase
-            .from('shifts')
-            .select('*')
-            .eq('status', 'open')
-            .maybeSingle()
-          
-          if (!shiftError && activeShift) {
-            const mov = {
-              id: uid(),
-              date: sale.date,
-              type: 'venta',
-              amount: sale.total,
-              reason: `Venta en efectivo (${sale.items.length} art.) [Sincronizada]`,
-            }
-            const updatedShift = {
-              ...activeShift,
-              movements: [...(activeShift.movements || []), mov]
-            }
-            await supabase.from('shifts').update(updatedShift).eq('id', activeShift.id)
-          }
-        }
-
-        // 4. Update customer balance if credit ("fiado")
-        if (sale.method === 'fiado' && sale.customerId) {
-          const { data: customer, error: custError } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('id', sale.customerId)
-            .single()
-          
-          if (!custError && customer) {
-            const detail = sale.items.map((i) => `${i.qty}x ${i.name}`).join(', ')
-            const updated = {
-              ...customer,
-              entries: [...(customer.entries || []), { id: uid(), date: sale.date, type: 'compra', amount: sale.total, detail }],
-            }
-            await supabase.from('customers').update(updated).eq('id', sale.customerId)
-          }
-        }
+        const { error } = await supabase.rpc('complete_sale_rpc', {
+          p_sale_id: sale.id,
+          p_items: sale.items,
+          p_method: sale.method,
+          p_customer_id: sale.customerId || null,
+          p_cash_received: sale.cashReceived || 0,
+          p_change: sale.change || 0,
+          p_cost: sale.cost || 0,
+          p_sold_by: sale.soldBy,
+          p_date: sale.date,
+        })
+        if (error) throw error
 
         // Remove successfully synced sale from queue
         dequeueOfflineSale(sale.id)
@@ -402,41 +353,12 @@ export function useStore() {
           }
           case 'REGISTER_CUSTOMER_PAYMENT': {
             const { customerId, amount, date } = action.payload
-            const { data: customer, error: custError } = await supabase
-              .from('customers')
-              .select('*')
-              .eq('id', customerId)
-              .single()
-            if (custError) throw custError
-
-            const updated = {
-              ...customer,
-              entries: [...(customer.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago de deuda' }],
-            }
-            const { error: updateError } = await supabase.from('customers').update(updated).eq('id', customerId)
-            if (updateError) throw updateError
-
-            // Shift movement
-            const { data: activeShift, error: shiftError } = await supabase
-              .from('shifts')
-              .select('*')
-              .eq('status', 'open')
-              .maybeSingle()
-            
-            if (!shiftError && activeShift) {
-              const mov = {
-                id: uid(),
-                date,
-                type: 'cobro_fiado',
-                amount: Math.abs(amount),
-                reason: `Cobro de fiado - ${customer.name} [Sincronizado]`,
-              }
-              const updatedShift = {
-                ...activeShift,
-                movements: [...(activeShift.movements || []), mov]
-              }
-              await supabase.from('shifts').update(updatedShift).eq('id', activeShift.id)
-            }
+            const { error } = await supabase.rpc('register_customer_payment_rpc', {
+              p_customer_id: customerId,
+              p_amount: amount,
+              p_date: date,
+            })
+            if (error) throw error
             break
           }
           case 'ADD_SUPPLIER': {
@@ -446,82 +368,25 @@ export function useStore() {
           }
           case 'RECEIVE_GOODS': {
             const { supplierId, amount, detail, paidCash, date } = action.payload
-            const { data: supplier, error: supError } = await supabase
-              .from('suppliers')
-              .select('*')
-              .eq('id', supplierId)
-              .single()
-            if (supError) throw supError
-
-            let entries = [...(supplier.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash }]
-            if (paidCash) {
-              entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
-            }
-            const { error: updateError } = await supabase.from('suppliers').update({ entries }).eq('id', supplierId)
-            if (updateError) throw updateError
-
-            if (paidCash) {
-              const { data: activeShift, error: shiftError } = await supabase
-                .from('shifts')
-                .select('*')
-                .eq('status', 'open')
-                .maybeSingle()
-              
-              if (!shiftError && activeShift) {
-                const mov = {
-                  id: uid(),
-                  date,
-                  type: 'pago_proveedor',
-                  amount: -Math.abs(amount),
-                  reason: `Pago contado - ${supplier.name} [Sincronizado]`,
-                }
-                const updatedShift = {
-                  ...activeShift,
-                  movements: [...(activeShift.movements || []), mov]
-                }
-                await supabase.from('shifts').update(updatedShift).eq('id', activeShift.id)
-              }
-            }
+            const { error } = await supabase.rpc('receive_goods_rpc', {
+              p_supplier_id: supplierId,
+              p_amount: amount,
+              p_detail: detail,
+              p_paid_cash: paidCash,
+              p_date: date,
+            })
+            if (error) throw error
             break
           }
           case 'REGISTER_SUPPLIER_PAYMENT': {
             const { supplierId, amount, fromCash, date } = action.payload
-            const { data: supplier, error: supError } = await supabase
-              .from('suppliers')
-              .select('*')
-              .eq('id', supplierId)
-              .single()
-            if (supError) throw supError
-
-            const updated = {
-              ...supplier,
-              entries: [...(supplier.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor' }],
-            }
-            const { error: updateError } = await supabase.from('suppliers').update(updated).eq('id', supplierId)
-            if (updateError) throw updateError
-
-            if (fromCash) {
-              const { data: activeShift, error: shiftError } = await supabase
-                .from('shifts')
-                .select('*')
-                .eq('status', 'open')
-                .maybeSingle()
-              
-              if (!shiftError && activeShift) {
-                const mov = {
-                  id: uid(),
-                  date,
-                  type: 'pago_proveedor',
-                  amount: -Math.abs(amount),
-                  reason: `Pago a proveedor - ${supplier.name} [Sincronizado]`,
-                }
-                const updatedShift = {
-                  ...activeShift,
-                  movements: [...(activeShift.movements || []), mov]
-                }
-                await supabase.from('shifts').update(updatedShift).eq('id', activeShift.id)
-              }
-            }
+            const { error } = await supabase.rpc('register_supplier_payment_rpc', {
+              p_supplier_id: supplierId,
+              p_amount: amount,
+              p_from_cash: fromCash,
+              p_date: date,
+            })
+            if (error) throw error
             break
           }
           default:
@@ -714,28 +579,12 @@ export function useStore() {
   const registerCustomerPaymentMutation = useMutation({
     mutationFn: async ({ customerId, amount }) => {
       const date = new Date().toISOString()
-      const customer = customers.find((c) => c.id === customerId)
-      if (!customer) throw new Error('Customer not found')
-      const updated = {
-        ...customer,
-        entries: [...(customer.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago de deuda' }],
-      }
-      await supabase.from('customers').update(updated).eq('id', customerId)
-
-      if (currentShift) {
-        const mov = {
-          id: uid(),
-          date,
-          type: 'cobro_fiado',
-          amount: Math.abs(amount),
-          reason: `Cobro de fiado - ${customer.name}`,
-        }
-        const updatedShift = {
-          ...currentShift,
-          movements: [...(currentShift.movements || []), mov],
-        }
-        await supabase.from('shifts').update(updatedShift).eq('id', currentShift.id)
-      }
+      const { error } = await supabase.rpc('register_customer_payment_rpc', {
+        p_customer_id: customerId,
+        p_amount: amount,
+        p_date: date,
+      })
+      if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['customers'] })
@@ -755,30 +604,14 @@ export function useStore() {
   const receiveGoodsMutation = useMutation({
     mutationFn: async ({ supplierId, amount, detail, paidCash }) => {
       const date = new Date().toISOString()
-      const supplier = suppliers.find((x) => x.id === supplierId)
-      if (!supplier) throw new Error('Supplier not found')
-
-      let entries = [...(supplier.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash }]
-      if (paidCash) {
-        entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
-      }
-
-      await supabase.from('suppliers').update({ entries }).eq('id', supplierId)
-
-      if (paidCash && currentShift) {
-        const mov = {
-          id: uid(),
-          date,
-          type: 'pago_proveedor',
-          amount: -Math.abs(amount),
-          reason: `Pago contado - ${supplier.name}`,
-        }
-        const updatedShift = {
-          ...currentShift,
-          movements: [...(currentShift.movements || []), mov],
-        }
-        await supabase.from('shifts').update(updatedShift).eq('id', currentShift.id)
-      }
+      const { error } = await supabase.rpc('receive_goods_rpc', {
+        p_supplier_id: supplierId,
+        p_amount: amount,
+        p_detail: detail,
+        p_paid_cash: paidCash,
+        p_date: date,
+      })
+      if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] })
@@ -789,29 +622,13 @@ export function useStore() {
   const registerSupplierPaymentMutation = useMutation({
     mutationFn: async ({ supplierId, amount, fromCash }) => {
       const date = new Date().toISOString()
-      const supplier = suppliers.find((x) => x.id === supplierId)
-      if (!supplier) throw new Error('Supplier not found')
-
-      const updated = {
-        ...supplier,
-        entries: [...(supplier.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor' }],
-      }
-      await supabase.from('suppliers').update(updated).eq('id', supplierId)
-
-      if (fromCash && currentShift) {
-        const mov = {
-          id: uid(),
-          date,
-          type: 'pago_proveedor',
-          amount: -Math.abs(amount),
-          reason: `Pago a proveedor - ${supplier.name}`,
-        }
-        const updatedShift = {
-          ...currentShift,
-          movements: [...(currentShift.movements || []), mov],
-        }
-        await supabase.from('shifts').update(updatedShift).eq('id', currentShift.id)
-      }
+      const { error } = await supabase.rpc('register_supplier_payment_rpc', {
+        p_supplier_id: supplierId,
+        p_amount: amount,
+        p_from_cash: fromCash,
+        p_date: date,
+      })
+      if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] })
@@ -821,10 +638,9 @@ export function useStore() {
 
   const completeSaleMutation = useMutation({
     mutationFn: async (args) => {
-      if (!currentShift) return
+      if (!currentShift) throw new Error('No hay una caja abierta')
 
       const date = new Date().toISOString()
-      const total = args.items.reduce((sum, i) => sum + i.price * i.qty, 0)
       
       let cost = 0
       for (const item of args.items) {
@@ -834,61 +650,19 @@ export function useStore() {
         }
       }
 
-      const sale = {
-        id: uid(),
-        date,
-        items: args.items,
-        total,
-        method: args.method,
-        customerId: args.customerId,
-        cashReceived: args.cashReceived,
-        change: args.change,
-        cost,
-        soldBy: currentUser?.username || 'admin',
-      }
-
-      // 1. Insert sale
-      await supabase.from('sales').insert([sale])
-
-      // 2. Decrement stocks
-      for (const item of args.items) {
-        if (item.productId) {
-          const prod = products.find((p) => p.id === item.productId)
-          if (prod) {
-            const newStock = Math.max(0, prod.stock - item.qty)
-            await supabase.from('products').update({ stock: newStock }).eq('id', item.productId)
-          }
-        }
-      }
-
-      // 3. Register cash shift movement if paid in cash
-      if (args.method === 'efectivo' && currentShift) {
-        const mov = {
-          id: uid(),
-          date,
-          type: 'venta',
-          amount: total,
-          reason: `Venta en efectivo (${args.items.length} art.)`,
-        }
-        const updatedShift = {
-          ...currentShift,
-          movements: [...(currentShift.movements || []), mov],
-        }
-        await supabase.from('shifts').update(updatedShift).eq('id', currentShift.id)
-      }
-
-      // 4. Update customer balance if credit ("fiado")
-      if (args.method === 'fiado' && args.customerId) {
-        const customer = customers.find((c) => c.id === args.customerId)
-        if (customer) {
-          const detail = args.items.map((i) => `${i.qty}x ${i.name}`).join(', ')
-          const updated = {
-            ...customer,
-            entries: [...(customer.entries || []), { id: uid(), date, type: 'compra', amount: total, detail }],
-          }
-          await supabase.from('customers').update(updated).eq('id', args.customerId)
-        }
-      }
+      const saleId = uid()
+      const { error } = await supabase.rpc('complete_sale_rpc', {
+        p_sale_id: saleId,
+        p_items: args.items,
+        p_method: args.method,
+        p_customer_id: args.customerId || null,
+        p_cash_received: args.cashReceived || 0,
+        p_change: args.change || 0,
+        p_cost: cost,
+        p_sold_by: currentUser?.username || 'admin',
+        p_date: date,
+      })
+      if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sales'] })

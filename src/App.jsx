@@ -38,7 +38,7 @@ function LoginScreen() {
             🛒
           </div>
           <h2 className="mt-6 text-3xl font-bold tracking-tight font-heading text-foreground">
-            eKiosco
+            Bienvenido a eKiosco
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Iniciá sesión para acceder al sistema
