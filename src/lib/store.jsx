@@ -605,9 +605,9 @@ export function useStore() {
   })
 
   const openShiftMutation = useMutation({
-    mutationFn: async ({ openingAmount, openedBy }) => {
+    mutationFn: async ({ id, openingAmount, openedBy }) => {
       const shift = {
-        id: uid(),
+        id,
         openedAt: new Date().toISOString(),
         openingAmount,
         movements: [],
@@ -618,7 +618,12 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
+    onSuccess: (serverShift) => {
+      // Replace the optimistic entry with the confirmed server data
+      qc.setQueryData(['shifts'], (old = []) =>
+        old.map((s) => (s.id === serverShift?.id ? serverShift : s))
+      )
+    },
   })
 
   const closeShiftMutation = useMutation({
@@ -853,65 +858,85 @@ export function useStore() {
   }, [toggleMostSoldMutation])
 
   const openShift = useCallback((openingAmount, openedBy) => {
+    // Build shift object once so both paths share the same ID
+    const newShift = {
+      id: uid(),
+      openedAt: new Date().toISOString(),
+      openingAmount,
+      movements: [],
+      status: 'open',
+      openedBy,
+    }
+    // Optimistically update the cache immediately (both online and offline)
+    qc.setQueryData(['shifts'], (old = []) => [newShift, ...old])
+    setCurrentShiftCache(newShift)
     if (!isOnline) {
-      const shiftId = uid()
-      const newShift = {
-        id: shiftId,
-        openedAt: new Date().toISOString(),
-        openingAmount,
-        movements: [],
-        status: 'open',
-        openedBy,
-      }
       enqueueOfflineAction({
         id: uid(),
         type: 'OPEN_SHIFT',
         payload: newShift
       })
-      qc.setQueryData(['shifts'], (old = []) => [newShift, ...old])
-      setCurrentShiftCache(newShift)
     } else {
-      openShiftMutation.mutate({ openingAmount, openedBy })
+      openShiftMutation.mutate(
+        { id: newShift.id, openingAmount, openedBy },
+        {
+          onError: () => {
+            // Roll back optimistic update on error
+            qc.setQueryData(['shifts'], (old = []) => old.filter((s) => s.id !== newShift.id))
+            setCurrentShiftCache(null)
+          },
+        }
+      )
     }
   }, [openShiftMutation, isOnline, enqueueOfflineAction, setCurrentShiftCache, qc])
 
   const closeShift = useCallback((counted, closedBy) => {
+    if (!currentShift) return
+    const theoretical = shiftTheoretical(currentShift)
+    // Optimistically close the shift in the cache immediately (both online and offline)
+    const closedAt = new Date().toISOString()
+    const difference = counted - theoretical
+    qc.setQueryData(['shifts'], (old = []) => {
+      return old.map((s) => {
+        if (s.id === currentShift.id) {
+          return {
+            ...s,
+            closedAt,
+            closingCounted: counted,
+            closingTheoretical: theoretical,
+            difference,
+            status: 'closed',
+            closedBy,
+          }
+        }
+        return s
+      })
+    })
+    setCurrentShiftCache(null)
     if (!isOnline) {
-      if (currentShift === null) return
-      const theoretical = shiftTheoretical(currentShift)
-      const closed = {
-        shiftId: currentShift.id,
-        closedAt: new Date().toISOString(),
-        closingCounted: counted,
-        closingTheoretical: theoretical,
-        difference: counted - theoretical,
-        status: 'closed',
-        closedBy,
-      }
       enqueueOfflineAction({
         id: uid(),
         type: 'CLOSE_SHIFT',
-        payload: closed
+        payload: {
+          shiftId: currentShift.id,
+          closedAt,
+          closingCounted: counted,
+          closingTheoretical: theoretical,
+          difference,
+          status: 'closed',
+          closedBy,
+        }
       })
-      qc.setQueryData(['shifts'], (old = []) => {
-        return old.map((s) => {
-          if (s.id === currentShift.id) {
-            return {
-              ...s,
-              closedAt: closed.closedAt,
-              closingCounted: counted,
-              closingTheoretical: theoretical,
-              difference: closed.difference,
-              status: 'closed',
-              closedBy,
-            }
-          }
-          return s
-        })
-      })
-      setCurrentShiftCache(null)
     } else {
-      closeShiftMutation.mutate({ counted, closedBy })
+      closeShiftMutation.mutate(
+        { counted, closedBy },
+        {
+          onError: () => {
+            // Roll back on error by re-fetching the real state
+            qc.invalidateQueries({ queryKey: ['shifts'] })
+          },
+        }
+      )
     }
   }, [closeShiftMutation, isOnline, currentShift, enqueueOfflineAction, setCurrentShiftCache, qc])
 
