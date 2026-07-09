@@ -118,13 +118,18 @@ export function AppShell({
       setIsOnline(false)
       toast('Sin conexión a internet. Operando en Modo Offline.', 'warning')
     }
+    const handleSyncCompleted = () => {
+      toast('¡Sincronización completa! Todos los datos offline fueron guardados.', 'success')
+    }
 
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+    window.addEventListener('offline-sync-completed', handleSyncCompleted)
 
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('offline-sync-completed', handleSyncCompleted)
     }
   }, [toast])
 

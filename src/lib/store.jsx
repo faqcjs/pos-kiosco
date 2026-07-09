@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useCallback } from 'react'
+import { createContext, useContext, useEffect, useMemo, useCallback, useRef } from 'react'
 import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -159,6 +159,9 @@ export function useStore() {
   const qc = useQueryClient()
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine
   
+  const syncingSalesRef = useRef(false)
+  const syncingActionsRef = useRef(false)
+  
   // Zustand Local UI state
   const uiTheme = useUIStore((s) => s.theme)
   const adminPassword = useUIStore((s) => s.adminPassword)
@@ -288,10 +291,12 @@ export function useStore() {
 
   // Background offline sales synchronization function
   const syncOfflineSales = useCallback(async () => {
-    if (offlineSalesQueue.length === 0) return
+    const queue = useUIStore.getState().offlineSalesQueue
+    if (queue.length === 0 || syncingSalesRef.current) return
+    syncingSalesRef.current = true
 
-    console.log(`Syncing ${offlineSalesQueue.length} offline sales...`)
-    const queueToProcess = [...offlineSalesQueue]
+    console.log(`Syncing ${queue.length} offline sales...`)
+    const queueToProcess = [...queue]
 
     for (const sale of queueToProcess) {
       try {
@@ -366,14 +371,26 @@ export function useStore() {
       }
     }
     qc.invalidateQueries()
-  }, [offlineSalesQueue, dequeueOfflineSale, qc])
+    syncingSalesRef.current = false
+
+    // Check if everything is synced to notify UI
+    const remainingSales = useUIStore.getState().offlineSalesQueue.length
+    const remainingActions = useUIStore.getState().offlineActionsQueue.length
+    if (remainingSales === 0 && remainingActions === 0) {
+      if (typeof window !== 'undefined' && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('offline-sync-completed'))
+      }
+    }
+  }, [dequeueOfflineSale, qc])
 
   // Background offline actions (customers/suppliers) synchronization function
   const syncOfflineActions = useCallback(async () => {
-    if (offlineActionsQueue.length === 0) return
+    const queue = useUIStore.getState().offlineActionsQueue
+    if (queue.length === 0 || syncingActionsRef.current) return
+    syncingActionsRef.current = true
 
-    console.log(`Syncing ${offlineActionsQueue.length} offline actions...`)
-    const queueToProcess = [...offlineActionsQueue]
+    console.log(`Syncing ${queue.length} offline actions...`)
+    const queueToProcess = [...queue]
 
     for (const action of queueToProcess) {
       try {
@@ -520,28 +537,41 @@ export function useStore() {
       }
     }
     qc.invalidateQueries()
-  }, [offlineActionsQueue, dequeueOfflineAction, qc])
+    syncingActionsRef.current = false
+
+    // Check if everything is synced to notify UI
+    const remainingSales = useUIStore.getState().offlineSalesQueue.length
+    const remainingActions = useUIStore.getState().offlineActionsQueue.length
+    if (remainingSales === 0 && remainingActions === 0) {
+      if (typeof window !== 'undefined' && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('offline-sync-completed'))
+      }
+    }
+  }, [dequeueOfflineAction, qc])
 
   // Sync effect when regaining connectivity
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const handleOnline = () => {
-      console.log('App regained connection. Syncing offline data...')
+      console.log('App regained connection/startup. Syncing offline data...')
       syncOfflineSales()
       syncOfflineActions()
     }
 
     window.addEventListener('online', handleOnline)
 
-    if (navigator.onLine && (offlineSalesQueue.length > 0 || offlineActionsQueue.length > 0)) {
+    // Run once at startup if we are online and have items in either queue
+    const startupSales = useUIStore.getState().offlineSalesQueue.length
+    const startupActions = useUIStore.getState().offlineActionsQueue.length
+    if (navigator.onLine && (startupSales > 0 || startupActions > 0)) {
       handleOnline()
     }
 
     return () => {
       window.removeEventListener('online', handleOnline)
     }
-  }, [syncOfflineSales, syncOfflineActions, offlineSalesQueue.length, offlineActionsQueue.length])
+  }, [syncOfflineSales, syncOfflineActions])
 
   // Sync shifts query results with currentShiftCache
   useEffect(() => {
