@@ -47,7 +47,7 @@ function startOfDay(d) {
 }
 
 export function Admin() {
-  const { state, logout, resetData, createUser, deleteUser } = useStore()
+  const { state, logout, resetData, createUser, deleteUser, resetDataPending } = useStore()
 
   const handleReset = () => {
     if (window.confirm('¿Estás seguro de que querés resetear todos los datos? Se borrarán todos los registros de la base de datos y se restaurarán los datos de prueba iniciales.')) {
@@ -272,9 +272,10 @@ export function Admin() {
             <Button
               variant="outline"
               onClick={handleReset}
+              disabled={resetDataPending}
               className="border-destructive text-destructive hover:bg-destructive/10"
             >
-              Resetear Datos
+              {resetDataPending ? 'Reseteando...' : 'Resetear Datos'}
             </Button>
             <Button variant="destructive" onClick={logout}>
               <Lock className="size-4" />
@@ -936,7 +937,7 @@ function UsersTab({ state, createUser, deleteUser }) {
             <Label htmlFor="employee-password">Contraseña</Label>
             <Input
               id="employee-password"
-              type="text"
+              type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}

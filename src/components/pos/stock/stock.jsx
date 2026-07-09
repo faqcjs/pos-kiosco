@@ -207,8 +207,10 @@ export function Stock() {
                       </button>
                       <button
                         onClick={() => {
-                          deleteProduct(p.id)
-                          toast('Producto eliminado', 'info')
+                          if (window.confirm(`¿Estás seguro de que querés eliminar el producto "${p.name}"?`)) {
+                            deleteProduct(p.id)
+                            toast('Producto eliminado', 'info')
+                          }
                         }}
                         className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         aria-label="Eliminar"

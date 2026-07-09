@@ -36,6 +36,10 @@ export function Clientes() {
         customer={selected}
         onBack={() => setSelectedId(null)}
         onPay={(amount) => {
+          if (state.currentUser?.role !== 'administrador') {
+            toast('No tenés permisos para registrar pagos.', 'destructive')
+            return
+          }
           const isOnline = typeof navigator !== 'undefined' && navigator.onLine
           registerCustomerPayment(selected.id, amount)
           if (!isOnline) {
@@ -45,6 +49,7 @@ export function Clientes() {
           }
         }}
         hasOpenShift={state.currentShift?.status === 'open'}
+        isAdmin={state.currentUser?.role === 'administrador'}
       />
     )
   }
@@ -156,6 +161,7 @@ function CustomerDetail({
   onBack,
   onPay,
   hasOpenShift,
+  isAdmin,
 }) {
   const [payOpen, setPayOpen] = useState(false)
   const [amount, setAmount] = useState('')
@@ -200,17 +206,19 @@ function CustomerDetail({
             </p>
           </div>
         </div>
-        <Button
-          className="mt-4 h-11 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
-          disabled={balance <= 0}
-          onClick={() => {
-            setAmount(String(balance))
-            setPayOpen(true)
-          }}
-        >
-          <HandCoins className="size-5" />
-          Registrar pago
-        </Button>
+        {isAdmin && (
+          <Button
+            className="mt-4 h-11 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
+            disabled={balance <= 0}
+            onClick={() => {
+              setAmount(String(balance))
+              setPayOpen(true)
+            }}
+          >
+            <HandCoins className="size-5" />
+            Registrar pago
+          </Button>
+        )}
       </Card>
 
       <div>

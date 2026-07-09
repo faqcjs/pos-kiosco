@@ -68,8 +68,6 @@ export const useUIStore = create()(
   persist(
     (set) => ({
       theme: 'light',
-      adminPassword: 'admin123',
-      isAdminAuthenticated: false,
       currentUser: null,
       offlineSalesQueue: [],
       productsCache: [],
@@ -83,22 +81,6 @@ export const useUIStore = create()(
         const nextTheme = state.theme === 'dark' ? 'light' : 'dark'
         return { theme: nextTheme }
       }),
-      loginAdmin: (password) => {
-        let success = false
-        set((state) => {
-          if (password === state.adminPassword) {
-            success = true
-            return { isAdminAuthenticated: true }
-          }
-          return {}
-        })
-        return success
-      },
-      logoutAdmin: () => set({ isAdminAuthenticated: false }),
-      changeAdminPassword: (newPassword) => {
-        if (!newPassword || newPassword.trim().length === 0) return
-        set({ adminPassword: newPassword })
-      },
       setCurrentUser: (user) => set({ currentUser: user }),
       enqueueOfflineSale: (sale) => set((state) => ({
         offlineSalesQueue: [...state.offlineSalesQueue, sale]
@@ -196,8 +178,6 @@ export function useStore() {
   
   // Zustand Local UI state
   const uiTheme = useUIStore((s) => s.theme)
-  const adminPassword = useUIStore((s) => s.adminPassword)
-  const isAdminAuthenticated = useUIStore((s) => s.isAdminAuthenticated)
   const currentUser = useUIStore((s) => s.currentUser)
   const productsCache = useUIStore((s) => s.productsCache)
   const currentShiftCache = useUIStore((s) => s.currentShiftCache)
@@ -206,9 +186,6 @@ export function useStore() {
   const cart = useUIStore((s) => s.cart)
   
   const toggleTheme = useUIStore((s) => s.toggleTheme)
-  const loginAdmin = useUIStore((s) => s.loginAdmin)
-  const logoutAdmin = useUIStore((s) => s.logoutAdmin)
-  const changeAdminPassword = useUIStore((s) => s.changeAdminPassword)
   const setCurrentUser = useUIStore((s) => s.setCurrentUser)
   const enqueueOfflineSale = useUIStore((s) => s.enqueueOfflineSale)
   const dequeueOfflineSale = useUIStore((s) => s.dequeueOfflineSale)
@@ -608,6 +585,7 @@ export function useStore() {
       return data[0]
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onError: (err) => console.error('toggleMostSold error:', err),
   })
 
   const openShiftMutation = useMutation({
@@ -983,6 +961,7 @@ export function useStore() {
   }, [addCustomerMutation, isOnline, enqueueOfflineAction, qc])
 
   const registerCustomerPayment = useCallback((customerId, amount) => {
+    if (currentUser?.role !== 'administrador') return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
       const date = new Date().toISOString()
@@ -1045,8 +1024,13 @@ export function useStore() {
   }, [addSupplierMutation, isOnline, enqueueOfflineAction, qc])
 
   const receiveGoods = useCallback((supplierId, amount, detail, paidCash) => {
+    if (currentUser?.role !== 'administrador') return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
+      if (paidCash && !currentShift?.id) {
+        console.warn('Cannot register cash payment without an open shift')
+        return Promise.resolve(null)
+      }
       const date = new Date().toISOString()
       const goods = { supplierId, amount, detail, paidCash, date, shiftId }
       enqueueOfflineAction({
@@ -1097,8 +1081,13 @@ export function useStore() {
   }, [receiveGoodsMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const registerSupplierPayment = useCallback((supplierId, amount, fromCash) => {
+    if (currentUser?.role !== 'administrador') return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
+      if (fromCash && !currentShift?.id) {
+        console.warn('Cannot register cash payment without an open shift')
+        return Promise.resolve(null)
+      }
       const date = new Date().toISOString()
       const payment = { supplierId, amount, fromCash, date, shiftId }
       enqueueOfflineAction({
@@ -1331,8 +1320,6 @@ export function useStore() {
     currentShift,
     shiftHistory,
     theme: uiTheme,
-    adminPassword,
-    isAdminAuthenticated,
     currentUser,
     users,
     failedSalesQueue,
@@ -1346,8 +1333,6 @@ export function useStore() {
     currentShift,
     shiftHistory,
     uiTheme,
-    adminPassword,
-    isAdminAuthenticated,
     currentUser,
     users,
     failedSalesQueue,
@@ -1373,9 +1358,6 @@ export function useStore() {
     receiveGoods,
     registerSupplierPayment,
     resetData,
-    loginAdmin,
-    logoutAdmin,
-    changeAdminPassword,
     login,
     logout,
     createUser,
@@ -1389,5 +1371,8 @@ export function useStore() {
     discardFailedAction,
     syncOfflineData,
     setCart,
+    openShiftPending: openShiftMutation.isPending,
+    closeShiftPending: closeShiftMutation.isPending,
+    resetDataPending: resetDataMutation.isPending,
   }
 }

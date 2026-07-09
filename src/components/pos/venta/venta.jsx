@@ -348,19 +348,21 @@ export function Venta() {
                         ) : (
                           <Badge tone="muted">{p.stock} u.</Badge>
                         )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleMostSold(p.id, !p.isMostSold)
-                          }}
-                          className={cn(
-                            "rounded-full p-1 transition-colors hover:bg-muted active:scale-95",
-                            p.isMostSold ? "text-orange-500 hover:text-orange-600" : "text-muted-foreground/30 hover:text-muted-foreground/60"
-                          )}
-                          title={p.isMostSold ? "Quitar de más vendidos" : "Marcar como más vendido"}
-                        >
-                          <Flame className="size-4.5 fill-current" />
-                        </button>
+                        {state.currentUser?.role !== 'cajero' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMostSold(p.id, !p.isMostSold)
+                            }}
+                            className={cn(
+                              "rounded-full p-1 transition-colors hover:bg-muted active:scale-95",
+                              p.isMostSold ? "text-orange-500 hover:text-orange-600" : "text-muted-foreground/30 hover:text-muted-foreground/60"
+                            )}
+                            title={p.isMostSold ? "Quitar de más vendidos" : "Marcar como más vendido"}
+                          >
+                            <Flame className="size-4.5 fill-current" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight">{p.name}</p>

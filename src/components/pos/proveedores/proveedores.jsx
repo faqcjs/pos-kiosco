@@ -54,6 +54,7 @@ export function Proveedores() {
         onReceive={receiveGoods}
         onPay={registerSupplierPayment}
         cashOpen={state.currentShift?.status === 'open'}
+        isAdmin={state.currentUser?.role === 'administrador'}
       />
     )
   }
@@ -159,6 +160,7 @@ function SupplierDetail({
   onReceive,
   onPay,
   cashOpen,
+  isAdmin,
 }) {
   const toast = useToast()
   const balance = supplierBalance(supplier)
@@ -175,6 +177,10 @@ function SupplierDetail({
   const entries = [...supplier.entries].reverse()
 
   function submitReceive() {
+    if (!isAdmin) {
+      toast('No tenés permisos para realizar esta acción.', 'destructive')
+      return
+    }
     const value = Number(amount)
     if (!value || value <= 0) return
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine
@@ -196,6 +202,10 @@ function SupplierDetail({
   }
 
   function submitPay() {
+    if (!isAdmin) {
+      toast('No tenés permisos para realizar esta acción.', 'destructive')
+      return
+    }
     const value = Number(payAmount)
     if (!value || value <= 0) return
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine
@@ -243,12 +253,16 @@ function SupplierDetail({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={() => setReceiveOpen(true)}>
-            <PackagePlus className="size-4" /> Recibir
-          </Button>
-          <Button onClick={() => setPayOpen(true)} disabled={balance <= 0}>
-            <Wallet className="size-4" /> Pagar
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setReceiveOpen(true)}>
+              <PackagePlus className="size-4" /> Recibir
+            </Button>
+          )}
+          {isAdmin && (
+            <Button onClick={() => setPayOpen(true)} disabled={balance <= 0}>
+              <Wallet className="size-4" /> Pagar
+            </Button>
+          )}
         </div>
       </Card>
 

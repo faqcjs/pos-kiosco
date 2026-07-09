@@ -45,7 +45,7 @@ const MOV_LABEL = {
 }
 
 export function Caja() {
-  const { state, openShift, closeShift, addMovement } = useStore()
+  const { state, openShift, closeShift, addMovement, openShiftPending, closeShiftPending } = useStore()
   const toast = useToast()
   const shift = state.currentShift
 
@@ -53,9 +53,9 @@ export function Caja() {
     <div className="mx-auto max-w-4xl space-y-5 p-1.5 lg:p-6">
       <PageHeader title="Caja" description="Control del flujo de efectivo por turno." />
       {shift ? (
-        <OpenShiftView shift={shift} onClose={closeShift} onMovement={addMovement} toast={toast} />
+        <OpenShiftView shift={shift} onClose={closeShift} onMovement={addMovement} toast={toast} closeShiftPending={closeShiftPending} />
       ) : (
-        <ClosedShiftView onOpen={openShift} toast={toast} currentUser={state.currentUser} />
+        <ClosedShiftView onOpen={openShift} toast={toast} currentUser={state.currentUser} openShiftPending={openShiftPending} />
       )}
       <ShiftHistory history={state.shiftHistory} />
     </div>
@@ -66,6 +66,7 @@ function ClosedShiftView({
   onOpen,
   toast,
   currentUser,
+  openShiftPending,
 }) {
   const [amount, setAmount] = useState('')
   const cashierName = currentUser?.name || 'Desconocido'
@@ -99,6 +100,7 @@ function ClosedShiftView({
       </div>
       <Button
         className="h-12 w-full max-w-xs bg-success text-base font-bold text-success-foreground hover:bg-success/90"
+        disabled={openShiftPending}
         onClick={() => {
           const n = Number(amount)
           if (n < 0 || Number.isNaN(n)) return
@@ -119,6 +121,7 @@ function OpenShiftView({
   onClose,
   onMovement,
   toast,
+  closeShiftPending,
 }) {
   const { state } = useStore()
   const { cashSales, manualIn, manualOut, qrSales } = useMemo(
@@ -387,7 +390,7 @@ function OpenShiftView({
         footer={
           <Button
             className="h-12 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
-            disabled={counted === ''}
+            disabled={counted === '' || closeShiftPending}
             onClick={() => {
               const cashierName = state.currentUser?.name || 'Administrador'
               onClose(countedNum, cashierName)

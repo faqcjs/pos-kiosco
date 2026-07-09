@@ -4,6 +4,7 @@ import { Banknote, QrCode, NotebookPen, UserPlus } from 'lucide-react'
 import { useMemo, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Modal, Select } from '@/components/ui/kit'
+import { useToast } from '@/components/ui/toast'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
@@ -18,6 +19,7 @@ export function PaymentModal({
   isSaving,
 }) {
   const { state, addCustomer } = useStore()
+  const toast = useToast()
   const [method, setMethod] = useState('efectivo')
   const [cash, setCash] = useState(0)
   const [customerId, setCustomerId] = useState('')
@@ -71,6 +73,7 @@ export function PaymentModal({
           cid = c.id
         } catch (err) {
           console.error(err)
+          toast('Error al crear el cliente. Intentá de nuevo.', 'destructive')
           return
         }
       }
