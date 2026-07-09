@@ -394,7 +394,7 @@ BEGIN
     WHERE id = p_customer_id;
 
     SELECT * INTO active_shift FROM public.shifts WHERE id = p_shift_id;
-    IF active_shift IS NOT NULL THEN
+    IF active_shift.id IS NOT NULL THEN
         UPDATE public.shifts
         SET 
             movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
@@ -481,7 +481,7 @@ BEGIN
 
     IF p_paid_cash THEN
         SELECT * INTO active_shift FROM public.shifts WHERE id = p_shift_id;
-        IF active_shift IS NULL THEN
+        IF active_shift.id IS NULL THEN
             RAISE EXCEPTION 'El turno de caja especificado no existe.';
         END IF;
 
@@ -554,7 +554,7 @@ BEGIN
 
     IF p_from_cash THEN
         SELECT * INTO active_shift FROM public.shifts WHERE id = p_shift_id;
-        IF active_shift IS NULL THEN
+        IF active_shift.id IS NULL THEN
             RAISE EXCEPTION 'El turno de caja especificado no existe.';
         END IF;
 
