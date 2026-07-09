@@ -19,6 +19,19 @@ import { formatDateTime, formatTime, money } from '@/lib/format'
 import { shiftTheoretical, shiftTotals, useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
+const USER_DISPLAY_NAMES = {
+  admin: 'Administrador',
+  cajero: 'Juan Cajero',
+  repo: 'Pedro Repositor',
+}
+
+export function getCashierDisplayName(openedBy, currentUser) {
+  if (!openedBy) return 'Desconocido'
+  if (openedBy === currentUser?.username) return currentUser?.name || openedBy
+  if (openedBy === currentUser?.name) return currentUser?.name
+  return USER_DISPLAY_NAMES[openedBy] || openedBy
+}
+
 const MOV_LABEL = {
   apertura: 'Apertura',
   venta: 'Venta efectivo',
@@ -110,7 +123,7 @@ function OpenShiftView({
     [shift, state.sales]
   )
   const theoretical = useMemo(() => shiftTheoretical(shift), [shift])
-  const shiftOpName = shift.openedBy === state.currentUser?.username ? state.currentUser?.name : shift.openedBy
+  const shiftOpName = getCashierDisplayName(shift.openedBy, state.currentUser)
 
   const [movType, setMovType] = useState('ingreso')
   const [movAmount, setMovAmount] = useState('')
@@ -424,6 +437,7 @@ function OpenShiftView({
 }
 
 function ShiftHistory({ history }) {
+  const { state } = useStore()
   const [open, setOpen] = useState(false)
   if (history.length === 0) return null
   return (
@@ -448,7 +462,7 @@ function ShiftHistory({ history }) {
                   <div>
                     <p className="text-sm font-medium">{formatDateTime(s.openedAt)}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      Cajero: <b className="text-foreground">{s.openedBy || 'Desconocido'}</b> (Apertura) | <b className="text-foreground">{s.closedBy || 'Desconocido'}</b> (Cierre)
+                      Cajero: <b className="text-foreground">{getCashierDisplayName(s.openedBy, state.currentUser)}</b> (Apertura) | <b className="text-foreground">{getCashierDisplayName(s.closedBy, state.currentUser)}</b> (Cierre)
                     </p>
                   </div>
                   <Badge tone={diff === 0 ? 'success' : diff > 0 ? 'accent' : 'danger'}>
