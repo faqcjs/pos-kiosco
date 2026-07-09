@@ -36,7 +36,7 @@ export function Clientes() {
         customer={selected}
         onBack={() => setSelectedId(null)}
         onPay={(amount) => {
-          if (state.currentUser?.role !== 'administrador') {
+          if (state.currentUser?.role !== 'administrador' && state.currentUser?.role !== 'cajero') {
             toast('No tenés permisos para registrar pagos.', 'destructive')
             return
           }
@@ -49,7 +49,7 @@ export function Clientes() {
           }
         }}
         hasOpenShift={state.currentShift?.status === 'open'}
-        isAdmin={state.currentUser?.role === 'administrador'}
+        isAdmin={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'cajero'}
       />
     )
   }

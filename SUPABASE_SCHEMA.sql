@@ -365,8 +365,8 @@ DECLARE
     customer_name TEXT;
     active_shift RECORD;
 BEGIN
-    -- 1. Security Check (Only admin/supervisor allowed)
-    IF NOT public.has_role('administrador') THEN
+    -- 1. Security Check (Only admin/cajero allowed)
+    IF NOT public.has_role('administrador', 'cajero') THEN
         RAISE EXCEPTION 'Unauthorized role execution.';
     END IF;
 
@@ -436,8 +436,8 @@ DECLARE
     active_shift RECORD;
     v_entries JSONB;
 BEGIN
-    -- 1. Security Check (Only admin/supervisor allowed)
-    IF NOT public.has_role('administrador') THEN
+    -- 1. Security Check (Only admin/repositor/cajero allowed)
+    IF NOT public.has_role('administrador', 'repositor', 'cajero') THEN
         RAISE EXCEPTION 'Unauthorized role execution.';
     END IF;
 
@@ -524,8 +524,8 @@ DECLARE
     supplier_name TEXT;
     active_shift RECORD;
 BEGIN
-    -- 1. Security Check (Only admin/supervisor allowed)
-    IF NOT public.has_role('administrador') THEN
+    -- 1. Security Check (Only admin/cajero allowed)
+    IF NOT public.has_role('administrador', 'cajero') THEN
         RAISE EXCEPTION 'Unauthorized role execution.';
     END IF;
 

@@ -615,7 +615,6 @@ export function useStore() {
       if (!currentShift) return
       const theoretical = shiftTheoretical(currentShift)
       const closed = {
-        ...currentShift,
         closedAt: new Date().toISOString(),
         closingCounted: counted,
         closingTheoretical: theoretical,
@@ -635,11 +634,11 @@ export function useStore() {
       if (!currentShift) return
       const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
       const mov = { id: uid(), date: new Date().toISOString(), type, amount: signed, reason }
-      const updated = {
-        ...currentShift,
-        movements: [...(currentShift.movements || []), mov],
-      }
-      const { data, error } = await supabase.from('shifts').update(updated).eq('id', currentShift.id).select()
+      const { data, error } = await supabase
+        .from('shifts')
+        .update({ movements: [...(currentShift.movements || []), mov] })
+        .eq('id', currentShift.id)
+        .select()
       if (error) throw error
       return data[0]
     },
@@ -961,7 +960,7 @@ export function useStore() {
   }, [addCustomerMutation, isOnline, enqueueOfflineAction, qc])
 
   const registerCustomerPayment = useCallback((customerId, amount) => {
-    if (currentUser?.role !== 'administrador') return Promise.resolve(null)
+    if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero') return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
       const date = new Date().toISOString()
@@ -1024,7 +1023,7 @@ export function useStore() {
   }, [addSupplierMutation, isOnline, enqueueOfflineAction, qc])
 
   const receiveGoods = useCallback((supplierId, amount, detail, paidCash) => {
-    if (currentUser?.role !== 'administrador') return Promise.resolve(null)
+    if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero' && currentUser?.role !== 'repositor') return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
       if (paidCash && !currentShift?.id) {
@@ -1081,7 +1080,7 @@ export function useStore() {
   }, [receiveGoodsMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const registerSupplierPayment = useCallback((supplierId, amount, fromCash) => {
-    if (currentUser?.role !== 'administrador') return Promise.resolve(null)
+    if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero') return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
       if (fromCash && !currentShift?.id) {
