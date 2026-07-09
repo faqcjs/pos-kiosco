@@ -117,7 +117,6 @@ function OpenShiftView({
   const [movReason, setMovReason] = useState('')
   const [closeOpen, setCloseOpen] = useState(false)
   const [counted, setCounted] = useState('')
-  const [closedBy, setClosedBy] = useState('')
   const [selectedSale, setSelectedSale] = useState(null)
 
   const shiftSales = useMemo(() => {
@@ -372,15 +371,15 @@ function OpenShiftView({
         footer={
           <Button
             className="h-12 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
-            disabled={counted === '' || !closedBy.trim()}
+            disabled={counted === ''}
             onClick={() => {
-              onClose(countedNum, closedBy.trim())
+              const cashierName = state.currentUser?.name || 'Administrador'
+              onClose(countedNum, cashierName)
               const label =
                 diff === 0 ? 'Caja perfecta' : diff > 0 ? `Sobrante ${money(diff)}` : `Faltante ${money(Math.abs(diff))}`
               toast(`Caja cerrada. ${label}`, diff === 0 ? 'success' : 'info')
               setCloseOpen(false)
               setCounted('')
-              setClosedBy('')
             }}
           >
             Confirmar cierre
@@ -391,17 +390,6 @@ function OpenShiftView({
           <div className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
             <span className="text-sm text-muted-foreground">Total teórico</span>
             <span className="font-heading text-lg font-bold tabular-nums">{money(theoretical)}</span>
-          </div>
-          <div>
-            <Label htmlFor="closedBy">Nombre del cajero</Label>
-            <Input
-              id="closedBy"
-              value={closedBy}
-              onChange={(e) => setClosedBy(e.target.value)}
-              placeholder="Tu nombre"
-              required
-              autoFocus
-            />
           </div>
           <div>
             <Label htmlFor="counted">Monto físico real en caja</Label>
