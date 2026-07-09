@@ -130,10 +130,12 @@ function OpenShiftView({
 
   const timeline = useMemo(() => {
     if (!shift) return []
-    const movs = (shift.movements || []).map((m) => ({
-      ...m,
-      isMovement: true,
-    }))
+    const movs = (shift.movements || [])
+      .filter((m) => m.type !== 'venta')
+      .map((m) => ({
+        ...m,
+        isMovement: true,
+      }))
     const sls = shiftSales.map((s) => ({
       ...s,
       isSale: true,
