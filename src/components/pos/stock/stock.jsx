@@ -78,11 +78,13 @@ export function Stock() {
       toast('Ingresá el nombre del producto', 'error')
       return
     }
-    const finalProduct = { ...draft, unidad: draft.unidad || 1 }
     if (draft.id) {
+      const finalProduct = { ...draft, unidad: draft.unidad || 1 }
       updateProduct(finalProduct)
       toast('Producto actualizado')
     } else {
+      const u = draft.unidad || 1
+      const finalProduct = { ...draft, stock: u, unidad: u }
       addProduct(finalProduct)
       toast('Producto agregado')
     }
