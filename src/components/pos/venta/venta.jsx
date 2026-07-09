@@ -19,12 +19,12 @@ const LOCAL_CATEGORY_ICON = {
 }
 
 export function Venta() {
-  const { state, completeSale, toggleMostSold } = useStore()
+  const { state, completeSale, toggleMostSold, setCart } = useStore()
+  const cart = state.cart
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Todos')
   const [quickAmount, setQuickAmount] = useState('')
-  const [cart, setCart] = useState([])
   const [scannerOpen, setScannerOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [mobileCartOpen, setMobileCartOpen] = useState(false)

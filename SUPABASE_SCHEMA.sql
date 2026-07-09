@@ -697,12 +697,14 @@ CREATE POLICY "Allow update shifts for administrators or shift creator"
     USING (
         status = 'open' AND (
             public.has_role('administrador') OR 
-            "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid())
+            "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR
+            "openedBy" = (SELECT name FROM public.users WHERE id = auth.uid())
         )
     )
     WITH CHECK (
         public.has_role('administrador') OR 
-        "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid())
+        "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR
+        "openedBy" = (SELECT name FROM public.users WHERE id = auth.uid())
     );
 
 CREATE POLICY "Allow delete shifts for administrators only" 

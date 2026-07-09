@@ -77,6 +77,7 @@ export const useUIStore = create()(
       offlineActionsQueue: [],
       failedSalesQueue: [],
       failedActionsQueue: [],
+      cart: [],
       
       toggleTheme: () => set((state) => {
         const nextTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -127,6 +128,7 @@ export const useUIStore = create()(
         failedActionsQueue: state.failedActionsQueue.filter(a => a.id !== actionId)
       })),
       clearFailedActionsQueue: () => set({ failedActionsQueue: [] }),
+      setCart: (cart) => set({ cart }),
     }),
     {
       name: 'kiosko-pos-ui-state',
@@ -186,6 +188,7 @@ export function useStore() {
   const currentShiftCache = useUIStore((s) => s.currentShiftCache)
   const failedSalesQueue = useUIStore((s) => s.failedSalesQueue)
   const failedActionsQueue = useUIStore((s) => s.failedActionsQueue)
+  const cart = useUIStore((s) => s.cart)
   
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const loginAdmin = useUIStore((s) => s.loginAdmin)
@@ -202,6 +205,7 @@ export function useStore() {
   const clearFailedSalesQueue = useUIStore((s) => s.clearFailedSalesQueue)
   const dequeueFailedAction = useUIStore((s) => s.dequeueFailedAction)
   const clearFailedActionsQueue = useUIStore((s) => s.clearFailedActionsQueue)
+  const setCart = useUIStore((s) => s.setCart)
 
   // Apply theme class side effect
   useEffect(() => {
@@ -415,6 +419,20 @@ export function useStore() {
               p_shift_id: shiftId,
             })
             if (error) throw error
+            break
+          }
+          case 'ADD_MOVEMENT': {
+            const { type, amount, reason, date, shiftId } = action.payload
+            const { data: shiftData, error: fetchError } = await supabase.from('shifts').select('*').eq('id', shiftId).single()
+            if (fetchError) throw fetchError
+            const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
+            const mov = { id: action.id, date, type, amount: signed, reason }
+            const updated = {
+              ...shiftData,
+              movements: [...(shiftData.movements || []), mov]
+            }
+            const { error: updateError } = await supabase.from('shifts').update(updated).eq('id', shiftId)
+            if (updateError) throw updateError
             break
           }
           default:
@@ -808,8 +826,29 @@ export function useStore() {
   }, [closeShiftMutation])
 
   const addMovement = useCallback((type, amount, reason) => {
-    addMovementMutation.mutate({ type, amount, reason })
-  }, [addMovementMutation])
+    if (!isOnline) {
+      enqueueOfflineAction({
+        id: uid(),
+        type: 'ADD_MOVEMENT',
+        payload: { type, amount, reason, date: new Date().toISOString(), shiftId: currentShift?.id }
+      })
+      const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
+      const mov = { id: uid(), date: new Date().toISOString(), type, amount: signed, reason }
+      qc.setQueryData(['shifts'], (oldShifts = []) => {
+        return oldShifts.map((s) => {
+          if (s.id === currentShift?.id) {
+            return {
+              ...s,
+              movements: [...(s.movements || []), mov]
+            }
+          }
+          return s
+        })
+      })
+    } else {
+      addMovementMutation.mutate({ type, amount, reason })
+    }
+  }, [addMovementMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const addCustomer = useCallback(async (name, phone) => {
     const cust = { id: uid(), name, phone, entries: [] }
@@ -1178,6 +1217,7 @@ export function useStore() {
     users,
     failedSalesQueue,
     failedActionsQueue,
+    cart,
   }), [
     displayedProducts,
     sales,
@@ -1192,6 +1232,7 @@ export function useStore() {
     users,
     failedSalesQueue,
     failedActionsQueue,
+    cart,
   ])
 
   return {
@@ -1227,5 +1268,6 @@ export function useStore() {
     retryFailedAction,
     discardFailedAction,
     syncOfflineData,
+    setCart,
   }
 }
