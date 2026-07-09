@@ -449,7 +449,11 @@ export function useStore() {
             break
           }
           case 'OPEN_SHIFT': {
-            const { error } = await supabase.from('shifts').insert([action.payload])
+            // Use upsert so that if the shift was already inserted online
+            // (e.g. mutation succeeded before connection dropped), this is a no-op
+            const { error } = await supabase
+              .from('shifts')
+              .upsert([action.payload], { onConflict: 'id', ignoreDuplicates: true })
             if (error) throw error
             break
           }
@@ -457,6 +461,8 @@ export function useStore() {
             const { shiftId, closedAt, closingCounted, closingTheoretical, difference, status, closedBy } = action.payload
             const { data: shiftData, error: fetchError } = await supabase.from('shifts').select('*').eq('id', shiftId).single()
             if (fetchError) throw fetchError
+            // If the shift is already closed, skip to avoid overwriting a manual close
+            if (shiftData?.status === 'closed') break
             const updated = {
               ...shiftData,
               closedAt,
