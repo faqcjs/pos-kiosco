@@ -284,7 +284,9 @@ function Shell() {
 
   // Shift block checking
   const isShiftActive = !!state.currentShift
-  const isShiftOwner = state.currentUser?.name === state.currentShift?.openedBy
+  const isShiftOwner =
+    state.currentUser?.username === state.currentShift?.openedBy ||
+    state.currentUser?.name === state.currentShift?.openedBy
   const isBlocked = state.currentUser?.role === 'cajero' && isShiftActive && !isShiftOwner
 
   if (isBlocked) {
