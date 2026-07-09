@@ -39,7 +39,9 @@ CREATE TABLE public.products (
     cost NUMERIC DEFAULT 0,
     price NUMERIC DEFAULT 0,
     stock NUMERIC DEFAULT 0,
-    "minStock" NUMERIC DEFAULT 0
+    "minStock" NUMERIC DEFAULT 0,
+    "isMostSold" BOOLEAN DEFAULT FALSE,
+    "unidad" NUMERIC DEFAULT 1
 );
 
 -- Enable RLS for products
