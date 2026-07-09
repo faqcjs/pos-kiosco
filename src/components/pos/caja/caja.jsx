@@ -152,7 +152,7 @@ function OpenShiftView({
   const timeline = useMemo(() => {
     if (!shift) return []
     const movs = (shift.movements || [])
-      .filter((m) => m.type !== 'venta')
+      .filter((m) => m.type !== 'venta' && m.type !== 'venta_qr')
       .map((m) => ({
         ...m,
         isMovement: true,
