@@ -438,6 +438,28 @@ export function useStore() {
             if (updateError) throw updateError
             break
           }
+          case 'OPEN_SHIFT': {
+            const { error } = await supabase.from('shifts').insert([action.payload])
+            if (error) throw error
+            break
+          }
+          case 'CLOSE_SHIFT': {
+            const { shiftId, closedAt, closingCounted, closingTheoretical, difference, status, closedBy } = action.payload
+            const { data: shiftData, error: fetchError } = await supabase.from('shifts').select('*').eq('id', shiftId).single()
+            if (fetchError) throw fetchError
+            const updated = {
+              ...shiftData,
+              closedAt,
+              closingCounted,
+              closingTheoretical,
+              difference,
+              status,
+              closedBy,
+            }
+            const { error: updateError } = await supabase.from('shifts').update(updated).eq('id', shiftId)
+            if (updateError) throw updateError
+            break
+          }
           default:
             console.warn(`Unknown action type: ${action.type}`)
         }
@@ -821,12 +843,67 @@ export function useStore() {
   }, [toggleMostSoldMutation])
 
   const openShift = useCallback((openingAmount, openedBy) => {
-    openShiftMutation.mutate({ openingAmount, openedBy })
-  }, [openShiftMutation])
+    if (!isOnline) {
+      const shiftId = uid()
+      const newShift = {
+        id: shiftId,
+        openedAt: new Date().toISOString(),
+        openingAmount,
+        movements: [],
+        status: 'open',
+        openedBy,
+      }
+      enqueueOfflineAction({
+        id: uid(),
+        type: 'OPEN_SHIFT',
+        payload: newShift
+      })
+      qc.setQueryData(['shifts'], (old = []) => [newShift, ...old])
+      setCurrentShiftCache(newShift)
+    } else {
+      openShiftMutation.mutate({ openingAmount, openedBy })
+    }
+  }, [openShiftMutation, isOnline, enqueueOfflineAction, setCurrentShiftCache, qc])
 
   const closeShift = useCallback((counted, closedBy) => {
-    closeShiftMutation.mutate({ counted, closedBy })
-  }, [closeShiftMutation])
+    if (!isOnline) {
+      if (currentShift === null) return
+      const theoretical = shiftTheoretical(currentShift)
+      const closed = {
+        shiftId: currentShift.id,
+        closedAt: new Date().toISOString(),
+        closingCounted: counted,
+        closingTheoretical: theoretical,
+        difference: counted - theoretical,
+        status: 'closed',
+        closedBy,
+      }
+      enqueueOfflineAction({
+        id: uid(),
+        type: 'CLOSE_SHIFT',
+        payload: closed
+      })
+      qc.setQueryData(['shifts'], (old = []) => {
+        return old.map((s) => {
+          if (s.id === currentShift.id) {
+            return {
+              ...s,
+              closedAt: closed.closedAt,
+              closingCounted: counted,
+              closingTheoretical: theoretical,
+              difference: closed.difference,
+              status: 'closed',
+              closedBy,
+            }
+          }
+          return s
+        })
+      })
+      setCurrentShiftCache(null)
+    } else {
+      closeShiftMutation.mutate({ counted, closedBy })
+    }
+  }, [closeShiftMutation, isOnline, currentShift, enqueueOfflineAction, setCurrentShiftCache, qc])
 
   const addMovement = useCallback((type, amount, reason) => {
     if (!isOnline) {
