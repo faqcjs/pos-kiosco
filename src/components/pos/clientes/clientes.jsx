@@ -3,7 +3,7 @@
 import { ArrowLeft, HandCoins, Phone, Plus, ShoppingBag, UserPlus, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge, Card, EmptyState, Input, Label, Modal } from '@/components/ui/kit'
+import { Card, EmptyState, Input, Label, Modal } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { formatDateTime, money } from '@/lib/format'
@@ -259,7 +259,7 @@ function CustomerDetail({
         footer={
           <Button
             className="h-11 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
-            disabled={!Number(amount) || Number(amount) <= 0}
+            disabled={!Number(amount) || Number(amount) <= 0 || !hasOpenShift}
             onClick={() => {
               onPay(Number(amount))
               setPayOpen(false)
@@ -297,7 +297,7 @@ function CustomerDetail({
           <p
             className={cn(
               'rounded-xl px-4 py-3 text-sm text-pretty',
-              hasOpenShift ? 'bg-success/10 text-success' : 'bg-warning/15 text-warning-foreground',
+              hasOpenShift ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive',
             )}
           >
             {hasOpenShift ? (
@@ -305,7 +305,7 @@ function CustomerDetail({
                 <Plus className="size-4" /> El pago ingresa a la caja activa.
               </span>
             ) : (
-              'La caja está cerrada: el pago se registra pero no impacta en un turno de caja.'
+              'La caja está cerrada. Debés abrir un turno de caja antes de poder registrar un pago.'
             )}
           </p>
         </div>

@@ -33,6 +33,7 @@ export function Venta() {
     return localStorage.getItem('pos-cart-collapsed') === 'true'
   })
   const [floatingEffects, setFloatingEffects] = useState([])
+  const [isSaving, setIsSaving] = useState(false)
 
   const toggleCartCollapsed = () => {
     setCartCollapsed((c) => {
@@ -194,19 +195,27 @@ export function Venta() {
     }
   }
 
-  function handleConfirmSale(args) {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
-    completeSale({ items: cart, ...args })
-    const label =
-      args.method === 'efectivo' ? 'Efectivo' : args.method === 'qr' ? 'QR/Transferencia' : 'Fiado'
-    if (!isOnline) {
-      toast(`Venta registrada localmente (Modo Offline) (${label}): ${money(total)}`, 'warning')
-    } else {
-      toast(`Venta registrada (${label}): ${money(total)}`)
+  async function handleConfirmSale(args) {
+    setIsSaving(true)
+    try {
+      await completeSale({ items: cart, ...args })
+      const label =
+        args.method === 'efectivo' ? 'Efectivo' : args.method === 'qr' ? 'QR/Transferencia' : 'Fiado'
+      const isOnline = typeof navigator !== 'undefined' && navigator.onLine
+      if (!isOnline) {
+        toast(`Venta registrada localmente (Modo Offline) (${label}): ${money(total)}`, 'warning')
+      } else {
+        toast(`Venta registrada (${label}): ${money(total)}`)
+      }
+      setCart([])
+      setPayOpen(false)
+      setMobileCartOpen(false)
+    } catch (error) {
+      console.error(error)
+      toast(error.message || 'Error al registrar la venta', 'error')
+    } finally {
+      setIsSaving(false)
     }
-    setCart([])
-    setPayOpen(false)
-    setMobileCartOpen(false)
   }
 
   return (
@@ -482,9 +491,10 @@ export function Venta() {
       <ScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onDetect={handleScan} />
       <PaymentModal
         open={payOpen}
-        onClose={() => setPayOpen(false)}
+        onClose={() => !isSaving && setPayOpen(false)}
         total={total}
         onConfirm={handleConfirmSale}
+        isSaving={isSaving}
       />
     </div>
     </>

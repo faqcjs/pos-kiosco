@@ -1,7 +1,7 @@
 'use client'
 
 import { Banknote, QrCode, NotebookPen, UserPlus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Modal, Select } from '@/components/ui/kit'
 import { money } from '@/lib/format'
@@ -15,6 +15,7 @@ export function PaymentModal({
   onClose,
   total,
   onConfirm,
+  isSaving,
 }) {
   const { state, addCustomer } = useStore()
   const [method, setMethod] = useState('efectivo')
@@ -51,7 +52,13 @@ export function PaymentModal({
     setNewPhone('')
   }
 
-  function handleConfirm() {
+  useEffect(() => {
+    if (!open) {
+      reset()
+    }
+  }, [open])
+
+  async function handleConfirm() {
     if (method === 'efectivo') {
       onConfirm({ method, cashReceived: cash, change })
     } else if (method === 'qr') {
@@ -59,13 +66,17 @@ export function PaymentModal({
     } else {
       let cid = customerId
       if (creating && newName.trim()) {
-        const c = addCustomer(newName.trim(), newPhone.trim())
-        cid = c.id
+        try {
+          const c = await addCustomer(newName.trim(), newPhone.trim())
+          cid = c.id
+        } catch (err) {
+          console.error(err)
+          return
+        }
       }
       if (!cid) return
       onConfirm({ method, customerId: cid })
     }
-    reset()
   }
 
   const methods = [
@@ -86,10 +97,17 @@ export function PaymentModal({
       footer={
         <Button
           onClick={handleConfirm}
-          disabled={disabled}
+          disabled={disabled || isSaving}
           className="h-12 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
         >
-          Confirmar venta
+          {isSaving ? (
+            <div className="flex items-center justify-center gap-2">
+              <span className="animate-spin text-lg">⏳</span>
+              <span>Guardando...</span>
+            </div>
+          ) : (
+            'Confirmar venta'
+          )}
         </Button>
       }
     >

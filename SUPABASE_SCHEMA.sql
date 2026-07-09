@@ -47,6 +47,8 @@ CREATE TABLE public.products (
 -- Enable RLS for products
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
+CREATE INDEX IF NOT EXISTS idx_products_barcode ON public.products(barcode);
+
 -- 3. Create Sales Table
 CREATE TABLE public.sales (
     id TEXT PRIMARY KEY,
@@ -59,11 +61,14 @@ CREATE TABLE public.sales (
     "cashReceived" NUMERIC DEFAULT 0,
     change NUMERIC DEFAULT 0,
     cost NUMERIC DEFAULT 0,
-    "soldBy" TEXT
+    "soldBy" TEXT,
+    "shiftId" TEXT REFERENCES public.shifts(id) ON DELETE SET NULL
 );
 
 -- Enable RLS for sales
 ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS idx_sales_date ON public.sales(date);
 
 -- 4. Create Customers Table
 CREATE TABLE public.customers (
@@ -106,6 +111,15 @@ CREATE TABLE public.shifts (
 
 -- Enable RLS for shifts
 ALTER TABLE public.shifts ENABLE ROW LEVEL SECURITY;
+
+-- Ensure at most one open shift exists at any time
+CREATE UNIQUE INDEX shifts_only_one_open ON public.shifts (status) WHERE (status = 'open');
+
+-- Drop old function signatures to prevent duplicates
+DROP FUNCTION IF EXISTS public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.register_customer_payment_rpc(TEXT, NUMERIC, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.register_supplier_payment_rpc(TEXT, NUMERIC, BOOLEAN, TIMESTAMPTZ);
 
 
 -- =========================================================================
@@ -224,59 +238,95 @@ CREATE OR REPLACE FUNCTION public.complete_sale_rpc(
     p_change NUMERIC,
     p_cost NUMERIC,
     p_sold_by TEXT,
-    p_date TIMESTAMPTZ
+    p_date TIMESTAMPTZ,
+    p_shift_id TEXT
 ) RETURNS VOID AS $$
 DECLARE
     item RECORD;
     v_total NUMERIC := 0;
+    v_current_stock NUMERIC;
     active_shift RECORD;
     detail_desc TEXT;
+    v_user_name TEXT;
 BEGIN
-    -- Validar que cada ítem tenga stock suficiente y acumular total
+    -- Assert p_sold_by matches auth.uid() username
+    SELECT username INTO v_user_name FROM public.users WHERE id = auth.uid();
+    IF v_user_name IS NULL OR v_user_name <> p_sold_by THEN
+        RAISE EXCEPTION 'Identity mismatch: cannot complete sale on behalf of another user.';
+    END IF;
+
+    -- Restrict Sales to Open Shifts matching the operator
+    SELECT * INTO active_shift FROM public.shifts WHERE id = p_shift_id;
+    IF active_shift IS NULL THEN
+        RAISE EXCEPTION 'El turno de caja especificado no existe.';
+    END IF;
+
+    -- Enforce transaction timestamp buffer
+    p_date := COALESCE(p_date, NOW());
+    IF p_date > NOW() + INTERVAL '1 hour' THEN
+        RAISE EXCEPTION 'La fecha de la transacción está fuera del rango permitido (no se permiten fechas futuras).';
+    END IF;
+
+    -- 1. Lock product rows in a deterministic order to prevent deadlocks
+    PERFORM 1 FROM public.products
+    WHERE id IN (
+        SELECT DISTINCT ix."productId" 
+        FROM jsonb_to_recordset(p_items) AS ix("productId" TEXT)
+        WHERE ix."productId" IS NOT NULL
+    )
+    ORDER BY id
+    FOR UPDATE;
+
+    -- 2. Validate stock levels and execute decrement
     FOR item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(id TEXT, "productId" TEXT, name TEXT, price NUMERIC, qty NUMERIC)
     LOOP
         v_total := v_total + (item.price * item.qty);
         
-        -- Si tiene un ID de producto, validar stock y descontarlo de forma atómica
         IF item."productId" IS NOT NULL THEN
-            IF NOT EXISTS (
-                SELECT 1 FROM public.products 
-                WHERE id = item."productId" AND stock >= item.qty
-            ) THEN
-                RAISE EXCEPTION 'Stock insuficiente para el producto: %', item.name;
+            SELECT stock INTO v_current_stock 
+            FROM public.products 
+            WHERE id = item."productId";
+            
+            IF v_current_stock IS NULL OR v_current_stock < item.qty THEN
+                RAISE EXCEPTION 'Stock insuficiente para el producto: % (Disponible: %, Requerido: %)', 
+                    item.name, COALESCE(v_current_stock, 0), item.qty;
             END IF;
             
             UPDATE public.products 
-            SET stock = GREATEST(0, stock - item.qty) 
+            SET stock = stock - item.qty 
             WHERE id = item."productId";
         END IF;
     END LOOP;
 
-    -- Insertar la venta
-    INSERT INTO public.sales (id, date, created_at, items, total, method, "customerId", "cashReceived", change, cost, "soldBy")
-    VALUES (p_sale_id, p_date, p_date, p_items, v_total, p_method, p_customer_id, p_cash_received, p_change, p_cost, p_sold_by);
+    -- 3. Insert Sale including shiftId
+    INSERT INTO public.sales (id, date, created_at, items, total, method, "customerId", "cashReceived", change, cost, "soldBy", "shiftId")
+    VALUES (p_sale_id, p_date, p_date, p_items, v_total, p_method, p_customer_id, p_cash_received, p_change, p_cost, p_sold_by, p_shift_id);
 
-    -- Registrar movimiento en el turno de caja activo (efectivo)
+    -- 4. Log cash shift movement and retroactively adjust closed shift totals
     IF p_method = 'efectivo' THEN
-        SELECT * INTO active_shift FROM public.shifts WHERE status = 'open' LIMIT 1;
-        IF active_shift IS NULL THEN
-            RAISE EXCEPTION 'No hay una caja abierta para registrar la venta en efectivo.';
-        END IF;
-        
         UPDATE public.shifts
-        SET movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
-            jsonb_build_object(
-                'id', extensions.gen_random_uuid()::text,
-                'date', p_date,
-                'type', 'venta',
-                'amount', v_total,
-                'reason', 'Venta en efectivo (' || jsonb_array_length(p_items) || ' art.)'
-            )
-        )
+        SET 
+            movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
+                jsonb_build_object(
+                    'id', extensions.gen_random_uuid()::text,
+                    'date', p_date,
+                    'type', 'venta',
+                    'amount', v_total,
+                    'reason', 'Venta en efectivo (' || jsonb_array_length(p_items) || ' art.)'
+                )
+            ),
+            "closingTheoretical" = CASE 
+                WHEN status = 'closed' THEN COALESCE("closingTheoretical", 0) + v_total 
+                ELSE "closingTheoretical" 
+            END,
+            difference = CASE 
+                WHEN status = 'closed' THEN COALESCE(difference, 0) - v_total 
+                ELSE difference 
+            END
         WHERE id = active_shift.id;
     END IF;
 
-    -- Registrar deuda de cliente si la venta es fiada
+    -- 5. Registrar deuda de cliente si la venta es fiada
     IF p_method = 'fiado' AND p_customer_id IS NOT NULL THEN
         IF NOT EXISTS (SELECT 1 FROM public.customers WHERE id = p_customer_id) THEN
             RAISE EXCEPTION 'Cliente no encontrado.';
@@ -301,19 +351,31 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Revocar ejecución pública de la función y habilitarla solo para autenticados
-REVOKE EXECUTE ON FUNCTION public.complete_sale_rpc FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.complete_sale_rpc TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ, TEXT) TO authenticated;
 
 -- 2. Función atómica para registro de pagos de clientes
 CREATE OR REPLACE FUNCTION public.register_customer_payment_rpc(
     p_customer_id TEXT,
     p_amount NUMERIC,
-    p_date TIMESTAMPTZ
+    p_date TIMESTAMPTZ,
+    p_shift_id TEXT
 ) RETURNS VOID AS $$
 DECLARE
     customer_name TEXT;
     active_shift RECORD;
 BEGIN
+    -- 1. Security Check (Only admin/supervisor allowed)
+    IF NOT public.has_role('administrador') THEN
+        RAISE EXCEPTION 'Unauthorized role execution.';
+    END IF;
+
+    -- 2. Enforce transaction timestamp buffer
+    p_date := COALESCE(p_date, NOW());
+    IF p_date > NOW() + INTERVAL '1 hour' THEN
+        RAISE EXCEPTION 'La fecha de la transacción está fuera del rango permitido (no se permiten fechas futuras).';
+    END IF;
+
     SELECT name INTO customer_name FROM public.customers WHERE id = p_customer_id;
     IF customer_name IS NULL THEN
         RAISE EXCEPTION 'Cliente no encontrado.';
@@ -331,25 +393,34 @@ BEGIN
     )
     WHERE id = p_customer_id;
 
-    SELECT * INTO active_shift FROM public.shifts WHERE status = 'open' LIMIT 1;
+    SELECT * INTO active_shift FROM public.shifts WHERE id = p_shift_id;
     IF active_shift IS NOT NULL THEN
         UPDATE public.shifts
-        SET movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
-            jsonb_build_object(
-                'id', extensions.gen_random_uuid()::text,
-                'date', p_date,
-                'type', 'cobro_fiado',
-                'amount', ABS(p_amount),
-                'reason', 'Cobro de fiado - ' || customer_name
-            )
-        )
+        SET 
+            movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
+                jsonb_build_object(
+                    'id', extensions.gen_random_uuid()::text,
+                    'date', p_date,
+                    'type', 'cobro_fiado',
+                    'amount', ABS(p_amount),
+                    'reason', 'Cobro de fiado - ' || customer_name
+                )
+            ),
+            "closingTheoretical" = CASE 
+                WHEN status = 'closed' THEN COALESCE("closingTheoretical", 0) + ABS(p_amount) 
+                ELSE "closingTheoretical" 
+            END,
+            difference = CASE 
+                WHEN status = 'closed' THEN COALESCE(difference, 0) - ABS(p_amount) 
+                ELSE difference 
+            END
         WHERE id = active_shift.id;
     END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-REVOKE EXECUTE ON FUNCTION public.register_customer_payment_rpc FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.register_customer_payment_rpc TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.register_customer_payment_rpc(TEXT, NUMERIC, TIMESTAMPTZ, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.register_customer_payment_rpc(TEXT, NUMERIC, TIMESTAMPTZ, TEXT) TO authenticated;
 
 -- 3. Función atómica para mercadería de proveedores
 CREATE OR REPLACE FUNCTION public.receive_goods_rpc(
@@ -357,13 +428,25 @@ CREATE OR REPLACE FUNCTION public.receive_goods_rpc(
     p_amount NUMERIC,
     p_detail TEXT,
     p_paid_cash BOOLEAN,
-    p_date TIMESTAMPTZ
+    p_date TIMESTAMPTZ,
+    p_shift_id TEXT
 ) RETURNS VOID AS $$
 DECLARE
     supplier_name TEXT;
     active_shift RECORD;
     v_entries JSONB;
 BEGIN
+    -- 1. Security Check (Only admin/supervisor allowed)
+    IF NOT public.has_role('administrador') THEN
+        RAISE EXCEPTION 'Unauthorized role execution.';
+    END IF;
+
+    -- 2. Enforce transaction timestamp buffer
+    p_date := COALESCE(p_date, NOW());
+    IF p_date > NOW() + INTERVAL '1 hour' THEN
+        RAISE EXCEPTION 'La fecha de la transacción está fuera del rango permitido (no se permiten fechas futuras).';
+    END IF;
+
     SELECT name INTO supplier_name FROM public.suppliers WHERE id = p_supplier_id;
     IF supplier_name IS NULL THEN
         RAISE EXCEPTION 'Proveedor no encontrado.';
@@ -397,40 +480,61 @@ BEGIN
     WHERE id = p_supplier_id;
 
     IF p_paid_cash THEN
-        SELECT * INTO active_shift FROM public.shifts WHERE status = 'open' LIMIT 1;
+        SELECT * INTO active_shift FROM public.shifts WHERE id = p_shift_id;
         IF active_shift IS NULL THEN
-            RAISE EXCEPTION 'No hay una caja abierta para registrar el egreso por pago al proveedor.';
+            RAISE EXCEPTION 'El turno de caja especificado no existe.';
         END IF;
 
         UPDATE public.shifts
-        SET movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
-            jsonb_build_object(
-                'id', extensions.gen_random_uuid()::text,
-                'date', p_date,
-                'type', 'pago_proveedor',
-                'amount', -ABS(p_amount),
-                'reason', 'Pago contado - ' || supplier_name
-            )
-        )
+        SET 
+            movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
+                jsonb_build_object(
+                    'id', extensions.gen_random_uuid()::text,
+                    'date', p_date,
+                    'type', 'pago_proveedor',
+                    'amount', -ABS(p_amount),
+                    'reason', 'Pago contado - ' || supplier_name
+                )
+            ),
+            "closingTheoretical" = CASE 
+                WHEN status = 'closed' THEN COALESCE("closingTheoretical", 0) - ABS(p_amount) 
+                ELSE "closingTheoretical" 
+            END,
+            difference = CASE 
+                WHEN status = 'closed' THEN COALESCE(difference, 0) + ABS(p_amount) 
+                ELSE difference 
+            END
         WHERE id = active_shift.id;
     END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-REVOKE EXECUTE ON FUNCTION public.receive_goods_rpc FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.receive_goods_rpc TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ, TEXT) TO authenticated;
 
 -- 4. Función atómica para pagos directos a proveedores
 CREATE OR REPLACE FUNCTION public.register_supplier_payment_rpc(
     p_supplier_id TEXT,
     p_amount NUMERIC,
     p_from_cash BOOLEAN,
-    p_date TIMESTAMPTZ
+    p_date TIMESTAMPTZ,
+    p_shift_id TEXT
 ) RETURNS VOID AS $$
 DECLARE
     supplier_name TEXT;
     active_shift RECORD;
 BEGIN
+    -- 1. Security Check (Only admin/supervisor allowed)
+    IF NOT public.has_role('administrador') THEN
+        RAISE EXCEPTION 'Unauthorized role execution.';
+    END IF;
+
+    -- 2. Enforce transaction timestamp buffer
+    p_date := COALESCE(p_date, NOW());
+    IF p_date > NOW() + INTERVAL '1 hour' THEN
+        RAISE EXCEPTION 'La fecha de la transacción está fuera del rango permitido (no se permiten fechas futuras).';
+    END IF;
+
     SELECT name INTO supplier_name FROM public.suppliers WHERE id = p_supplier_id;
     IF supplier_name IS NULL THEN
         RAISE EXCEPTION 'Proveedor no encontrado.';
@@ -449,28 +553,37 @@ BEGIN
     WHERE id = p_supplier_id;
 
     IF p_from_cash THEN
-        SELECT * INTO active_shift FROM public.shifts WHERE status = 'open' LIMIT 1;
+        SELECT * INTO active_shift FROM public.shifts WHERE id = p_shift_id;
         IF active_shift IS NULL THEN
-            RAISE EXCEPTION 'No hay una caja abierta para registrar el egreso por pago al proveedor.';
+            RAISE EXCEPTION 'El turno de caja especificado no existe.';
         END IF;
 
         UPDATE public.shifts
-        SET movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
-            jsonb_build_object(
-                'id', extensions.gen_random_uuid()::text,
-                'date', p_date,
-                'type', 'pago_proveedor',
-                'amount', -ABS(p_amount),
-                'reason', 'Pago a proveedor - ' || supplier_name
-            )
-        )
+        SET 
+            movements = COALESCE(movements, '[]'::jsonb) || jsonb_build_array(
+                jsonb_build_object(
+                    'id', extensions.gen_random_uuid()::text,
+                    'date', p_date,
+                    'type', 'pago_proveedor',
+                    'amount', -ABS(p_amount),
+                    'reason', 'Pago a proveedor - ' || supplier_name
+                )
+            ),
+            "closingTheoretical" = CASE 
+                WHEN status = 'closed' THEN COALESCE("closingTheoretical", 0) - ABS(p_amount) 
+                ELSE "closingTheoretical" 
+            END,
+            difference = CASE 
+                WHEN status = 'closed' THEN COALESCE(difference, 0) + ABS(p_amount) 
+                ELSE difference 
+            END
         WHERE id = active_shift.id;
     END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-REVOKE EXECUTE ON FUNCTION public.register_supplier_payment_rpc FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.register_supplier_payment_rpc TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.register_supplier_payment_rpc(TEXT, NUMERIC, BOOLEAN, TIMESTAMPTZ, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.register_supplier_payment_rpc(TEXT, NUMERIC, BOOLEAN, TIMESTAMPTZ, TEXT) TO authenticated;
 
 
 -- =========================================================================
@@ -522,8 +635,8 @@ CREATE POLICY "Allow delete products for admin and repositor"
 CREATE POLICY "Allow select sales for authenticated users" 
     ON public.sales FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Allow insert sales for authenticated users" 
-    ON public.sales FOR INSERT TO authenticated WITH CHECK (true);
+-- Direct insert sales for authenticated users is prohibited. All insertions must go through complete_sale_rpc.
+DROP POLICY IF EXISTS "Allow insert sales for authenticated users" ON public.sales;
 
 CREATE POLICY "Allow delete sales for administrators" 
     ON public.sales FOR DELETE TO authenticated 
@@ -577,11 +690,15 @@ CREATE POLICY "Allow insert shifts for authenticated users"
     ON public.shifts FOR INSERT TO authenticated 
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow update shifts for administrators or shift creator" ON public.shifts;
+
 CREATE POLICY "Allow update shifts for administrators or shift creator" 
     ON public.shifts FOR UPDATE TO authenticated 
     USING (
-        public.has_role('administrador') OR 
-        "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid())
+        status = 'open' AND (
+            public.has_role('administrador') OR 
+            "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid())
+        )
     )
     WITH CHECK (
         public.has_role('administrador') OR 

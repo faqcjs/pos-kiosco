@@ -17,8 +17,9 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/lib/store'
 import { isMockMode } from '@/lib/supabase'
-import { Badge } from '@/components/ui/kit'
+import { Badge, Modal } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
+import { money } from '@/lib/format'
 
 const NAV = [
   { id: 'venta', label: 'Venta', short: 'Venta', icon: ShoppingCart },
@@ -137,7 +138,73 @@ export function AppShell({
     return localStorage.getItem('pos-sidebar-collapsed') === 'true'
   })
 
-  const { state, logout } = useStore()
+  const {
+    state,
+    logout,
+    retryFailedSale,
+    discardFailedSale,
+    retryFailedAction,
+    discardFailedAction,
+    clearFailedSalesQueue,
+    clearFailedActionsQueue
+  } = useStore()
+
+  const [failedModalOpen, setFailedModalOpen] = useState(false)
+
+  const failedSales = state.failedSalesQueue || []
+  const failedActions = state.failedActionsQueue || []
+  const failedCount = failedSales.length + failedActions.length
+  const hasFailedTransactions = failedCount > 0
+
+  const getCustomerName = (id) => {
+    return state.customers?.find(c => c.id === id)?.name || id
+  }
+  const getSupplierName = (id) => {
+    return state.suppliers?.find(s => s.id === id)?.name || id
+  }
+
+  const handleDiscard = (item) => {
+    if (item.type) {
+      discardFailedAction(item.id)
+    } else {
+      discardFailedSale(item.id)
+    }
+  }
+
+  const handleRetry = (item) => {
+    if (item.type) {
+      retryFailedAction(item)
+    } else {
+      retryFailedSale(item)
+    }
+  }
+
+  const handleClearAll = () => {
+    clearFailedSalesQueue()
+    clearFailedActionsQueue()
+    setFailedModalOpen(false)
+    toast('Todos los errores han sido descartados.')
+  }
+
+  const combinedFailed = [
+    ...failedSales.map(s => ({ ...s, isSale: true })),
+    ...failedActions.map(a => ({ ...a, isAction: true }))
+  ].sort((a, b) => {
+    const dateA = new Date(a.failedAt || a.date || (a.payload && a.payload.date)).getTime()
+    const dateB = new Date(b.failedAt || b.date || (b.payload && b.payload.date)).getTime()
+    return dateB - dateA
+  })
+
+  function formatActionType(type) {
+    switch (type) {
+      case 'ADD_CUSTOMER': return 'Agregar Cliente'
+      case 'REGISTER_CUSTOMER_PAYMENT': return 'Pago de Cuenta (Cliente)'
+      case 'ADD_SUPPLIER': return 'Agregar Proveedor'
+      case 'RECEIVE_GOODS': return 'Ingreso de Mercadería'
+      case 'REGISTER_SUPPLIER_PAYMENT': return 'Pago a Proveedor'
+      default: return type
+    }
+  }
 
   const filteredNav = NAV.filter((item) => {
     const role = state.currentUser?.role
@@ -199,6 +266,31 @@ export function AppShell({
           <div className="mx-4 mt-3 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-1.5 text-center text-xs font-bold text-destructive animate-pulse">
             Modo Offline
           </div>
+        )}
+
+        {hasFailedTransactions && (
+          collapsed ? (
+            <button
+              onClick={() => setFailedModalOpen(true)}
+              title="Errores de sincronización"
+              className="mx-auto mt-3 flex size-10 shrink-0 items-center justify-center rounded-xl border border-destructive bg-destructive/15 text-destructive hover:bg-destructive hover:text-white transition-colors cursor-pointer"
+            >
+              ⚠️
+            </button>
+          ) : (
+            <button
+              onClick={() => setFailedModalOpen(true)}
+              className="mx-4 mt-3 flex items-center justify-between rounded-xl bg-destructive/10 border border-destructive border-dashed hover:bg-destructive hover:text-white px-3 py-2 text-xs font-bold text-destructive cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">⚠️</span>
+                <span>Errores de sync</span>
+              </div>
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                {failedCount}
+              </span>
+            </button>
+          )
         )}
 
         {/* Caja status */}
@@ -319,6 +411,18 @@ export function AppShell({
               <span className="font-heading text-base font-bold">{activeLabel}</span>
             </div>
             <div className="flex items-center gap-2">
+              {hasFailedTransactions && (
+                <button
+                  onClick={() => setFailedModalOpen(true)}
+                  className="flex size-9 items-center justify-center rounded-xl border border-destructive bg-destructive/10 text-destructive relative mr-1"
+                  aria-label="Ver errores de sincronización"
+                >
+                  <span className="text-base">⚠️</span>
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-black text-white animate-pulse">
+                    {failedCount}
+                  </span>
+                </button>
+              )}
               {!isOnline ? (
                 <Badge tone="danger" className="text-[10px] px-1.5 py-0.5 animate-pulse">
                   Offline
@@ -380,6 +484,152 @@ export function AppShell({
           })}
         </nav>
       </div>
+      {/* Modal de Transacciones Fallidas */}
+      <Modal
+        open={failedModalOpen}
+        onClose={() => setFailedModalOpen(false)}
+        title="Errores de Sincronización Offline"
+        footer={
+          <div className="flex justify-between w-full">
+            {failedCount > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="rounded-lg border border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive hover:text-white px-4 py-2 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Descartar todos
+              </button>
+            )}
+            <button
+              onClick={() => setFailedModalOpen(false)}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors cursor-pointer ml-auto"
+            >
+              Cerrar
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          {combinedFailed.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+              <span className="text-3xl mb-2">🎉</span>
+              <p className="text-sm font-semibold">No hay transacciones fallidas</p>
+              <p className="text-xs">Todas tus operaciones offline se sincronizaron con éxito.</p>
+            </div>
+          ) : (
+            combinedFailed.map((item) => {
+              const isSale = item.isSale
+              const dateVal = item.failedAt || item.date || item.payload?.date
+              const displayDate = dateVal ? new Date(dateVal).toLocaleString() : 'Fecha desconocida'
+              
+              return (
+                <div key={item.id} className="rounded-xl border border-border p-4 bg-card text-foreground space-y-3 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-bold text-sm text-foreground">
+                        {isSale ? 'Venta Offline' : formatActionType(item.type)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{displayDate}</p>
+                    </div>
+                    <span className="text-[10px] font-bold bg-destructive/10 text-destructive rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+                      Error de Sync
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    {isSale ? (
+                      <>
+                        <div>
+                          <span className="font-semibold text-foreground">Productos:</span>{' '}
+                          {item.items?.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-foreground">Total:</span> {money(item.total)} ({item.method === 'efectivo' ? 'Efectivo' : item.method === 'qr' ? 'QR' : 'Fiado'})
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {item.type === 'REGISTER_CUSTOMER_PAYMENT' && (
+                          <>
+                            <div>
+                              <span className="font-semibold text-foreground">Cliente:</span> {getCustomerName(item.payload?.customerId)}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-foreground">Monto:</span> {money(item.payload?.amount)}
+                            </div>
+                          </>
+                        )}
+                        {item.type === 'RECEIVE_GOODS' && (
+                          <>
+                            <div>
+                              <span className="font-semibold text-foreground">Proveedor:</span> {getSupplierName(item.payload?.supplierId)}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-foreground">Monto:</span> {money(item.payload?.amount)} ({item.payload?.paidCash ? 'Pago Contado' : 'A Cuenta'})
+                            </div>
+                            {item.payload?.detail && (
+                              <div>
+                                <span className="font-semibold text-foreground">Detalle:</span> {item.payload?.detail}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {item.type === 'REGISTER_SUPPLIER_PAYMENT' && (
+                          <>
+                            <div>
+                              <span className="font-semibold text-foreground">Proveedor:</span> {getSupplierName(item.payload?.supplierId)}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-foreground">Monto:</span> {money(item.payload?.amount)} ({item.payload?.fromCash ? 'Caja' : 'A Cuenta'})
+                            </div>
+                          </>
+                        )}
+                        {item.type === 'ADD_CUSTOMER' && (
+                          <>
+                            <div>
+                              <span className="font-semibold text-foreground">Nombre:</span> {item.payload?.name}
+                            </div>
+                            {item.payload?.phone && (
+                              <div>
+                                <span className="font-semibold text-foreground">Teléfono:</span> {item.payload?.phone}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {item.type === 'ADD_SUPPLIER' && (
+                          <>
+                            <div>
+                              <span className="font-semibold text-foreground">Nombre:</span> {item.payload?.name}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="bg-destructive/5 text-destructive border border-destructive/10 rounded-lg p-2.5 text-xs font-sans break-words">
+                    <span className="font-bold">Motivo:</span> {item.error || 'Error desconocido'}
+                  </div>
+
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => handleDiscard(item)}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted text-muted-foreground transition-colors cursor-pointer"
+                    >
+                      Descartar
+                    </button>
+                    <button
+                      onClick={() => handleRetry(item)}
+                      className="rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </Modal>
     </div>
   )
 }

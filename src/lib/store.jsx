@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useCallback, useRef } from 'react'
 import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -75,6 +75,8 @@ export const useUIStore = create()(
       productsCache: [],
       currentShiftCache: null,
       offlineActionsQueue: [],
+      failedSalesQueue: [],
+      failedActionsQueue: [],
       
       toggleTheme: () => set((state) => {
         const nextTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -111,6 +113,20 @@ export const useUIStore = create()(
       dequeueOfflineAction: (actionId) => set((state) => ({
         offlineActionsQueue: state.offlineActionsQueue.filter(a => a.id !== actionId)
       })),
+      enqueueFailedSale: (sale) => set((state) => ({
+        failedSalesQueue: [...state.failedSalesQueue, sale]
+      })),
+      dequeueFailedSale: (saleId) => set((state) => ({
+        failedSalesQueue: state.failedSalesQueue.filter(s => s.id !== saleId)
+      })),
+      clearFailedSalesQueue: () => set({ failedSalesQueue: [] }),
+      enqueueFailedAction: (action) => set((state) => ({
+        failedActionsQueue: [...state.failedActionsQueue, action]
+      })),
+      dequeueFailedAction: (actionId) => set((state) => ({
+        failedActionsQueue: state.failedActionsQueue.filter(a => a.id !== actionId)
+      })),
+      clearFailedActionsQueue: () => set({ failedActionsQueue: [] }),
     }),
     {
       name: 'kiosko-pos-ui-state',
@@ -140,7 +156,6 @@ function RealtimeSync() {
     return () => {
       supabase.removeChannel(channel)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return null
 }
@@ -167,10 +182,10 @@ export function useStore() {
   const adminPassword = useUIStore((s) => s.adminPassword)
   const isAdminAuthenticated = useUIStore((s) => s.isAdminAuthenticated)
   const currentUser = useUIStore((s) => s.currentUser)
-  const offlineSalesQueue = useUIStore((s) => s.offlineSalesQueue)
   const productsCache = useUIStore((s) => s.productsCache)
   const currentShiftCache = useUIStore((s) => s.currentShiftCache)
-  const offlineActionsQueue = useUIStore((s) => s.offlineActionsQueue)
+  const failedSalesQueue = useUIStore((s) => s.failedSalesQueue)
+  const failedActionsQueue = useUIStore((s) => s.failedActionsQueue)
   
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const loginAdmin = useUIStore((s) => s.loginAdmin)
@@ -183,6 +198,10 @@ export function useStore() {
   const setCurrentShiftCache = useUIStore((s) => s.setCurrentShiftCache)
   const enqueueOfflineAction = useUIStore((s) => s.enqueueOfflineAction)
   const dequeueOfflineAction = useUIStore((s) => s.dequeueOfflineAction)
+  const dequeueFailedSale = useUIStore((s) => s.dequeueFailedSale)
+  const clearFailedSalesQueue = useUIStore((s) => s.clearFailedSalesQueue)
+  const dequeueFailedAction = useUIStore((s) => s.dequeueFailedAction)
+  const clearFailedActionsQueue = useUIStore((s) => s.clearFailedActionsQueue)
 
   // Apply theme class side effect
   useEffect(() => {
@@ -310,6 +329,7 @@ export function useStore() {
           p_cost: sale.cost || 0,
           p_sold_by: sale.soldBy,
           p_date: sale.date,
+          p_shift_id: sale.shiftId,
         })
         if (error) throw error
 
@@ -318,7 +338,12 @@ export function useStore() {
         console.log(`Synced offline sale: ${sale.id}`)
       } catch (err) {
         console.error(`Failed to sync sale ${sale.id}:`, err)
-        break // Stop processing queue to maintain order
+        dequeueOfflineSale(sale.id)
+        useUIStore.getState().enqueueFailedSale({
+          ...sale,
+          failedAt: new Date().toISOString(),
+          error: err.message || String(err)
+        })
       }
     }
     qc.invalidateQueries()
@@ -352,11 +377,12 @@ export function useStore() {
             break
           }
           case 'REGISTER_CUSTOMER_PAYMENT': {
-            const { customerId, amount, date } = action.payload
+            const { customerId, amount, date, shiftId } = action.payload
             const { error } = await supabase.rpc('register_customer_payment_rpc', {
               p_customer_id: customerId,
               p_amount: amount,
               p_date: date,
+              p_shift_id: shiftId,
             })
             if (error) throw error
             break
@@ -367,24 +393,26 @@ export function useStore() {
             break
           }
           case 'RECEIVE_GOODS': {
-            const { supplierId, amount, detail, paidCash, date } = action.payload
+            const { supplierId, amount, detail, paidCash, date, shiftId } = action.payload
             const { error } = await supabase.rpc('receive_goods_rpc', {
               p_supplier_id: supplierId,
               p_amount: amount,
               p_detail: detail,
               p_paid_cash: paidCash,
               p_date: date,
+              p_shift_id: shiftId,
             })
             if (error) throw error
             break
           }
           case 'REGISTER_SUPPLIER_PAYMENT': {
-            const { supplierId, amount, fromCash, date } = action.payload
+            const { supplierId, amount, fromCash, date, shiftId } = action.payload
             const { error } = await supabase.rpc('register_supplier_payment_rpc', {
               p_supplier_id: supplierId,
               p_amount: amount,
               p_from_cash: fromCash,
               p_date: date,
+              p_shift_id: shiftId,
             })
             if (error) throw error
             break
@@ -398,7 +426,12 @@ export function useStore() {
         console.log(`Synced offline action: ${action.type} (${action.id})`)
       } catch (err) {
         console.error(`Failed to sync action ${action.id}:`, err)
-        break // Stop processing to preserve order
+        dequeueOfflineAction(action.id)
+        useUIStore.getState().enqueueFailedAction({
+          ...action,
+          failedAt: new Date().toISOString(),
+          error: err.message || String(err)
+        })
       }
     }
     qc.invalidateQueries()
@@ -414,14 +447,18 @@ export function useStore() {
     }
   }, [dequeueOfflineAction, qc])
 
+  const syncAllOfflineData = useCallback(async () => {
+    await syncOfflineActions()
+    await syncOfflineSales()
+  }, [syncOfflineActions, syncOfflineSales])
+
   // Sync effect when regaining connectivity
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const handleOnline = () => {
       console.log('App regained connection/startup. Syncing offline data...')
-      syncOfflineSales()
-      syncOfflineActions()
+      syncAllOfflineData()
     }
 
     window.addEventListener('online', handleOnline)
@@ -436,7 +473,7 @@ export function useStore() {
     return () => {
       window.removeEventListener('online', handleOnline)
     }
-  }, [syncOfflineSales, syncOfflineActions])
+  }, [syncAllOfflineData])
 
   // Sync shifts query results with currentShiftCache
   useEffect(() => {
@@ -577,14 +614,16 @@ export function useStore() {
   })
 
   const registerCustomerPaymentMutation = useMutation({
-    mutationFn: async ({ customerId, amount }) => {
+    mutationFn: async ({ customerId, amount, shiftId }) => {
       const date = new Date().toISOString()
       const { error } = await supabase.rpc('register_customer_payment_rpc', {
         p_customer_id: customerId,
         p_amount: amount,
         p_date: date,
+        p_shift_id: shiftId,
       })
       if (error) throw error
+      return { customerId, amount, date, shiftId }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['customers'] })
@@ -602,7 +641,7 @@ export function useStore() {
   })
 
   const receiveGoodsMutation = useMutation({
-    mutationFn: async ({ supplierId, amount, detail, paidCash }) => {
+    mutationFn: async ({ supplierId, amount, detail, paidCash, shiftId }) => {
       const date = new Date().toISOString()
       const { error } = await supabase.rpc('receive_goods_rpc', {
         p_supplier_id: supplierId,
@@ -610,8 +649,10 @@ export function useStore() {
         p_detail: detail,
         p_paid_cash: paidCash,
         p_date: date,
+        p_shift_id: shiftId,
       })
       if (error) throw error
+      return { supplierId, amount, detail, paidCash, date, shiftId }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] })
@@ -620,15 +661,17 @@ export function useStore() {
   })
 
   const registerSupplierPaymentMutation = useMutation({
-    mutationFn: async ({ supplierId, amount, fromCash }) => {
+    mutationFn: async ({ supplierId, amount, fromCash, shiftId }) => {
       const date = new Date().toISOString()
       const { error } = await supabase.rpc('register_supplier_payment_rpc', {
         p_supplier_id: supplierId,
         p_amount: amount,
         p_from_cash: fromCash,
         p_date: date,
+        p_shift_id: shiftId,
       })
       if (error) throw error
+      return { supplierId, amount, fromCash, date, shiftId }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] })
@@ -661,8 +704,24 @@ export function useStore() {
         p_cost: cost,
         p_sold_by: currentUser?.username || 'admin',
         p_date: date,
+        p_shift_id: currentShift.id,
       })
       if (error) throw error
+
+      const total = args.items.reduce((sum, i) => sum + i.price * i.qty, 0)
+      return {
+        id: saleId,
+        date,
+        items: args.items,
+        total,
+        method: args.method,
+        customerId: args.customerId || null,
+        cashReceived: args.cashReceived || 0,
+        change: args.change || 0,
+        cost,
+        soldBy: currentUser?.username || 'admin',
+        shiftId: currentShift.id,
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sales'] })
@@ -752,24 +811,26 @@ export function useStore() {
     addMovementMutation.mutate({ type, amount, reason })
   }, [addMovementMutation])
 
-  const addCustomer = useCallback((name, phone) => {
+  const addCustomer = useCallback(async (name, phone) => {
     const cust = { id: uid(), name, phone, entries: [] }
     if (!isOnline) {
       enqueueOfflineAction({ id: uid(), type: 'ADD_CUSTOMER', payload: cust })
       qc.setQueryData(['customers'], (old = []) => [...old, cust])
     } else {
-      addCustomerMutation.mutate(cust)
+      await addCustomerMutation.mutateAsync(cust)
     }
     return cust
   }, [addCustomerMutation, isOnline, enqueueOfflineAction, qc])
 
   const registerCustomerPayment = useCallback((customerId, amount) => {
+    const shiftId = currentShift?.id || null
     if (!isOnline) {
       const date = new Date().toISOString()
+      const payment = { customerId, amount, date, shiftId }
       enqueueOfflineAction({
         id: uid(),
         type: 'REGISTER_CUSTOMER_PAYMENT',
-        payload: { customerId, amount, date }
+        payload: payment
       })
 
       // Update customers local cache
@@ -806,8 +867,9 @@ export function useStore() {
           })
         })
       }
+      return Promise.resolve(payment)
     } else {
-      registerCustomerPaymentMutation.mutate({ customerId, amount })
+      return registerCustomerPaymentMutation.mutateAsync({ customerId, amount, shiftId })
     }
   }, [registerCustomerPaymentMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
@@ -823,12 +885,14 @@ export function useStore() {
   }, [addSupplierMutation, isOnline, enqueueOfflineAction, qc])
 
   const receiveGoods = useCallback((supplierId, amount, detail, paidCash) => {
+    const shiftId = currentShift?.id || null
     if (!isOnline) {
       const date = new Date().toISOString()
+      const goods = { supplierId, amount, detail, paidCash, date, shiftId }
       enqueueOfflineAction({
         id: uid(),
         type: 'RECEIVE_GOODS',
-        payload: { supplierId, amount, detail, paidCash, date }
+        payload: goods
       })
 
       // Update suppliers local cache
@@ -866,18 +930,21 @@ export function useStore() {
           })
         })
       }
+      return Promise.resolve(goods)
     } else {
-      receiveGoodsMutation.mutate({ supplierId, amount, detail, paidCash })
+      return receiveGoodsMutation.mutateAsync({ supplierId, amount, detail, paidCash, shiftId })
     }
   }, [receiveGoodsMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const registerSupplierPayment = useCallback((supplierId, amount, fromCash) => {
+    const shiftId = currentShift?.id || null
     if (!isOnline) {
       const date = new Date().toISOString()
+      const payment = { supplierId, amount, fromCash, date, shiftId }
       enqueueOfflineAction({
         id: uid(),
         type: 'REGISTER_SUPPLIER_PAYMENT',
-        payload: { supplierId, amount, fromCash, date }
+        payload: payment
       })
 
       // Update suppliers local cache
@@ -914,13 +981,15 @@ export function useStore() {
           })
         })
       }
+      return Promise.resolve(payment)
     } else {
-      registerSupplierPaymentMutation.mutate({ supplierId, amount, fromCash })
+      return registerSupplierPaymentMutation.mutateAsync({ supplierId, amount, fromCash, shiftId })
     }
   }, [registerSupplierPaymentMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const completeSale = useCallback((args) => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine
+    const shiftId = currentShift?.id || null
 
     if (!isOnline) {
       const date = new Date().toISOString()
@@ -946,6 +1015,7 @@ export function useStore() {
         cost,
         soldBy: currentUser?.username || 'admin',
         isOfflinePending: true,
+        shiftId,
       }
 
       enqueueOfflineSale(sale)
@@ -1007,14 +1077,52 @@ export function useStore() {
       if (typeof window !== 'undefined' && window.dispatchEvent) {
         window.dispatchEvent(new CustomEvent('offline-sale-registered', { detail: sale }))
       }
+
+      return Promise.resolve(sale)
     } else {
-      completeSaleMutation.mutate(args)
+      return completeSaleMutation.mutateAsync(args)
     }
   }, [completeSaleMutation, displayedProducts, currentUser, enqueueOfflineSale, currentShift, qc])
 
   const resetData = useCallback(() => {
     resetDataMutation.mutate()
   }, [resetDataMutation])
+
+  const retryFailedSale = useCallback((sale) => {
+    dequeueFailedSale(sale.id)
+    const cleanSale = { ...sale }
+    delete cleanSale.failedAt
+    delete cleanSale.error
+    enqueueOfflineSale(cleanSale)
+    if (navigator.onLine) {
+      syncOfflineSales()
+    }
+  }, [dequeueFailedSale, enqueueOfflineSale, syncOfflineSales])
+
+  const discardFailedSale = useCallback((saleId) => {
+    dequeueFailedSale(saleId)
+  }, [dequeueFailedSale])
+
+  const retryFailedAction = useCallback((action) => {
+    dequeueFailedAction(action.id)
+    const cleanAction = { ...action }
+    delete cleanAction.failedAt
+    delete cleanAction.error
+    enqueueOfflineAction(cleanAction)
+    if (navigator.onLine) {
+      syncOfflineActions()
+    }
+  }, [dequeueFailedAction, enqueueOfflineAction, syncOfflineActions])
+
+  const discardFailedAction = useCallback((actionId) => {
+    dequeueFailedAction(actionId)
+  }, [dequeueFailedAction])
+
+  const syncOfflineData = useCallback(() => {
+    if (navigator.onLine) {
+      syncAllOfflineData()
+    }
+  }, [syncAllOfflineData])
 
   const login = useCallback(async (username, password) => {
     const email = `${username.toLowerCase().trim()}@kiosko.com`
@@ -1068,6 +1176,8 @@ export function useStore() {
     isAdminAuthenticated,
     currentUser,
     users,
+    failedSalesQueue,
+    failedActionsQueue,
   }), [
     displayedProducts,
     sales,
@@ -1080,6 +1190,8 @@ export function useStore() {
     isAdminAuthenticated,
     currentUser,
     users,
+    failedSalesQueue,
+    failedActionsQueue,
   ])
 
   return {
@@ -1108,5 +1220,12 @@ export function useStore() {
     createUser,
     deleteUser,
     toggleMostSold,
+    clearFailedSalesQueue,
+    clearFailedActionsQueue,
+    retryFailedSale,
+    discardFailedSale,
+    retryFailedAction,
+    discardFailedAction,
+    syncOfflineData,
   }
 }

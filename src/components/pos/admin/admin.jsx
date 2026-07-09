@@ -788,7 +788,7 @@ function UsersTab({ state, createUser, deleteUser }) {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="font-semibold text-foreground text-base">{c.name}</h4>
-                        <p className="text-xs text-muted-foreground">@{c.username} · <span className="font-mono">{c.password}</span></p>
+                        <p className="text-xs text-muted-foreground">@{c.username}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge tone={c.role === 'repositor' ? 'accent' : 'muted'} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
@@ -844,7 +844,6 @@ function UsersTab({ state, createUser, deleteUser }) {
                   <tr className="border-b border-border text-muted-foreground font-semibold">
                     <th className="py-2.5">Nombre</th>
                     <th className="py-2.5">Usuario</th>
-                    <th className="py-2.5">Contraseña</th>
                     <th className="py-2.5">Rol</th>
                     <th className="py-2.5 text-right">Ventas</th>
                     <th className="py-2.5 text-right">Operac.</th>
@@ -861,7 +860,6 @@ function UsersTab({ state, createUser, deleteUser }) {
                       <tr key={c.id} className="hover:bg-muted/10 transition-colors">
                         <td className="py-3 font-medium text-foreground">{c.name}</td>
                         <td className="py-3 text-muted-foreground">{c.username}</td>
-                        <td className="py-3 text-muted-foreground font-mono">{c.password}</td>
                         <td className="py-3">
                           <Badge tone={c.role === 'repositor' ? 'accent' : 'muted'} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
                             {c.role === 'repositor' ? 'Repositor' : 'Empleado'}
