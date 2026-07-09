@@ -36,8 +36,13 @@ export function Clientes() {
         customer={selected}
         onBack={() => setSelectedId(null)}
         onPay={(amount) => {
+          const isOnline = typeof navigator !== 'undefined' && navigator.onLine
           registerCustomerPayment(selected.id, amount)
-          toast(`Pago registrado: ${money(amount)}`)
+          if (!isOnline) {
+            toast(`Pago registrado localmente (Modo Offline): ${money(amount)}`, 'warning')
+          } else {
+            toast(`Pago registrado: ${money(amount)}`)
+          }
         }}
         hasOpenShift={state.currentShift?.status === 'open'}
       />
@@ -115,8 +120,13 @@ export function Clientes() {
             className="h-11 w-full"
             disabled={!name.trim()}
             onClick={() => {
+              const isOnline = typeof navigator !== 'undefined' && navigator.onLine
               addCustomer(name.trim(), phone.trim())
-              toast('Cliente agregado')
+              if (!isOnline) {
+                toast('Cliente registrado localmente (Modo Offline)', 'warning')
+              } else {
+                toast('Cliente agregado')
+              }
               setName('')
               setPhone('')
               setNewOpen(false)

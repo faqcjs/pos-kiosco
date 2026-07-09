@@ -34,11 +34,16 @@ export function Proveedores() {
   function handleCreate() {
     const name = newName.trim()
     if (!name) return
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
     const sup = addSupplier(name)
     setNewName('')
     setNewOpen(false)
     setSelectedId(sup.id)
-    toast('Proveedor agregado', 'success')
+    if (!isOnline) {
+      toast('Proveedor agregado localmente (Modo Offline)', 'warning')
+    } else {
+      toast('Proveedor agregado', 'success')
+    }
   }
 
   if (selected) {
@@ -172,21 +177,36 @@ function SupplierDetail({
   function submitReceive() {
     const value = Number(amount)
     if (!value || value <= 0) return
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
     onReceive(supplier.id, value, detail.trim() || 'Mercadería', paidCash)
     setAmount('')
     setDetail('')
     setPaidCash(false)
     setReceiveOpen(false)
-    toast(paidCash ? 'Mercadería recibida y pagada' : 'Mercadería recibida a cuenta', 'success')
+    if (!isOnline) {
+      toast(
+        paidCash
+          ? 'Mercadería recibida y pagada localmente (Modo Offline)'
+          : 'Mercadería recibida a cuenta localmente (Modo Offline)',
+        'warning',
+      )
+    } else {
+      toast(paidCash ? 'Mercadería recibida y pagada' : 'Mercadería recibida a cuenta', 'success')
+    }
   }
 
   function submitPay() {
     const value = Number(payAmount)
     if (!value || value <= 0) return
+    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
     onPay(supplier.id, value, fromCash)
     setPayAmount('')
     setPayOpen(false)
-    toast('Pago registrado', 'success')
+    if (!isOnline) {
+      toast('Pago registrado localmente (Modo Offline)', 'warning')
+    } else {
+      toast('Pago registrado', 'success')
+    }
   }
 
   return (

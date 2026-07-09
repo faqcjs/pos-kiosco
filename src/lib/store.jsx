@@ -74,6 +74,7 @@ export const useUIStore = create()(
       offlineSalesQueue: [],
       productsCache: [],
       currentShiftCache: null,
+      offlineActionsQueue: [],
       
       toggleTheme: () => set((state) => {
         const nextTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -104,6 +105,12 @@ export const useUIStore = create()(
       })),
       setProductsCache: (products) => set({ productsCache: products }),
       setCurrentShiftCache: (shift) => set({ currentShiftCache: shift }),
+      enqueueOfflineAction: (action) => set((state) => ({
+        offlineActionsQueue: [...state.offlineActionsQueue, action]
+      })),
+      dequeueOfflineAction: (actionId) => set((state) => ({
+        offlineActionsQueue: state.offlineActionsQueue.filter(a => a.id !== actionId)
+      })),
     }),
     {
       name: 'kiosko-pos-ui-state',
@@ -160,6 +167,7 @@ export function useStore() {
   const offlineSalesQueue = useUIStore((s) => s.offlineSalesQueue)
   const productsCache = useUIStore((s) => s.productsCache)
   const currentShiftCache = useUIStore((s) => s.currentShiftCache)
+  const offlineActionsQueue = useUIStore((s) => s.offlineActionsQueue)
   
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const loginAdmin = useUIStore((s) => s.loginAdmin)
@@ -170,6 +178,8 @@ export function useStore() {
   const dequeueOfflineSale = useUIStore((s) => s.dequeueOfflineSale)
   const setProductsCache = useUIStore((s) => s.setProductsCache)
   const setCurrentShiftCache = useUIStore((s) => s.setCurrentShiftCache)
+  const enqueueOfflineAction = useUIStore((s) => s.enqueueOfflineAction)
+  const dequeueOfflineAction = useUIStore((s) => s.dequeueOfflineAction)
 
   // Apply theme class side effect
   useEffect(() => {
@@ -358,25 +368,180 @@ export function useStore() {
     qc.invalidateQueries()
   }, [offlineSalesQueue, dequeueOfflineSale, qc])
 
+  // Background offline actions (customers/suppliers) synchronization function
+  const syncOfflineActions = useCallback(async () => {
+    if (offlineActionsQueue.length === 0) return
+
+    console.log(`Syncing ${offlineActionsQueue.length} offline actions...`)
+    const queueToProcess = [...offlineActionsQueue]
+
+    for (const action of queueToProcess) {
+      try {
+        switch (action.type) {
+          case 'ADD_CUSTOMER': {
+            const { error } = await supabase.from('customers').insert([action.payload])
+            if (error) throw error
+            break
+          }
+          case 'REGISTER_CUSTOMER_PAYMENT': {
+            const { customerId, amount, date } = action.payload
+            const { data: customer, error: custError } = await supabase
+              .from('customers')
+              .select('*')
+              .eq('id', customerId)
+              .single()
+            if (custError) throw custError
+
+            const updated = {
+              ...customer,
+              entries: [...(customer.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago de deuda' }],
+            }
+            const { error: updateError } = await supabase.from('customers').update(updated).eq('id', customerId)
+            if (updateError) throw updateError
+
+            // Shift movement
+            const { data: activeShift, error: shiftError } = await supabase
+              .from('shifts')
+              .select('*')
+              .eq('status', 'open')
+              .maybeSingle()
+            
+            if (!shiftError && activeShift) {
+              const mov = {
+                id: uid(),
+                date,
+                type: 'cobro_fiado',
+                amount: Math.abs(amount),
+                reason: `Cobro de fiado - ${customer.name} [Sincronizado]`,
+              }
+              const updatedShift = {
+                ...activeShift,
+                movements: [...(activeShift.movements || []), mov]
+              }
+              await supabase.from('shifts').update(updatedShift).eq('id', activeShift.id)
+            }
+            break
+          }
+          case 'ADD_SUPPLIER': {
+            const { error } = await supabase.from('suppliers').insert([action.payload])
+            if (error) throw error
+            break
+          }
+          case 'RECEIVE_GOODS': {
+            const { supplierId, amount, detail, paidCash, date } = action.payload
+            const { data: supplier, error: supError } = await supabase
+              .from('suppliers')
+              .select('*')
+              .eq('id', supplierId)
+              .single()
+            if (supError) throw supError
+
+            let entries = [...(supplier.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash }]
+            if (paidCash) {
+              entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
+            }
+            const { error: updateError } = await supabase.from('suppliers').update({ entries }).eq('id', supplierId)
+            if (updateError) throw updateError
+
+            if (paidCash) {
+              const { data: activeShift, error: shiftError } = await supabase
+                .from('shifts')
+                .select('*')
+                .eq('status', 'open')
+                .maybeSingle()
+              
+              if (!shiftError && activeShift) {
+                const mov = {
+                  id: uid(),
+                  date,
+                  type: 'pago_proveedor',
+                  amount: -Math.abs(amount),
+                  reason: `Pago contado - ${supplier.name} [Sincronizado]`,
+                }
+                const updatedShift = {
+                  ...activeShift,
+                  movements: [...(activeShift.movements || []), mov]
+                }
+                await supabase.from('shifts').update(updatedShift).eq('id', activeShift.id)
+              }
+            }
+            break
+          }
+          case 'REGISTER_SUPPLIER_PAYMENT': {
+            const { supplierId, amount, fromCash, date } = action.payload
+            const { data: supplier, error: supError } = await supabase
+              .from('suppliers')
+              .select('*')
+              .eq('id', supplierId)
+              .single()
+            if (supError) throw supError
+
+            const updated = {
+              ...supplier,
+              entries: [...(supplier.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor' }],
+            }
+            const { error: updateError } = await supabase.from('suppliers').update(updated).eq('id', supplierId)
+            if (updateError) throw updateError
+
+            if (fromCash) {
+              const { data: activeShift, error: shiftError } = await supabase
+                .from('shifts')
+                .select('*')
+                .eq('status', 'open')
+                .maybeSingle()
+              
+              if (!shiftError && activeShift) {
+                const mov = {
+                  id: uid(),
+                  date,
+                  type: 'pago_proveedor',
+                  amount: -Math.abs(amount),
+                  reason: `Pago a proveedor - ${supplier.name} [Sincronizado]`,
+                }
+                const updatedShift = {
+                  ...activeShift,
+                  movements: [...(activeShift.movements || []), mov]
+                }
+                await supabase.from('shifts').update(updatedShift).eq('id', activeShift.id)
+              }
+            }
+            break
+          }
+          default:
+            console.warn(`Unknown action type: ${action.type}`)
+        }
+
+        // Dequeue successfully synced action
+        dequeueOfflineAction(action.id)
+        console.log(`Synced offline action: ${action.type} (${action.id})`)
+      } catch (err) {
+        console.error(`Failed to sync action ${action.id}:`, err)
+        break // Stop processing to preserve order
+      }
+    }
+    qc.invalidateQueries()
+  }, [offlineActionsQueue, dequeueOfflineAction, qc])
+
   // Sync effect when regaining connectivity
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const handleOnline = () => {
-      console.log('App regained connection. Syncing offline sales...')
+      console.log('App regained connection. Syncing offline data...')
       syncOfflineSales()
+      syncOfflineActions()
     }
 
     window.addEventListener('online', handleOnline)
 
-    if (navigator.onLine && offlineSalesQueue.length > 0) {
+    if (navigator.onLine && (offlineSalesQueue.length > 0 || offlineActionsQueue.length > 0)) {
       handleOnline()
     }
 
     return () => {
       window.removeEventListener('online', handleOnline)
     }
-  }, [syncOfflineSales, offlineSalesQueue.length])
+  }, [syncOfflineSales, syncOfflineActions, offlineSalesQueue.length, offlineActionsQueue.length])
 
   // Sync shifts query results with currentShiftCache
   useEffect(() => {
@@ -785,27 +950,170 @@ export function useStore() {
 
   const addCustomer = useCallback((name, phone) => {
     const cust = { id: uid(), name, phone, entries: [] }
-    addCustomerMutation.mutate(cust)
+    if (!isOnline) {
+      enqueueOfflineAction({ id: uid(), type: 'ADD_CUSTOMER', payload: cust })
+      qc.setQueryData(['customers'], (old = []) => [...old, cust])
+    } else {
+      addCustomerMutation.mutate(cust)
+    }
     return cust
-  }, [addCustomerMutation])
+  }, [addCustomerMutation, isOnline, enqueueOfflineAction, qc])
 
   const registerCustomerPayment = useCallback((customerId, amount) => {
-    registerCustomerPaymentMutation.mutate({ customerId, amount })
-  }, [registerCustomerPaymentMutation])
+    if (!isOnline) {
+      const date = new Date().toISOString()
+      enqueueOfflineAction({
+        id: uid(),
+        type: 'REGISTER_CUSTOMER_PAYMENT',
+        payload: { customerId, amount, date }
+      })
+
+      // Update customers local cache
+      qc.setQueryData(['customers'], (old = []) => {
+        return old.map((c) => {
+          if (c.id === customerId) {
+            return {
+              ...c,
+              entries: [...(c.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago de deuda' }]
+            }
+          }
+          return c
+        })
+      })
+
+      // Update shift movement local cache
+      if (currentShift) {
+        const mov = {
+          id: uid(),
+          date,
+          type: 'cobro_fiado',
+          amount: Math.abs(amount),
+          reason: `Cobro de fiado - Clientes`
+        }
+        qc.setQueryData(['shifts'], (oldShifts = []) => {
+          return oldShifts.map((s) => {
+            if (s.id === currentShift.id) {
+              return {
+                ...s,
+                movements: [...(s.movements || []), mov]
+              }
+            }
+            return s
+          })
+        })
+      }
+    } else {
+      registerCustomerPaymentMutation.mutate({ customerId, amount })
+    }
+  }, [registerCustomerPaymentMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const addSupplier = useCallback((name) => {
     const sup = { id: uid(), name, entries: [] }
-    addSupplierMutation.mutate(sup)
+    if (!isOnline) {
+      enqueueOfflineAction({ id: uid(), type: 'ADD_SUPPLIER', payload: sup })
+      qc.setQueryData(['suppliers'], (old = []) => [...old, sup])
+    } else {
+      addSupplierMutation.mutate(sup)
+    }
     return sup
-  }, [addSupplierMutation])
+  }, [addSupplierMutation, isOnline, enqueueOfflineAction, qc])
 
   const receiveGoods = useCallback((supplierId, amount, detail, paidCash) => {
-    receiveGoodsMutation.mutate({ supplierId, amount, detail, paidCash })
-  }, [receiveGoodsMutation])
+    if (!isOnline) {
+      const date = new Date().toISOString()
+      enqueueOfflineAction({
+        id: uid(),
+        type: 'RECEIVE_GOODS',
+        payload: { supplierId, amount, detail, paidCash, date }
+      })
+
+      // Update suppliers local cache
+      qc.setQueryData(['suppliers'], (old = []) => {
+        return old.map((s) => {
+          if (s.id === supplierId) {
+            let entries = [...(s.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash }]
+            if (paidCash) {
+              entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
+            }
+            return { ...s, entries }
+          }
+          return s
+        })
+      })
+
+      // Update shift movement local cache
+      if (paidCash && currentShift) {
+        const mov = {
+          id: uid(),
+          date,
+          type: 'pago_proveedor',
+          amount: -Math.abs(amount),
+          reason: `Pago contado`
+        }
+        qc.setQueryData(['shifts'], (oldShifts = []) => {
+          return oldShifts.map((s) => {
+            if (s.id === currentShift.id) {
+              return {
+                ...s,
+                movements: [...(s.movements || []), mov]
+              }
+            }
+            return s
+          })
+        })
+      }
+    } else {
+      receiveGoodsMutation.mutate({ supplierId, amount, detail, paidCash })
+    }
+  }, [receiveGoodsMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const registerSupplierPayment = useCallback((supplierId, amount, fromCash) => {
-    registerSupplierPaymentMutation.mutate({ supplierId, amount, fromCash })
-  }, [registerSupplierPaymentMutation])
+    if (!isOnline) {
+      const date = new Date().toISOString()
+      enqueueOfflineAction({
+        id: uid(),
+        type: 'REGISTER_SUPPLIER_PAYMENT',
+        payload: { supplierId, amount, fromCash, date }
+      })
+
+      // Update suppliers local cache
+      qc.setQueryData(['suppliers'], (old = []) => {
+        return old.map((s) => {
+          if (s.id === supplierId) {
+            return {
+              ...s,
+              entries: [...(s.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor' }]
+            }
+          }
+          return s
+        })
+      })
+
+      // Update shift movement local cache
+      if (fromCash && currentShift) {
+        const mov = {
+          id: uid(),
+          date,
+          type: 'pago_proveedor',
+          amount: -Math.abs(amount),
+          reason: `Pago a proveedor`
+        }
+        qc.setQueryData(['shifts'], (oldShifts = []) => {
+          return oldShifts.map((s) => {
+            if (s.id === currentShift.id) {
+              return {
+                ...s,
+                movements: [...(s.movements || []), mov]
+              }
+            }
+            return s
+          })
+        })
+      }
+    } else {
+      registerSupplierPaymentMutation.mutate({ supplierId, amount, fromCash })
+    }
+  }, [registerSupplierPaymentMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const completeSale = useCallback((args) => {
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine
@@ -875,6 +1183,22 @@ export function useStore() {
       qc.setQueryData(['sales'], (oldSales = []) => {
         return [sale, ...oldSales]
       })
+
+      // 4. Update customer balance locally if credit ("fiado")
+      if (args.method === 'fiado' && args.customerId) {
+        qc.setQueryData(['customers'], (oldCustomers = []) => {
+          return oldCustomers.map((c) => {
+            if (c.id === args.customerId) {
+              const detail = args.items.map((i) => `${i.qty}x ${i.name}`).join(', ')
+              return {
+                ...c,
+                entries: [...(c.entries || []), { id: uid(), date, type: 'compra', amount: total, detail }]
+              }
+            }
+            return c
+          })
+        })
+      }
 
       if (typeof window !== 'undefined' && window.dispatchEvent) {
         window.dispatchEvent(new CustomEvent('offline-sale-registered', { detail: sale }))

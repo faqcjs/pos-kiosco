@@ -13,11 +13,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/lib/store'
 import { isMockMode } from '@/lib/supabase'
 import { Badge } from '@/components/ui/kit'
+import { useToast } from '@/components/ui/toast'
 
 const NAV = [
   { id: 'venta', label: 'Venta', short: 'Venta', icon: ShoppingCart },
@@ -105,6 +106,28 @@ export function AppShell({
   onChange,
   children,
 }) {
+  const toast = useToast()
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true)
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      toast('¡Conexión restablecida! Sincronizando datos...', 'success')
+    }
+    const handleOffline = () => {
+      setIsOnline(false)
+      toast('Sin conexión a internet. Operando en Modo Offline.', 'warning')
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [toast])
+
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('pos-sidebar-collapsed') === 'true'
   })
@@ -156,13 +179,22 @@ export function AppShell({
             <p className="whitespace-nowrap font-heading text-sm font-bold leading-tight flex items-center gap-1.5">
               eKiosco
               <span
-                className={cn("size-2 rounded-full", isMockMode ? "bg-amber-500" : "bg-green-500")}
-                title={isMockMode ? "Modo Local (Mock)" : "Conectado a Supabase"}
+                className={cn(
+                  "size-2 rounded-full",
+                  !isOnline ? "bg-destructive animate-pulse" : (isMockMode ? "bg-amber-500" : "bg-green-500")
+                )}
+                title={!isOnline ? "Sin conexión (Modo Offline)" : (isMockMode ? "Modo Local (Mock)" : "Conectado a Supabase")}
               />
             </p>
             <p className="whitespace-nowrap text-xs text-muted-foreground">Sistema v1.2</p>
           </div>
         </div>
+
+        {!isOnline && !collapsed && (
+          <div className="mx-4 mt-3 rounded-xl bg-destructive/10 border border-destructive/20 px-3 py-1.5 text-center text-xs font-bold text-destructive animate-pulse">
+            Modo Offline
+          </div>
+        )}
 
         {/* Caja status */}
         <div className={cn('mt-4 px-3', collapsed ? 'flex justify-center' : '')}>
@@ -272,9 +304,15 @@ export function AppShell({
               <span className="font-heading text-base font-bold">{activeLabel}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Badge tone={isMockMode ? "warning" : "success"} className="text-[10px] px-1.5 py-0.5">
-                {isMockMode ? "Mock" : "Supabase"}
-              </Badge>
+              {!isOnline ? (
+                <Badge tone="danger" className="text-[10px] px-1.5 py-0.5 animate-pulse">
+                  Offline
+                </Badge>
+              ) : (
+                <Badge tone={isMockMode ? "warning" : "success"} className="text-[10px] px-1.5 py-0.5">
+                  {isMockMode ? "Mock" : "Supabase"}
+                </Badge>
+              )}
               <CajaStatus compact />
               <ThemeToggle compact />
             </div>
