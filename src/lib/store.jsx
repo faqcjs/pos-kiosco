@@ -382,7 +382,8 @@ export function useStore() {
     return shifts.filter((s) => s.status === 'closed')
   }, [shifts])
 
-  const hydrated = !loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts && (currentUser?.role === 'administrador' ? !loadingUsers : true)
+  const isOnline = typeof navigator !== 'undefined' && navigator.onLine
+  const hydrated = !isOnline || (!loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts && (currentUser?.role === 'administrador' ? !loadingUsers : true))
 
   // Mutations
   const addProductMutation = useMutation({
