@@ -287,6 +287,16 @@ CREATE POLICY "Allow write shifts for authenticated users"
     ON public.shifts FOR ALL TO authenticated 
     USING (true) WITH CHECK (true);
 
+-- =========================================================================
+-- ENABLE REALTIME REPLICATION FOR ALL TABLES
+-- =========================================================================
+
+BEGIN;
+  -- Drop tables from publication first to avoid duplicate registration errors
+  ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS public.users, public.products, public.sales, public.customers, public.suppliers, public.shifts;
+  -- Add tables to replication
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.users, public.products, public.sales, public.customers, public.suppliers, public.shifts;
+COMMIT;
 
 -- =========================================================================
 -- BOOTSTRAP INITIAL SEED DATA
