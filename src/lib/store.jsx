@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -177,8 +177,20 @@ export function StoreProvider({ children }) {
 // --- useStore Unified Hook ---
 export function useStore() {
   const qc = useQueryClient()
-  const isOnline = typeof navigator !== 'undefined' && navigator.onLine
-  
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
   const syncingSalesRef = useRef(false)
   const syncingActionsRef = useRef(false)
   
@@ -531,7 +543,7 @@ export function useStore() {
   // Compute shifts states
   const currentShift = useMemo(() => {
     const queryOpenShift = shifts.find((s) => s.status === 'open') || null
-    if (!isOnline) {
+    if (!isOnline || !queryOpenShift) {
       return currentShiftCache
     }
     return queryOpenShift
@@ -1107,7 +1119,6 @@ export function useStore() {
   }, [registerSupplierPaymentMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
   const completeSale = useCallback((args) => {
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
     const shiftId = currentShift?.id || null
 
     if (!isOnline) {
@@ -1201,7 +1212,7 @@ export function useStore() {
     } else {
       return completeSaleMutation.mutateAsync(args)
     }
-  }, [completeSaleMutation, displayedProducts, currentUser, enqueueOfflineSale, currentShift, qc])
+  }, [completeSaleMutation, displayedProducts, currentUser, enqueueOfflineSale, currentShift, qc, isOnline])
 
   const resetData = useCallback(() => {
     resetDataMutation.mutate()
