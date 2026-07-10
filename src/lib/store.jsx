@@ -183,6 +183,7 @@ export function useStore() {
     }
   }, [])
 
+  const [isSyncing, setIsSyncing] = useState(false)
   const syncingSalesRef = useRef(false)
   const syncingActionsRef = useRef(false)
   
@@ -193,6 +194,8 @@ export function useStore() {
   const currentShiftCache = useUIStore((s) => s.currentShiftCache)
   const failedSalesQueue = useUIStore((s) => s.failedSalesQueue)
   const failedActionsQueue = useUIStore((s) => s.failedActionsQueue)
+  const offlineSalesQueue = useUIStore((s) => s.offlineSalesQueue)
+  const offlineActionsQueue = useUIStore((s) => s.offlineActionsQueue)
   const cart = useUIStore((s) => s.cart)
   
   const toggleTheme = useUIStore((s) => s.toggleTheme)
@@ -498,28 +501,7 @@ export function useStore() {
     await syncOfflineSales()
   }, [syncOfflineActions, syncOfflineSales])
 
-  // Sync effect when regaining connectivity
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const handleOnline = () => {
-      console.log('App regained connection/startup. Syncing offline data...')
-      syncAllOfflineData()
-    }
-
-    window.addEventListener('online', handleOnline)
-
-    // Run once at startup if we are online and have items in either queue
-    const startupSales = useUIStore.getState().offlineSalesQueue.length
-    const startupActions = useUIStore.getState().offlineActionsQueue.length
-    if (navigator.onLine && (startupSales > 0 || startupActions > 0)) {
-      handleOnline()
-    }
-
-    return () => {
-      window.removeEventListener('online', handleOnline)
-    }
-  }, [syncAllOfflineData])
+  // Sincronización manual de datos sin efectos automáticos al recuperar conexión
 
   // Sync shifts query results with currentShiftCache
   useEffect(() => {
@@ -1271,7 +1253,8 @@ export function useStore() {
 
   const discardFailedSale = useCallback((saleId) => {
     dequeueFailedSale(saleId)
-  }, [dequeueFailedSale])
+    qc.invalidateQueries()
+  }, [dequeueFailedSale, qc])
 
   const retryFailedAction = useCallback((action) => {
     dequeueFailedAction(action.id)
@@ -1286,13 +1269,18 @@ export function useStore() {
 
   const discardFailedAction = useCallback((actionId) => {
     dequeueFailedAction(actionId)
-  }, [dequeueFailedAction])
+    qc.invalidateQueries()
+  }, [dequeueFailedAction, qc])
 
-  const syncOfflineData = useCallback(() => {
-    if (navigator.onLine) {
-      syncAllOfflineData()
+  const syncOfflineData = useCallback(async () => {
+    if (!isOnline || isSyncing) return
+    setIsSyncing(true)
+    try {
+      await syncAllOfflineData()
+    } finally {
+      setIsSyncing(false)
     }
-  }, [syncAllOfflineData])
+  }, [syncAllOfflineData, isOnline, isSyncing])
 
   const login = useCallback(async (username, password) => {
     const email = `${username.toLowerCase().trim()}@kiosko.com`
@@ -1347,6 +1335,9 @@ export function useStore() {
     failedSalesQueue,
     failedActionsQueue,
     cart,
+    offlineSalesQueue,
+    offlineActionsQueue,
+    isSyncing,
   }), [
     displayedProducts,
     sales,
@@ -1360,6 +1351,9 @@ export function useStore() {
     failedSalesQueue,
     failedActionsQueue,
     cart,
+    offlineSalesQueue,
+    offlineActionsQueue,
+    isSyncing,
   ])
 
   return {

@@ -12,6 +12,7 @@ import {
   Wallet,
   PanelLeftClose,
   PanelLeftOpen,
+  RefreshCw,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -113,7 +114,7 @@ export function AppShell({
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true)
-      toast('¡Conexión restablecida! Sincronizando datos...', 'success')
+      toast('¡Conexión restablecida! Tenés datos locales listos para sincronizar.', 'info')
     }
     const handleOffline = () => {
       setIsOnline(false)
@@ -134,6 +135,20 @@ export function AppShell({
     }
   }, [toast])
 
+  // Warn user before closing window with unsynced local data
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const pendingCount = (state?.offlineSalesQueue?.length || 0) + (state?.offlineActionsQueue?.length || 0)
+      if (pendingCount > 0) {
+        e.preventDefault()
+        e.returnValue = 'Tenés transacciones sin guardar en la nube. Si salís ahora se podrían perder los datos locales.'
+        return e.returnValue
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [state?.offlineSalesQueue, state?.offlineActionsQueue])
+
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('pos-sidebar-collapsed') === 'true'
   })
@@ -146,10 +161,17 @@ export function AppShell({
     retryFailedAction,
     discardFailedAction,
     clearFailedSalesQueue,
-    clearFailedActionsQueue
+    clearFailedActionsQueue,
+    syncOfflineData,
   } = useStore()
 
   const [failedModalOpen, setFailedModalOpen] = useState(false)
+
+  const pendingSalesCount = state.offlineSalesQueue?.length || 0
+  const pendingActionsCount = state.offlineActionsQueue?.length || 0
+  const pendingSyncCount = pendingSalesCount + pendingActionsCount
+  const hasPendingSync = pendingSyncCount > 0
+  const isSyncing = state.isSyncing
 
   const failedSales = state.failedSalesQueue || []
   const failedActions = state.failedActionsQueue || []
@@ -343,8 +365,33 @@ export function AppShell({
           })}
         </nav>
 
-        {/* Footer */}
         <div className={cn('flex flex-col gap-3 border-t border-sidebar-border px-3 pt-3 pb-2 transition-all duration-300 ease-in-out', collapsed && 'items-center px-2')}>
+          {hasPendingSync && (
+            <button
+              disabled={!isOnline || isSyncing}
+              onClick={syncOfflineData}
+              className={cn(
+                "flex items-center rounded-xl border transition-all duration-300 active:scale-[0.98]",
+                collapsed 
+                  ? "size-10 justify-center px-0 relative border-amber-200 dark:border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "h-10 px-3 py-2.5 text-xs font-bold gap-2 w-full border-amber-200 dark:border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20",
+                !isOnline && "border-muted bg-muted text-muted-foreground cursor-not-allowed hover:bg-muted"
+              )}
+              title={!isOnline ? "Conectate a internet para sincronizar" : "Sincronizar datos locales ahora"}
+            >
+              <RefreshCw className={cn("size-4 shrink-0", isSyncing && "animate-spin")} />
+              {!collapsed && (
+                <span className="truncate flex-1 text-left">
+                  {isSyncing ? "Sincronizando..." : `Subir datos (${pendingSyncCount})`}
+                </span>
+              )}
+              {collapsed && (
+                <span className="absolute -top-1 -right-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-white">
+                  {pendingSyncCount}
+                </span>
+              )}
+            </button>
+          )}
           <div
             className={cn(
               "flex flex-col gap-1 text-xs transition-all duration-300 ease-in-out origin-top",
@@ -431,6 +478,22 @@ export function AppShell({
                 <Badge tone={isMockMode ? "warning" : "success"} className="text-[10px] px-1.5 py-0.5">
                   {isMockMode ? "Mock" : "Supabase"}
                 </Badge>
+              )}
+              {hasPendingSync && (
+                <button
+                  disabled={!isOnline || isSyncing}
+                  onClick={syncOfflineData}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold transition-all active:scale-95",
+                    !isOnline
+                      ? "border-muted bg-muted text-muted-foreground cursor-not-allowed"
+                      : "border-amber-200 dark:border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+                  )}
+                  title={!isOnline ? "Conectate a internet para sincronizar" : "Sincronizar datos locales ahora"}
+                >
+                  <RefreshCw className={cn("size-3.5", isSyncing && "animate-spin")} />
+                  <span>{pendingSyncCount}</span>
+                </button>
               )}
               <CajaStatus compact />
               <ThemeToggle compact />

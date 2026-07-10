@@ -459,7 +459,7 @@ function OpenShiftView({
                 diff === 0
                   ? 'bg-success/10 text-success'
                   : diff > 0
-                    ? 'bg-accent/20 text-accent-foreground'
+                    ? 'bg-warning/10 text-warning'
                     : 'bg-destructive/10 text-destructive',
               )}
             >
