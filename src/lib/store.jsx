@@ -399,6 +399,11 @@ export function useStore() {
             if (error) throw error
             break
           }
+          case 'UPDATE_SUPPLIER': {
+            const { error } = await supabase.from('suppliers').update(action.payload).eq('id', action.payload.id)
+            if (error) throw error
+            break
+          }
           case 'RECEIVE_GOODS': {
             const { supplierId, amount, detail, paidCash, date, shiftId } = action.payload
             const { error } = await supabase.rpc('receive_goods_rpc', {
@@ -666,6 +671,15 @@ export function useStore() {
   const addSupplierMutation = useMutation({
     mutationFn: async (sup) => {
       const { data, error } = await supabase.from('suppliers').insert([sup]).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+  })
+
+  const updateSupplierMutation = useMutation({
+    mutationFn: async (sup) => {
+      const { data, error } = await supabase.from('suppliers').update(sup).eq('id', sup.id).select()
       if (error) throw error
       return data[0]
     },
@@ -1008,8 +1022,16 @@ export function useStore() {
     }
   }, [registerCustomerPaymentMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
-  const addSupplier = useCallback((name) => {
-    const sup = { id: uid(), name, entries: [] }
+  const addSupplier = useCallback((name, phone = '', contactName = '', category = 'Varios', deliveryDays = []) => {
+    const sup = {
+      id: uid(),
+      name,
+      phone,
+      contact_name: contactName,
+      category,
+      delivery_days: deliveryDays,
+      entries: []
+    }
     if (!isOnline) {
       enqueueOfflineAction({ id: uid(), type: 'ADD_SUPPLIER', payload: sup })
       qc.setQueryData(['suppliers'], (old = []) => [...old, sup])
@@ -1018,6 +1040,15 @@ export function useStore() {
     }
     return sup
   }, [addSupplierMutation, isOnline, enqueueOfflineAction, qc])
+
+  const updateSupplier = useCallback((sup) => {
+    if (!isOnline) {
+      enqueueOfflineAction({ id: uid(), type: 'UPDATE_SUPPLIER', payload: sup })
+      qc.setQueryData(['suppliers'], (old = []) => old.map((s) => s.id === sup.id ? { ...s, ...sup } : s))
+    } else {
+      updateSupplierMutation.mutate(sup)
+    }
+  }, [updateSupplierMutation, isOnline, enqueueOfflineAction, qc])
 
   const receiveGoods = useCallback((supplierId, amount, detail, paidCash) => {
     if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero' && currentUser?.role !== 'repositor') return Promise.resolve(null)
@@ -1371,6 +1402,7 @@ export function useStore() {
     addCustomer,
     registerCustomerPayment,
     addSupplier,
+    updateSupplier,
     receiveGoods,
     registerSupplierPayment,
     resetData,

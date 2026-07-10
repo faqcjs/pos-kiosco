@@ -1,48 +1,166 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet } from 'lucide-react'
+import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet, Pencil, MessageCircle, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, EmptyState, Input, Label, Modal, StatCard } from '@/components/ui/kit'
 import { PageHeader } from '@/components/pos/page-header'
 import { supplierBalance, useStore } from '@/lib/store'
 import { formatDateTime, money } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
+import { cn } from '@/lib/utils'
+
+const SUPPLIER_CATEGORIES = [
+  'Varios',
+  'Golosinas',
+  'Bebidas',
+  'Cigarrillos',
+  'Lácteos/Fiambres',
+  'Almacén',
+  'Panificados',
+  'Helados',
+  'Limpieza/Bazar',
+]
+
+const DAYS_OF_WEEK = [
+  { value: 'Lunes', short: 'Lun', letter: 'L' },
+  { value: 'Martes', short: 'Mar', letter: 'M' },
+  { value: 'Miércoles', short: 'Mié', letter: 'X' },
+  { value: 'Jueves', short: 'Jue', letter: 'J' },
+  { value: 'Viernes', short: 'Vie', letter: 'V' },
+  { value: 'Sábado', short: 'Sáb', letter: 'S' },
+  { value: 'Domingo', short: 'Dom', letter: 'D' },
+]
+
+const SPANISH_DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+function getWhatsAppLink(phone) {
+  const cleaned = phone.replace(/[^0-9]/g, '')
+  if (cleaned.length === 10 && !cleaned.startsWith('54')) {
+    return `https://wa.me/549${cleaned}`
+  }
+  return `https://wa.me/${cleaned}`
+}
 
 export function Proveedores() {
-  const { state, addSupplier, receiveGoods, registerSupplierPayment } = useStore()
+  const { state, addSupplier, updateSupplier, receiveGoods, registerSupplierPayment } = useStore()
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
-  const [newOpen, setNewOpen] = useState(false)
-  const [newName, setNewName] = useState('')
+  
+  // Modal & Form States
+  const [formOpen, setFormOpen] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState(null)
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [category, setCategory] = useState('Varios')
+  const [deliveryDays, setDeliveryDays] = useState([])
+
+  // Filters State
+  const [selectedCategory, setSelectedCategory] = useState('Todos')
+  const [viewFilter, setViewFilter] = useState('todos') // 'todos' | 'deuda' | 'visita_hoy'
 
   const suppliers = state.suppliers
   const selected = suppliers.find((s) => s.id === selectedId) ?? null
+
+  const todayDayName = useMemo(() => {
+    return SPANISH_DAYS[new Date().getDay()]
+  }, [])
 
   const totalDebt = useMemo(
     () => suppliers.reduce((sum, s) => sum + Math.max(0, supplierBalance(s)), 0),
     [suppliers],
   )
 
+  const visitingTodayCount = useMemo(() => {
+    return suppliers.filter((s) => s.delivery_days?.includes(todayDayName)).length
+  }, [suppliers, todayDayName])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = q ? suppliers.filter((s) => s.name.toLowerCase().includes(q)) : suppliers
-    return [...list].sort((a, b) => supplierBalance(b) - supplierBalance(a))
-  }, [suppliers, query])
+    let list = suppliers
 
-  function handleCreate() {
-    const name = newName.trim()
-    if (!name) return
+    // Text search filter
+    if (q) {
+      list = list.filter((s) => 
+        s.name.toLowerCase().includes(q) || 
+        (s.contact_name && s.contact_name.toLowerCase().includes(q))
+      )
+    }
+
+    // Category pill filter
+    if (selectedCategory !== 'Todos') {
+      list = list.filter((s) => s.category === selectedCategory)
+    }
+
+    // Quick filter dropdown/tabs
+    if (viewFilter === 'deuda') {
+      list = list.filter((s) => supplierBalance(s) > 0)
+    } else if (viewFilter === 'visita_hoy') {
+      list = list.filter((s) => s.delivery_days?.includes(todayDayName))
+    }
+
+    return [...list].sort((a, b) => supplierBalance(b) - supplierBalance(a))
+  }, [suppliers, query, selectedCategory, viewFilter, todayDayName])
+
+  function handleOpenNew() {
+    setEditingSupplier(null)
+    setName('')
+    setPhone('')
+    setContactName('')
+    setCategory('Varios')
+    setDeliveryDays([])
+    setFormOpen(true)
+  }
+
+  function handleOpenEdit(sup) {
+    setEditingSupplier(sup)
+    setName(sup.name)
+    setPhone(sup.phone || '')
+    setContactName(sup.contact_name || '')
+    setCategory(sup.category || 'Varios')
+    setDeliveryDays(sup.delivery_days || [])
+    setFormOpen(true)
+  }
+
+  function handleSave() {
+    const trimmedName = name.trim()
+    if (!trimmedName) return
+
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine
-    const sup = addSupplier(name)
-    setNewName('')
-    setNewOpen(false)
-    setSelectedId(sup.id)
-    if (!isOnline) {
-      toast('Proveedor agregado localmente (Modo Offline)', 'warning')
+
+    if (editingSupplier) {
+      const updated = {
+        ...editingSupplier,
+        name: trimmedName,
+        phone: phone.trim(),
+        contact_name: contactName.trim(),
+        category,
+        delivery_days: deliveryDays,
+      }
+      updateSupplier(updated)
+      setFormOpen(false)
+      if (!isOnline) {
+        toast('Proveedor actualizado localmente (Modo Offline)', 'warning')
+      } else {
+        toast('Proveedor actualizado', 'success')
+      }
     } else {
-      toast('Proveedor agregado', 'success')
+      const sup = addSupplier(
+        trimmedName,
+        phone.trim(),
+        contactName.trim(),
+        category,
+        deliveryDays
+      )
+      setFormOpen(false)
+      setSelectedId(sup.id)
+      if (!isOnline) {
+        toast('Proveedor agregado localmente (Modo Offline)', 'warning')
+      } else {
+        toast('Proveedor registrado', 'success')
+      }
     }
   }
 
@@ -53,101 +171,322 @@ export function Proveedores() {
         onBack={() => setSelectedId(null)}
         onReceive={receiveGoods}
         onPay={registerSupplierPayment}
+        onEdit={handleOpenEdit}
         cashOpen={state.currentShift?.status === 'open'}
-        canReceive={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'repositor' || state.currentUser?.role === 'cajero'}
+        canReceive={
+          state.currentUser?.role === 'administrador' ||
+          state.currentUser?.role === 'repositor' ||
+          state.currentUser?.role === 'cajero'
+        }
         canPay={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'cajero'}
+        canEdit={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'repositor'}
       />
     )
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-1.5 lg:p-6">
+    <div className="mx-auto max-w-5xl p-1.5 lg:p-6 space-y-6">
       <PageHeader
         title="Proveedores"
-        subtitle="Cuenta corriente con tus proveedores"
+        description="Cuenta corriente con tus proveedores y agenda de visitas."
         action={
-          <Button onClick={() => setNewOpen(true)}>
-            <Plus className="size-4" /> Nuevo
+          <Button onClick={handleOpenNew} className="active:scale-[0.98]">
+            <Plus className="size-4" /> Nuevo proveedor
           </Button>
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-        <StatCard label="Deuda total" value={money(totalDebt)} tone="danger" icon={<Wallet className="size-4" />} />
-        <StatCard label="Proveedores" value={String(suppliers.length)} icon={<Truck className="size-4" />} />
-      </div>
-
-      <div className="relative mt-5">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar proveedor..."
-          className="pl-10"
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard 
+          label="Deuda total" 
+          value={money(totalDebt)} 
+          tone="danger" 
+          icon={<Wallet className="size-4" />} 
+        />
+        <StatCard 
+          label="Total proveedores" 
+          value={String(suppliers.length)} 
+          icon={<Truck className="size-4" />} 
+        />
+        <StatCard 
+          label="Visitas de hoy" 
+          value={String(visitingTodayCount)} 
+          tone={visitingTodayCount > 0 ? "warning" : "muted"}
+          icon={<Calendar className="size-4" />} 
+          sub={todayDayName}
         />
       </div>
 
-      <div className="mt-4 space-y-2.5">
+      {/* Search and Quick Filters */}
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por distribuidora o vendedor..."
+              className="pl-10 h-11"
+            />
+          </div>
+
+          {/* Quick Filters Segment */}
+          <div className="flex rounded-xl bg-muted/60 p-1 shrink-0 border border-border/40">
+            <button
+              onClick={() => setViewFilter('todos')}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all active:scale-[0.97]",
+                viewFilter === 'todos' 
+                  ? "bg-card text-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setViewFilter('deuda')}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all active:scale-[0.97] flex items-center gap-1",
+                viewFilter === 'deuda' 
+                  ? "bg-destructive/10 text-destructive shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Con deuda
+            </button>
+            <button
+              onClick={() => setViewFilter('visita_hoy')}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all active:scale-[0.97] flex items-center gap-1",
+                viewFilter === 'visita_hoy' 
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Visitan hoy
+            </button>
+          </div>
+        </div>
+
+        {/* Category Pills (Horizontal scrolling) */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            onClick={() => setSelectedCategory('Todos')}
+            className={cn(
+              "rounded-xl px-3.5 py-1.5 text-xs font-semibold border transition-all shrink-0 active:scale-95",
+              selectedCategory === 'Todos'
+                ? "bg-primary border-primary text-primary-foreground"
+                : "bg-card border-border text-muted-foreground hover:border-primary/20 hover:text-foreground"
+            )}
+          >
+            Todos los rubros
+          </button>
+          {SUPPLIER_CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={cn(
+                "rounded-xl px-3.5 py-1.5 text-xs font-semibold border transition-all shrink-0 active:scale-95",
+                selectedCategory === cat
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : "bg-card border-border text-muted-foreground hover:border-primary/20 hover:text-foreground"
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Supplier List */}
+      <div className="grid gap-3 sm:grid-cols-2">
         {filtered.length === 0 ? (
-          <EmptyState
-            icon={<Truck className="size-8" />}
-            title="Sin proveedores"
-            description="Agregá tu primer proveedor para registrar mercadería y pagos."
-          />
+          <div className="col-span-full">
+            <EmptyState
+              icon={<Truck className="size-10 text-muted-foreground/60" />}
+              title="No se encontraron proveedores"
+              description="Intentá buscando otro rubro, nombre o ajustando tus filtros."
+            />
+          </div>
         ) : (
           filtered.map((s) => {
             const balance = supplierBalance(s)
+            const isVisitingToday = s.delivery_days?.includes(todayDayName)
+            
             return (
-              <button
+              <div
                 key={s.id}
                 onClick={() => setSelectedId(s.id)}
-                className="flex min-h-[44px] w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
+                className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-md hover:scale-[1.005] cursor-pointer"
               >
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 font-heading text-base font-bold text-primary">
-                  {s.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-heading font-semibold">{s.name}</p>
-                  <p className="text-xs text-muted-foreground">{s.entries.length} movimientos</p>
-                </div>
-                <div className="text-right">
-                  {balance > 0 ? (
-                    <>
-                      <p className="font-heading text-base font-bold tabular-nums text-destructive">
-                        {money(balance)}
+                <div className="flex items-start gap-3">
+                  {/* Category icon / avatar */}
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-heading text-base font-bold text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+                    {s.name.slice(0, 2).toUpperCase()}
+                  </div>
+
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate font-heading font-semibold text-foreground">{s.name}</p>
+                      {s.category && s.category !== 'Varios' && (
+                        <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground uppercase tracking-wide">
+                          {s.category}
+                        </span>
+                      )}
+                    </div>
+                    {s.contact_name && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        Vendedor: <span className="font-medium text-foreground">{s.contact_name}</span>
                       </p>
-                      <p className="text-xs text-muted-foreground">a pagar</p>
-                    </>
-                  ) : (
-                    <Badge tone="success">Al día</Badge>
-                  )}
+                    )}
+                    
+                    {/* Delivery Days Summary */}
+                    {s.delivery_days && s.delivery_days.length > 0 ? (
+                      <p className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                        <span>🚚</span>
+                        <span className="truncate">
+                          {isVisitingToday ? 'Visita hoy!' : `Reparto: ${s.delivery_days.join(', ')}`}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground italic">Sin días programados</p>
+                    )}
+                  </div>
                 </div>
-              </button>
+
+                <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3">
+                  <div className="flex items-center gap-2">
+                    {s.phone && (
+                      <a
+                        href={getWhatsAppLink(s.phone)}
+                        onClick={(e) => e.stopPropagation()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex size-8 items-center justify-center rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 transition-colors"
+                        title={`Escribir a ${s.name}`}
+                      >
+                        <MessageCircle className="size-4" />
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="text-right">
+                    {balance > 0 ? (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xs text-muted-foreground">Debés:</span>
+                        <span className="font-heading text-base font-bold tabular-nums text-destructive">
+                          {money(balance)}
+                        </span>
+                      </div>
+                    ) : (
+                      <Badge tone="success" className="text-[10px]">Al día</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
             )
           })
         )}
       </div>
 
-      <Modal open={newOpen} onClose={() => setNewOpen(false)} title="Nuevo proveedor" variant="center">
-        <div>
-          <Label htmlFor="sup-name">Nombre del proveedor</Label>
-          <Input
-            id="sup-name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Ej: Distribuidora del Sur"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleCreate()
-            }}
-          />
+      {/* Creation/Edit Form Modal */}
+      <Modal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}
+        variant="center"
+      >
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          <div>
+            <Label htmlFor="sup-name">Nombre de la Distribuidora</Label>
+            <Input
+              id="sup-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ej: Distribuidora del Sur"
+              autoFocus={!editingSupplier}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="sup-category">Rubro / Categoría</Label>
+            <Select
+              id="sup-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {SUPPLIER_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="sup-contact">Vendedor / Contacto</Label>
+              <Input
+                id="sup-contact"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Ej: Juan Pérez"
+              />
+            </div>
+            <div>
+              <Label htmlFor="sup-phone">Celular (WhatsApp)</Label>
+              <Input
+                id="sup-phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/[^0-9+]/g, ''))}
+                placeholder="Ej: 1123456789"
+                inputMode="tel"
+              />
+            </div>
+          </div>
+
+          {/* Delivery Days Select buttons */}
+          <div>
+            <Label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+              Días de visita
+            </Label>
+            <div className="flex flex-wrap gap-1.5">
+              {DAYS_OF_WEEK.map((day) => {
+                const isSelected = deliveryDays.includes(day.value)
+                return (
+                  <button
+                    key={day.value}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        setDeliveryDays(deliveryDays.filter((d) => d !== day.value))
+                      } else {
+                        setDeliveryDays([...deliveryDays, day.value])
+                      }
+                    }}
+                    className={cn(
+                      "rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all active:scale-[0.96] flex items-center gap-1",
+                      isSelected
+                        ? "bg-primary border-primary text-primary-foreground font-bold shadow-sm"
+                        : "bg-card border-border text-muted-foreground hover:bg-muted/40"
+                    )}
+                  >
+                    <span>{day.short}</span>
+                    {isSelected && <span className="text-[10px]">✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
-        <div className="mt-4 flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={() => setNewOpen(false)}>
+
+        <div className="mt-6 flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={() => setFormOpen(false)}>
             Cancelar
           </Button>
-          <Button className="flex-1" onClick={handleCreate} disabled={!newName.trim()}>
-            Agregar
+          <Button className="flex-1" onClick={handleSave} disabled={!name.trim()}>
+            {editingSupplier ? 'Guardar cambios' : 'Agregar'}
           </Button>
         </div>
       </Modal>
@@ -160,9 +499,11 @@ function SupplierDetail({
   onBack,
   onReceive,
   onPay,
+  onEdit,
   cashOpen,
   canReceive,
   canPay,
+  canEdit,
 }) {
   const toast = useToast()
   const balance = supplierBalance(supplier)
@@ -222,26 +563,96 @@ function SupplierDetail({
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-1.5 lg:p-6">
+    <div className="mx-auto max-w-3xl p-1.5 lg:p-6 space-y-6">
       <button
         onClick={onBack}
-        className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" /> Volver
       </button>
 
-      <Card className="p-5">
-        <div className="flex items-center gap-4">
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 font-heading text-xl font-bold text-primary">
-            {supplier.name.slice(0, 2).toUpperCase()}
+      <Card className="p-5 space-y-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-heading text-xl font-bold text-primary">
+              {supplier.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-heading text-xl font-bold text-balance text-foreground">{supplier.name}</h2>
+                {supplier.category && supplier.category !== 'Varios' && (
+                  <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wide">
+                    {supplier.category}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">Cuenta corriente</p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="font-heading text-xl font-bold text-balance">{supplier.name}</h2>
-            <p className="text-sm text-muted-foreground">Cuenta corriente</p>
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 px-2.5 gap-1.5 text-xs shrink-0 active:scale-95 border-border hover:border-primary/30"
+              onClick={() => onEdit(supplier)}
+            >
+              <Pencil className="size-3.5" /> Editar
+            </Button>
+          )}
+        </div>
+
+        {/* Contact info list */}
+        {(supplier.contact_name || supplier.phone) && (
+          <div className="flex flex-wrap items-center gap-3 border-t border-border/50 pt-4 text-sm text-muted-foreground">
+            {supplier.contact_name && (
+              <div className="flex items-center gap-1.5 bg-muted/40 px-3 py-1.5 rounded-xl border border-border/40">
+                <span className="font-medium text-foreground">Contacto:</span>
+                <span>{supplier.contact_name}</span>
+              </div>
+            )}
+            {supplier.phone && (
+              <a
+                href={getWhatsAppLink(supplier.phone)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 bg-green-500/10 hover:bg-green-500/20 px-3 py-1.5 rounded-xl border border-green-500/20 text-green-600 dark:text-green-400 font-semibold transition-colors cursor-pointer"
+              >
+                <MessageCircle className="size-4" />
+                <span>Enviar WhatsApp</span>
+                <span className="text-[11px] font-normal text-muted-foreground/80">({supplier.phone})</span>
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Visual delivery calendar */}
+        <div className="border-t border-border/50 pt-4 space-y-2">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            Cronograma de repartos y visitas
+          </p>
+          <div className="flex gap-1.5">
+            {DAYS_OF_WEEK.map((day) => {
+              const isActive = supplier.delivery_days?.includes(day.value)
+              return (
+                <div
+                  key={day.value}
+                  title={day.value}
+                  className={cn(
+                    "flex flex-1 flex-col items-center justify-center py-2 px-1 rounded-xl border text-center transition-all",
+                    isActive
+                      ? "bg-primary/10 border-primary/20 text-primary font-bold shadow-sm"
+                      : "bg-muted/10 border-border/40 text-muted-foreground/40 text-xs"
+                  )}
+                >
+                  <span className="text-[10px] uppercase font-bold tracking-wider leading-none mb-1">{day.letter}</span>
+                  <span className="text-[8px] font-medium leading-none">{isActive ? "🚚" : "—"}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl bg-muted/50 p-4 text-center">
+        <div className="rounded-2xl bg-muted/50 p-4 text-center">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {balance > 0 ? 'Saldo a pagar' : 'Cuenta'}
           </p>
@@ -254,55 +665,57 @@ function SupplierDetail({
           </p>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {canReceive && (
-            <Button variant="outline" onClick={() => setReceiveOpen(true)}>
+            <Button variant="outline" onClick={() => setReceiveOpen(true)} className="h-11">
               <PackagePlus className="size-4" /> Recibir
             </Button>
           )}
           {canPay && (
-            <Button onClick={() => setPayOpen(true)} disabled={balance <= 0}>
+            <Button onClick={() => setPayOpen(true)} disabled={balance <= 0} className="h-11">
               <Wallet className="size-4" /> Pagar
             </Button>
           )}
         </div>
       </Card>
 
-      <h3 className="mb-2 mt-6 font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Movimientos
-      </h3>
-      {entries.length === 0 ? (
-        <EmptyState title="Sin movimientos" description="Registrá una recepción de mercadería o un pago." />
-      ) : (
-        <div className="space-y-2">
-          {entries.map((e) => {
-            const isInvoice = e.type === 'factura'
-            return (
-              <Card key={e.id} className="flex items-center gap-3 p-3.5">
-                <div
-                  className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-                    isInvoice ? 'bg-destructive/12 text-destructive' : 'bg-success/15 text-success'
-                  }`}
-                >
-                  {isInvoice ? <PackagePlus className="size-4" /> : <Wallet className="size-4" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{e.detail}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateTime(e.date)}</p>
-                </div>
-                <p
-                  className={`font-heading text-sm font-bold tabular-nums ${
-                    isInvoice ? 'text-destructive' : 'text-success'
-                  }`}
-                >
-                  {isInvoice ? '+' : '−'}
-                  {money(e.amount)}
-                </p>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+      <div className="space-y-2.5">
+        <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Movimientos
+        </h3>
+        {entries.length === 0 ? (
+          <EmptyState title="Sin movimientos" description="Registrá una recepción de mercadería o un pago." />
+        ) : (
+          <div className="space-y-2">
+            {entries.map((e) => {
+              const isInvoice = e.type === 'factura'
+              return (
+                <Card key={e.id} className="flex items-center gap-3 p-3.5">
+                  <div
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
+                      isInvoice ? 'bg-destructive/12 text-destructive' : 'bg-success/15 text-success'
+                    }`}
+                  >
+                    {isInvoice ? <PackagePlus className="size-4" /> : <Wallet className="size-4" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{e.detail}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(e.date)}</p>
+                  </div>
+                  <p
+                    className={`font-heading text-sm font-bold tabular-nums ${
+                      isInvoice ? 'text-destructive' : 'text-success'
+                    }`}
+                  >
+                    {isInvoice ? '+' : '−'}
+                    {money(e.amount)}
+                  </p>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Recibir mercadería */}
       <Modal open={receiveOpen} onClose={() => setReceiveOpen(false)} title="Recibir mercadería">

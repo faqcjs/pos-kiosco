@@ -615,21 +615,25 @@ CREATE POLICY "Allow select products for authenticated users"
     ON public.products FOR SELECT TO authenticated USING (true);
 
 DROP POLICY IF EXISTS "Allow insert products for admin, repositor and cajero" ON public.products;
+DROP POLICY IF EXISTS "Allow update products for admin, repositor and cajero" ON public.products;
+DROP POLICY IF EXISTS "Allow delete products for admin, repositor and cajero" ON public.products;
+DROP POLICY IF EXISTS "Allow insert products for admin and repositor" ON public.products;
 DROP POLICY IF EXISTS "Allow update products for admin and repositor" ON public.products;
 DROP POLICY IF EXISTS "Allow delete products for admin and repositor" ON public.products;
 
-CREATE POLICY "Allow insert products for admin, repositor and cajero" 
+-- Only administrators and repositors (stock managers) can create, update, or delete products
+CREATE POLICY "Allow insert products for admin and repositor" 
     ON public.products FOR INSERT TO authenticated 
-    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
+    WITH CHECK (public.has_role('administrador', 'repositor'));
 
-CREATE POLICY "Allow update products for admin, repositor and cajero" 
+CREATE POLICY "Allow update products for admin and repositor" 
     ON public.products FOR UPDATE TO authenticated 
-    USING (public.has_role('administrador', 'repositor', 'cajero'))
-    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
+    USING (public.has_role('administrador', 'repositor'))
+    WITH CHECK (public.has_role('administrador', 'repositor'));
 
-CREATE POLICY "Allow delete products for admin, repositor and cajero" 
+CREATE POLICY "Allow delete products for admin and repositor" 
     ON public.products FOR DELETE TO authenticated 
-    USING (public.has_role('administrador', 'repositor', 'cajero'));
+    USING (public.has_role('administrador', 'repositor'));
 
 -- 3. Sales Policies
 CREATE POLICY "Allow select sales for authenticated users" 
@@ -692,11 +696,23 @@ CREATE POLICY "Allow insert shifts for authenticated users"
 
 DROP POLICY IF EXISTS "Allow update shifts for administrators or shift creator" ON public.shifts;
 DROP POLICY IF EXISTS "Allow update shifts for authenticated users" ON public.shifts;
+DROP POLICY IF EXISTS "Allow update shifts for shift owner or admin" ON public.shifts;
 
-CREATE POLICY "Allow update shifts for authenticated users" 
+-- Allow updates only if the shift is open AND it belongs to the active user (or user is administrador)
+CREATE POLICY "Allow update shifts for shift owner or admin" 
     ON public.shifts FOR UPDATE TO authenticated 
-    USING (status = 'open')
-    WITH CHECK (true);
+    USING (
+        status = 'open' AND (
+            "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR 
+            public.has_role('administrador')
+        )
+    )
+    WITH CHECK (
+        status = 'open' AND (
+            "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR 
+            public.has_role('administrador')
+        )
+    );
 
 CREATE POLICY "Allow delete shifts for administrators only" 
     ON public.shifts FOR DELETE TO authenticated 
@@ -718,3 +734,10 @@ CREATE PUBLICATION supabase_realtime FOR TABLE public.users, public.products, pu
 SELECT public.create_user('admin', 'admin123', 'Administrador', 'administrador');
 SELECT public.create_user('cajero', '123', 'Juan Cajero', 'cajero');
 SELECT public.create_user('repo', '123', 'Pedro Repositor', 'repositor');
+
+-- Migration: Add extra info columns to suppliers table
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '';
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS contact_name TEXT DEFAULT '';
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Varios';
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS delivery_days TEXT[] DEFAULT '{}';
+
