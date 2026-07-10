@@ -691,21 +691,12 @@ CREATE POLICY "Allow insert shifts for authenticated users"
     WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow update shifts for administrators or shift creator" ON public.shifts;
+DROP POLICY IF EXISTS "Allow update shifts for authenticated users" ON public.shifts;
 
-CREATE POLICY "Allow update shifts for administrators or shift creator" 
+CREATE POLICY "Allow update shifts for authenticated users" 
     ON public.shifts FOR UPDATE TO authenticated 
-    USING (
-        status = 'open' AND (
-            public.has_role('administrador') OR 
-            "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR
-            "openedBy" = (SELECT name FROM public.users WHERE id = auth.uid())
-        )
-    )
-    WITH CHECK (
-        public.has_role('administrador') OR 
-        "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR
-        "openedBy" = (SELECT name FROM public.users WHERE id = auth.uid())
-    );
+    USING (status = 'open')
+    WITH CHECK (true);
 
 CREATE POLICY "Allow delete shifts for administrators only" 
     ON public.shifts FOR DELETE TO authenticated 

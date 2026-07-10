@@ -636,6 +636,7 @@ export function useStore() {
       return data[0]
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
+    onError: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
   })
 
   const addMovementMutation = useMutation({
@@ -919,16 +920,9 @@ export function useStore() {
           closedBy,
         }
       })
+      return Promise.resolve(null)
     } else {
-      closeShiftMutation.mutate(
-        { counted, closedBy },
-        {
-          onError: () => {
-            // Roll back on error by re-fetching the real state
-            qc.invalidateQueries({ queryKey: ['shifts'] })
-          },
-        }
-      )
+      return closeShiftMutation.mutateAsync({ counted, closedBy })
     }
   }, [closeShiftMutation, isOnline, currentShift, enqueueOfflineAction, setCurrentShiftCache, qc])
 

@@ -417,14 +417,19 @@ function OpenShiftView({
           <Button
             className="h-12 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
             disabled={counted === '' || closeShiftPending}
-            onClick={() => {
+            onClick={async () => {
               const cashierName = state.currentUser?.name || 'Administrador'
-              onClose(countedNum, cashierName)
-              const label =
-                diff === 0 ? 'Caja perfecta' : diff > 0 ? `Sobrante ${money(diff)}` : `Faltante ${money(Math.abs(diff))}`
-              toast(`Caja cerrada. ${label}`, diff === 0 ? 'success' : 'info')
-              setCloseOpen(false)
-              setCounted('')
+              try {
+                await onClose(countedNum, cashierName)
+                const label =
+                  diff === 0 ? 'Caja perfecta' : diff > 0 ? `Sobrante ${money(diff)}` : `Faltante ${money(Math.abs(diff))}`
+                toast(`Caja cerrada. ${label}`, diff === 0 ? 'success' : 'info')
+                setCloseOpen(false)
+                setCounted('')
+              } catch (err) {
+                console.error(err)
+                toast(err?.message || 'Error al cerrar la caja. Intentá de nuevo.', 'error')
+              }
             }}
           >
             Confirmar cierre
