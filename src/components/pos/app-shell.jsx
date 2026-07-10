@@ -135,20 +135,6 @@ export function AppShell({
     }
   }, [toast])
 
-  // Warn user before closing window with unsynced local data
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      const pendingCount = (state?.offlineSalesQueue?.length || 0) + (state?.offlineActionsQueue?.length || 0)
-      if (pendingCount > 0) {
-        e.preventDefault()
-        e.returnValue = 'Tenés transacciones sin guardar en la nube. Si salís ahora se podrían perder los datos locales.'
-        return e.returnValue
-      }
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [state?.offlineSalesQueue, state?.offlineActionsQueue])
-
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('pos-sidebar-collapsed') === 'true'
   })
@@ -172,6 +158,20 @@ export function AppShell({
   const pendingSyncCount = pendingSalesCount + pendingActionsCount
   const hasPendingSync = pendingSyncCount > 0
   const isSyncing = state.isSyncing
+
+  // Warn user before closing window with unsynced local data
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const pendingCount = (state?.offlineSalesQueue?.length || 0) + (state?.offlineActionsQueue?.length || 0)
+      if (pendingCount > 0) {
+        e.preventDefault()
+        e.returnValue = 'Tenés transacciones sin guardar en la nube. Si salís ahora se podrían perder los datos locales.'
+        return e.returnValue
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [state?.offlineSalesQueue, state?.offlineActionsQueue])
 
   const failedSales = state.failedSalesQueue || []
   const failedActions = state.failedActionsQueue || []
