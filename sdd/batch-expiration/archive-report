@@ -1,0 +1,45 @@
+# Archive Report: batch-expiration
+
+- **Change Name**: `batch-expiration`
+- **Date**: 2026-07-10
+- **Status**: Completed & Verified
+- **Target Project**: `pos-kiosco`
+
+---
+
+## 1. Executive Summary
+This report documents the archiving of the `batch-expiration` change. All requirements (Product Batch Control Toggle, Supplier Receipt Batch Entry, FEFO Batch Deduction, and Expiration Date Warnings at Checkout) have been successfully implemented, verified via unit tests, and are ready for staging.
+
+---
+
+## 2. Implemented Features
+1. **Product Batch Control Toggle**:
+   - Added `controlLotes` boolean field in `products` DB schema ([SUPABASE_SCHEMA.sql](file:///C:/Users/facu/kiosko-pos/SUPABASE_SCHEMA.sql)).
+   - Implemented forms to toggle batch control in `stock.jsx` ([stock.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/stock/stock.jsx)).
+   - Disabled general stock additions for products with batch control enabled.
+
+2. **Supplier Receipt Batch Entry**:
+   - Updated goods receipt UI in `proveedores.jsx` ([proveedores.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/proveedores/proveedores.jsx)) to enforce entering a `batchCode` and `expirationDate` for catalog items when `controlLotes` is enabled.
+   - Handled local cache update in `store.jsx` ([store.jsx](file:///C:/Users/facu/kiosko-pos/src/lib/store.jsx)) (`receiveGoods`) and DB trigger/RPC upserting batch records in `SUPABASE_SCHEMA.sql` ([SUPABASE_SCHEMA.sql](file:///C:/Users/facu/kiosko-pos/SUPABASE_SCHEMA.sql)).
+
+3. **FEFO Batch Deduction**:
+   - Implemented cascading FEFO batch deductions in `completeSale` (local cache path) in `store.jsx` ([store.jsx](file:///C:/Users/facu/kiosko-pos/src/lib/store.jsx)) and in `complete_sale_rpc` (DB path) in `SUPABASE_SCHEMA.sql` ([SUPABASE_SCHEMA.sql](file:///C:/Users/facu/kiosko-pos/SUPABASE_SCHEMA.sql)).
+   - Sorted active batches by `expirationDate ASC, created_at ASC` and successfully threw an error when total batch stock is insufficient.
+
+4. **Expiration Date Warnings at Checkout**:
+   - Implemented warnings inside `venta.jsx` ([venta.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/venta/venta.jsx)). Toast-warns the cashier if the earliest-expiring active batch is expired (warning) or expires within 7 days (info).
+   - Displayed permanent badge indicating expiration status next to the item name in the checkout cart list.
+
+---
+
+## 3. Verification Details
+- **Verification Result**: PASS
+- **Test Status**: PASS (13/13 tests passed in [store.test.js](file:///C:/Users/facu/kiosko-pos/src/lib/store.test.js))
+- **Modified Files**:
+  - [stock.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/stock/stock.jsx)
+  - [SUPABASE_SCHEMA.sql](file:///C:/Users/facu/kiosko-pos/SUPABASE_SCHEMA.sql)
+  - [store.jsx](file:///C:/Users/facu/kiosko-pos/src/lib/store.jsx)
+  - [store.test.js](file:///C:/Users/facu/kiosko-pos/src/lib/store.test.js)
+  - [proveedores.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/proveedores/proveedores.jsx)
+  - [venta.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/venta/venta.jsx)
+  - [manual_usuario.md](file:///C:/Users/facu/kiosko-pos/manual_usuario.md)

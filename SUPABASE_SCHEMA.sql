@@ -6,6 +6,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 -- Drop old tables and functions if they exist (clean setup)
 DROP TABLE IF EXISTS public.users CASCADE;
+DROP TABLE IF EXISTS public.product_batches CASCADE;
 DROP TABLE IF EXISTS public.products CASCADE;
 DROP TABLE IF EXISTS public.sales CASCADE;
 DROP TABLE IF EXISTS public.customers CASCADE;
@@ -41,13 +42,51 @@ CREATE TABLE public.products (
     stock NUMERIC DEFAULT 0,
     "minStock" NUMERIC DEFAULT 0,
     "isMostSold" BOOLEAN DEFAULT FALSE,
-    "unidad" NUMERIC DEFAULT 1
+    "unidad" NUMERIC DEFAULT 1,
+    "controlLotes" BOOLEAN DEFAULT FALSE
 );
 
 -- Enable RLS for products
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX IF NOT EXISTS idx_products_barcode ON public.products(barcode);
+
+-- Create Product Batches Table
+CREATE TABLE public.product_batches (
+    id TEXT PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    "productId" TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    "batchCode" TEXT NOT NULL,
+    "expirationDate" TIMESTAMPTZ NOT NULL,
+    stock NUMERIC DEFAULT 0 CHECK (stock >= 0),
+    CONSTRAINT product_batches_product_batch_unique UNIQUE ("productId", "batchCode")
+);
+
+-- Enable RLS for product_batches
+ALTER TABLE public.product_batches ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS idx_product_batches_product_expiration 
+ON public.product_batches("productId", "expirationDate");
+
+-- Trigger to sync product stock from active batches
+CREATE OR REPLACE FUNCTION public.sync_product_stock_from_batches()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE public.products
+    SET stock = COALESCE((
+        SELECT SUM(stock)
+        FROM public.product_batches
+        WHERE "productId" = COALESCE(NEW."productId", OLD."productId")
+    ), 0)
+    WHERE id = COALESCE(NEW."productId", OLD."productId");
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_product_stock_from_batches
+AFTER INSERT OR UPDATE OR DELETE ON public.product_batches
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_product_stock_from_batches();
 
 -- 3. Create Sales Table
 CREATE TABLE public.sales (
@@ -283,18 +322,69 @@ BEGIN
         v_total := v_total + (item.price * item.qty);
         
         IF item."productId" IS NOT NULL THEN
-            SELECT stock INTO v_current_stock 
-            FROM public.products 
-            WHERE id = item."productId";
-            
-            IF v_current_stock IS NULL OR v_current_stock < item.qty THEN
-                RAISE EXCEPTION 'Stock insuficiente para el producto: % (Disponible: %, Requerido: %)', 
-                    item.name, COALESCE(v_current_stock, 0), item.qty;
-            END IF;
-            
-            UPDATE public.products 
-            SET stock = stock - item.qty 
-            WHERE id = item."productId";
+            DECLARE
+                v_control_lotes BOOLEAN;
+            BEGIN
+                SELECT "controlLotes", stock INTO v_control_lotes, v_current_stock 
+                FROM public.products 
+                WHERE id = item."productId";
+                
+                IF v_current_stock IS NULL OR v_current_stock < item.qty THEN
+                    RAISE EXCEPTION 'Stock insuficiente para el producto: % (Disponible: %, Requerido: %)', 
+                        item.name, COALESCE(v_current_stock, 0), item.qty;
+                END IF;
+                
+                IF v_control_lotes THEN
+                    -- FEFO Batch Deduction
+                    DECLARE
+                        v_qty_to_deduct NUMERIC := item.qty;
+                        v_batch RECORD;
+                        v_batch_stock_sum NUMERIC;
+                    BEGIN
+                        SELECT COALESCE(SUM(stock), 0) INTO v_batch_stock_sum
+                        FROM public.product_batches
+                        WHERE "productId" = item."productId";
+
+                        IF v_batch_stock_sum < item.qty THEN
+                            RAISE EXCEPTION 'Stock insuficiente en los lotes para el producto: % (Disponible: %, Requerido: %)', 
+                                item.name, v_batch_stock_sum, item.qty;
+                        END IF;
+
+                        FOR v_batch IN 
+                            SELECT id, stock 
+                            FROM public.product_batches
+                            WHERE "productId" = item."productId" AND stock > 0
+                            ORDER BY "expirationDate" ASC, created_at ASC
+                            FOR UPDATE
+                        LOOP
+                            IF v_qty_to_deduct <= 0 THEN
+                                EXIT;
+                            END IF;
+
+                            IF v_batch.stock >= v_qty_to_deduct THEN
+                                UPDATE public.product_batches
+                                SET stock = stock - v_qty_to_deduct
+                                WHERE id = v_batch.id;
+                                v_qty_to_deduct := 0;
+                            ELSE
+                                UPDATE public.product_batches
+                                SET stock = 0
+                                WHERE id = v_batch.id;
+                                v_qty_to_deduct := v_qty_to_deduct - v_batch.stock;
+                            END IF;
+                        END LOOP;
+
+                        IF v_qty_to_deduct > 0 THEN
+                            RAISE EXCEPTION 'Stock insuficiente en los lotes para el producto: %', item.name;
+                        END IF;
+                    END;
+                ELSE
+                    -- Deduct directly from products stock
+                    UPDATE public.products 
+                    SET stock = stock - item.qty 
+                    WHERE id = item."productId";
+                END IF;
+            END;
         END IF;
     END LOOP;
 
@@ -455,6 +545,73 @@ BEGIN
     IF supplier_name IS NULL THEN
         RAISE EXCEPTION 'Proveedor no encontrado.';
     END IF;
+
+    -- Update products stock/cost and handle batches
+    DECLARE
+        item RECORD;
+    BEGIN
+        FOR item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(
+            "productId" TEXT, 
+            name TEXT, 
+            qty NUMERIC, 
+            "totalUnits" NUMERIC, 
+            cost NUMERIC, 
+            "batchCode" TEXT, 
+            "expirationDate" TIMESTAMPTZ
+        )
+        LOOP
+            IF item."productId" IS NOT NULL THEN
+                DECLARE
+                    v_control_lotes BOOLEAN;
+                    v_calculated_unit_cost NUMERIC;
+                BEGIN
+                    -- Get controlLotes status
+                    SELECT "controlLotes" INTO v_control_lotes 
+                    FROM public.products 
+                    WHERE id = item."productId";
+                    
+                    IF v_control_lotes IS NULL THEN
+                        RAISE EXCEPTION 'Producto con ID % no encontrado.', item."productId";
+                    END IF;
+
+                    -- Calculate unit cost and round it to 2 decimals
+                    IF item."totalUnits" > 0 THEN
+                        v_calculated_unit_cost := ROUND(item.cost / item."totalUnits", 2);
+                    ELSE
+                        v_calculated_unit_cost := 0;
+                    END IF;
+
+                    -- Update product cost
+                    UPDATE public.products 
+                    SET cost = v_calculated_unit_cost
+                    WHERE id = item."productId";
+
+                    IF NOT v_control_lotes THEN
+                        -- Update product stock directly
+                        UPDATE public.products 
+                        SET stock = stock + item."totalUnits"
+                        WHERE id = item."productId";
+                    ELSE
+                        -- Upsert batch details
+                        IF item."batchCode" IS NULL OR item."batchCode" = '' OR item."expirationDate" IS NULL THEN
+                            RAISE EXCEPTION 'El producto % requiere lote y fecha de vencimiento.', item.name;
+                        END IF;
+
+                        INSERT INTO public.product_batches (id, "productId", "batchCode", "expirationDate", stock)
+                        VALUES (
+                            extensions.gen_random_uuid()::text, 
+                            item."productId", 
+                            item."batchCode", 
+                            item."expirationDate", 
+                            item."totalUnits"
+                        )
+                        ON CONFLICT ("productId", "batchCode") 
+                        DO UPDATE SET stock = public.product_batches.stock + EXCLUDED.stock;
+                    END IF;
+                END;
+            END IF;
+        END LOOP;
+    END;
 
     v_entries := jsonb_build_array(
         jsonb_build_object(
@@ -640,6 +797,23 @@ CREATE POLICY "Allow delete products for admin and repositor"
     ON public.products FOR DELETE TO authenticated 
     USING (public.has_role('administrador', 'repositor'));
 
+-- 2.1 Product Batches Policies
+CREATE POLICY "Allow select product_batches for authenticated users" 
+    ON public.product_batches FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Allow insert product_batches for admin and repositor" 
+    ON public.product_batches FOR INSERT TO authenticated 
+    WITH CHECK (public.has_role('administrador', 'repositor'));
+
+CREATE POLICY "Allow update product_batches for admin and repositor" 
+    ON public.product_batches FOR UPDATE TO authenticated 
+    USING (public.has_role('administrador', 'repositor'))
+    WITH CHECK (public.has_role('administrador', 'repositor'));
+
+CREATE POLICY "Allow delete product_batches for admin and repositor" 
+    ON public.product_batches FOR DELETE TO authenticated 
+    USING (public.has_role('administrador', 'repositor'));
+
 -- 3. Sales Policies
 CREATE POLICY "Allow select sales for authenticated users" 
     ON public.sales FOR SELECT TO authenticated USING (true);
@@ -729,7 +903,7 @@ CREATE POLICY "Allow delete shifts for administrators only"
 
 -- Recreate publication safely to avoid duplicate registration errors or syntax issues
 DROP PUBLICATION IF EXISTS supabase_realtime;
-CREATE PUBLICATION supabase_realtime FOR TABLE public.users, public.products, public.sales, public.customers, public.suppliers, public.shifts;
+CREATE PUBLICATION supabase_realtime FOR TABLE public.users, public.products, public.sales, public.customers, public.suppliers, public.shifts, public.product_batches;
 
 -- =========================================================================
 -- BOOTSTRAP INITIAL SEED DATA

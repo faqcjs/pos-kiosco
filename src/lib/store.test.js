@@ -12,12 +12,23 @@ global.localStorage = {
 // Mock react-query
 const mockInvalidateQueries = vi.fn()
 const mockSetQueryData = vi.fn()
+const mockGetQueryData = vi.fn()
+
+let isOnlineValue = false
+if (!global.navigator) {
+  global.navigator = {}
+}
+Object.defineProperty(global.navigator, 'onLine', {
+  get: () => isOnlineValue,
+  configurable: true
+})
 
 vi.mock('@tanstack/react-query', () => {
   return {
     useQueryClient: () => ({
       invalidateQueries: mockInvalidateQueries,
       setQueryData: mockSetQueryData,
+      getQueryData: mockGetQueryData,
     }),
     useQuery: vi.fn(() => ({ data: [], isLoading: false })),
     useMutation: vi.fn(() => ({ mutate: vi.fn(), mutateAsync: vi.fn() })),
@@ -31,7 +42,10 @@ vi.mock('react', async () => {
   const actual = await vi.importActual('react')
   return {
     ...actual,
-    useState: (val) => [val, vi.fn()],
+    useState: (val) => {
+      const initialVal = typeof val === 'function' ? val() : val
+      return [initialVal, vi.fn()]
+    },
     useEffect: vi.fn(),
     useMemo: (fn) => fn(),
     useCallback: (fn) => fn,
@@ -262,5 +276,111 @@ describe('useStore hook discard actions & query invalidation', () => {
     expect(useUIStore.getState().failedActionsQueue.length).toBe(0)
     // Check that it invalidated the query cache
     expect(mockInvalidateQueries).toHaveBeenCalled()
+  })
+})
+
+describe('completeSale offline FEFO batch deductions', () => {
+  let localQueryCache = {}
+
+  beforeEach(() => {
+    mockInvalidateQueries.mockClear()
+    mockSetQueryData.mockClear()
+    mockGetQueryData.mockClear()
+
+    isOnlineValue = false
+    localQueryCache = {}
+
+    mockSetQueryData.mockImplementation((key, updater) => {
+      const k = JSON.stringify(key)
+      const oldVal = localQueryCache[k]
+      const newVal = typeof updater === 'function' ? updater(oldVal) : updater
+      localQueryCache[k] = newVal
+    })
+
+    mockGetQueryData.mockImplementation((key) => {
+      const k = JSON.stringify(key)
+      return localQueryCache[k]
+    })
+
+    // Setup initial cache data
+    localQueryCache[JSON.stringify(['products'])] = [
+      { id: 'p1', name: 'Product 1', price: 100, cost: 50, stock: 5, controlLotes: true },
+      { id: 'p2', name: 'Product 2', price: 200, cost: 100, stock: 10, controlLotes: false },
+    ]
+
+    localQueryCache[JSON.stringify(['product_batches'])] = [
+      { id: 'b1', productId: 'p1', batchCode: 'L1', expirationDate: '2026-08-01T00:00:00.000Z', stock: 2, created_at: '2026-07-01T00:00:00.000Z' },
+      { id: 'b2', productId: 'p1', batchCode: 'L2', expirationDate: '2026-09-01T00:00:00.000Z', stock: 3, created_at: '2026-07-02T00:00:00.000Z' }
+    ]
+
+    useUIStore.setState({
+      productsCache: localQueryCache[JSON.stringify(['products'])],
+      batchesCache: localQueryCache[JSON.stringify(['product_batches'])],
+      currentShiftCache: { id: 'shift-1' },
+      offlineSalesQueue: [],
+      offlineActionsQueue: [],
+    })
+  })
+
+  it('fails to complete sale if total batch stock is insufficient', () => {
+    const store = useStore()
+    const saleArgs = {
+      items: [{ productId: 'p1', name: 'Product 1', price: 100, qty: 6 }],
+      method: 'efectivo',
+    }
+
+    expect(() => store.completeSale(saleArgs)).toThrowError(
+      'Stock insuficiente en los lotes para el producto: Product 1'
+    )
+  })
+
+  it('deducts from earliest-expiring active batches cascadingly (FEFO)', () => {
+    const store = useStore()
+    const saleArgs = {
+      items: [{ productId: 'p1', name: 'Product 1', price: 100, qty: 3 }],
+      method: 'efectivo',
+    }
+
+    store.completeSale(saleArgs)
+
+    const updatedBatches = localQueryCache[JSON.stringify(['product_batches'])]
+    const b1 = updatedBatches.find((b) => b.id === 'b1')
+    const b2 = updatedBatches.find((b) => b.id === 'b2')
+
+    // FEFO: 2 units from b1 (expires Aug), 1 unit from b2 (expires Sep)
+    expect(b1.stock).toBe(0)
+    expect(b2.stock).toBe(2)
+
+    // Sync product stock
+    const updatedProducts = localQueryCache[JSON.stringify(['products'])]
+    const p1 = updatedProducts.find((p) => p.id === 'p1')
+    expect(p1.stock).toBe(2)
+  })
+
+  it('triangulates: handles equal expiration dates sorting by created_at', () => {
+    // Re-setup cache with same expiration date but different created_at
+    localQueryCache[JSON.stringify(['product_batches'])] = [
+      { id: 'b3', productId: 'p1', batchCode: 'L3', expirationDate: '2026-08-01T00:00:00.000Z', stock: 2, created_at: '2026-07-05T00:00:00.000Z' },
+      { id: 'b4', productId: 'p1', batchCode: 'L4', expirationDate: '2026-08-01T00:00:00.000Z', stock: 2, created_at: '2026-07-03T00:00:00.000Z' }
+    ]
+    useUIStore.setState({
+      batchesCache: localQueryCache[JSON.stringify(['product_batches'])]
+    })
+
+    const store = useStore()
+    const saleArgs = {
+      items: [{ productId: 'p1', name: 'Product 1', price: 100, qty: 3 }],
+      method: 'efectivo',
+    }
+
+    store.completeSale(saleArgs)
+
+    const updatedBatches = localQueryCache[JSON.stringify(['product_batches'])]
+    const b3 = updatedBatches.find((b) => b.id === 'b3')
+    const b4 = updatedBatches.find((b) => b.id === 'b4')
+
+    // Earliest created_at is b4 (July 3), so it should deduct 2 from b4 and 1 from b3 (July 5)
+    expect(b4.stock).toBe(0)
+    expect(b3.stock).toBe(1)
   })
 })

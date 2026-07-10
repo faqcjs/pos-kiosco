@@ -80,6 +80,7 @@ export const useUIStore = create()(
       currentUser: null,
       offlineSalesQueue: [],
       productsCache: [],
+      batchesCache: [],
       currentShiftCache: null,
       offlineActionsQueue: [],
       failedSalesQueue: [],
@@ -98,6 +99,7 @@ export const useUIStore = create()(
         offlineSalesQueue: state.offlineSalesQueue.filter(s => s.id !== saleId)
       })),
       setProductsCache: (products) => set({ productsCache: products }),
+      setBatchesCache: (batches) => set({ batchesCache: batches }),
       setCurrentShiftCache: (shift) => set({ currentShiftCache: shift }),
       enqueueOfflineAction: (action) => set((state) => ({
         offlineActionsQueue: [...state.offlineActionsQueue, action]
@@ -191,6 +193,7 @@ export function useStore() {
   const uiTheme = useUIStore((s) => s.theme)
   const currentUser = useUIStore((s) => s.currentUser)
   const productsCache = useUIStore((s) => s.productsCache)
+  const batchesCache = useUIStore((s) => s.batchesCache)
   const currentShiftCache = useUIStore((s) => s.currentShiftCache)
   const failedSalesQueue = useUIStore((s) => s.failedSalesQueue)
   const failedActionsQueue = useUIStore((s) => s.failedActionsQueue)
@@ -203,6 +206,7 @@ export function useStore() {
   const enqueueOfflineSale = useUIStore((s) => s.enqueueOfflineSale)
   const dequeueOfflineSale = useUIStore((s) => s.dequeueOfflineSale)
   const setProductsCache = useUIStore((s) => s.setProductsCache)
+  const setBatchesCache = useUIStore((s) => s.setBatchesCache)
   const setCurrentShiftCache = useUIStore((s) => s.setCurrentShiftCache)
   const enqueueOfflineAction = useUIStore((s) => s.enqueueOfflineAction)
   const dequeueOfflineAction = useUIStore((s) => s.dequeueOfflineAction)
@@ -300,6 +304,29 @@ export function useStore() {
     },
     enabled: currentUser?.role === 'administrador',
   })
+
+  const { data: productBatches = [], isLoading: loadingProductBatches } = useQuery({
+    queryKey: ['product_batches'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('product_batches').select('*').order('expirationDate')
+      if (error) throw error
+      return data || []
+    },
+  })
+
+  // Sync product batches query results with batchesCache
+  useEffect(() => {
+    if (productBatches && productBatches.length > 0) {
+      setBatchesCache(productBatches)
+    }
+  }, [productBatches, setBatchesCache])
+
+  const displayedProductBatches = useMemo(() => {
+    if (!productBatches || productBatches.length === 0) {
+      return batchesCache || []
+    }
+    return productBatches
+  }, [productBatches, batchesCache])
 
   // Sync products query results with productsCache
   useEffect(() => {
@@ -406,6 +433,11 @@ export function useStore() {
           }
           case 'UPDATE_PRODUCT': {
             const { error } = await supabase.from('products').update(action.payload).eq('id', action.payload.id)
+            if (error) throw error
+            break
+          }
+          case 'UPDATE_BATCH': {
+            const { error } = await supabase.from('product_batches').upsert(action.payload)
             if (error) throw error
             break
           }
@@ -537,7 +569,7 @@ export function useStore() {
     return shifts.filter((s) => s.status === 'closed')
   }, [shifts])
 
-  const hydrated = !isOnline || (!loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts && (currentUser?.role === 'administrador' ? !loadingUsers : true))
+  const hydrated = !isOnline || (!loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts && !loadingProductBatches && (currentUser?.role === 'administrador' ? !loadingUsers : true))
 
   // Mutations
   const addProductMutation = useMutation({
@@ -590,6 +622,18 @@ export function useStore() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
     onError: (err) => console.error('toggleMostSold error:', err),
+  })
+
+  const updateProductBatchMutation = useMutation({
+    mutationFn: async (batch) => {
+      const { data, error } = await supabase.from('product_batches').upsert(batch).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['product_batches'] })
+      qc.invalidateQueries({ queryKey: ['products'] })
+    },
   })
 
   const openShiftMutation = useMutation({
@@ -710,6 +754,8 @@ export function useStore() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] })
       qc.invalidateQueries({ queryKey: ['shifts'] })
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['product_batches'] })
     },
   })
 
@@ -781,6 +827,7 @@ export function useStore() {
       qc.invalidateQueries({ queryKey: ['products'] })
       qc.invalidateQueries({ queryKey: ['shifts'] })
       qc.invalidateQueries({ queryKey: ['customers'] })
+      qc.invalidateQueries({ queryKey: ['product_batches'] })
     },
   })
 
@@ -852,6 +899,35 @@ export function useStore() {
   const adjustStock = useCallback((id, delta) => {
     adjustStockMutation.mutate({ id, delta })
   }, [adjustStockMutation])
+
+  const updateProductBatch = useCallback((batch) => {
+    if (!isOnline) {
+      qc.setQueryData(['product_batches'], (old = []) => {
+        const existing = old.find((b) => b.id === batch.id)
+        if (existing) {
+          return old.map((b) => b.id === batch.id ? { ...b, ...batch } : b)
+        } else {
+          return [...old, batch]
+        }
+      })
+      qc.setQueryData(['products'], (oldProds = []) => {
+        return oldProds.map((p) => {
+          if (p.id === batch.productId) {
+            const latestBatches = qc.getQueryData(['product_batches']) || []
+            const totalStock = latestBatches
+              .filter((b) => b.productId === p.id)
+              .reduce((sum, b) => sum + b.stock, 0)
+            return { ...p, stock: totalStock }
+          }
+          return p
+        })
+      })
+      enqueueOfflineAction({ id: uid(), type: 'UPDATE_BATCH', payload: batch })
+      return Promise.resolve(batch)
+    } else {
+      return updateProductBatchMutation.mutateAsync(batch)
+    }
+  }, [updateProductBatchMutation, isOnline, enqueueOfflineAction, qc])
 
   const toggleMostSold = useCallback((id, isMostSold) => {
     toggleMostSoldMutation.mutate({ id, isMostSold })
@@ -1072,6 +1148,62 @@ export function useStore() {
       }
       const date = new Date().toISOString()
       const goods = { supplierId, amount, detail, paidCash, date, shiftId, items }
+
+      // Update products stock/cost and batches locally
+      let batchesUpdated = false
+      qc.setQueryData(['product_batches'], (oldBatches = []) => {
+        let updated = [...oldBatches]
+        for (const item of items) {
+          if (item.productId) {
+            const prod = displayedProducts.find((p) => p.id === item.productId)
+            if (prod && prod.controlLotes) {
+              batchesUpdated = true
+              const existingIdx = updated.findIndex((b) => b.productId === item.productId && b.batchCode === item.batchCode)
+              if (existingIdx !== -1) {
+                updated[existingIdx] = {
+                  ...updated[existingIdx],
+                  stock: updated[existingIdx].stock + item.totalUnits
+                }
+              } else {
+                updated.push({
+                  id: uid(),
+                  productId: item.productId,
+                  batchCode: item.batchCode,
+                  expirationDate: item.expirationDate,
+                  stock: item.totalUnits,
+                  created_at: date
+                })
+              }
+            }
+          }
+        }
+        if (batchesUpdated) {
+          setBatchesCache(updated)
+        }
+        return updated
+      })
+
+      qc.setQueryData(['products'], (oldProds = []) => {
+        const updated = oldProds.map((p) => {
+          const item = items.find((it) => it.productId === p.id)
+          if (item) {
+            const calculatedUnitCost = Number((item.cost / item.totalUnits).toFixed(2))
+            if (p.controlLotes) {
+              const latestBatches = qc.getQueryData(['product_batches']) || []
+              const totalStock = latestBatches
+                .filter((b) => b.productId === p.id)
+                .reduce((sum, b) => sum + b.stock, 0)
+              return { ...p, cost: calculatedUnitCost, stock: totalStock }
+            } else {
+              return { ...p, cost: calculatedUnitCost, stock: p.stock + item.totalUnits }
+            }
+          }
+          return p
+        })
+        setProductsCache(updated)
+        return updated
+      })
+
       enqueueOfflineAction({
         id: uid(),
         type: 'RECEIVE_GOODS',
@@ -1119,7 +1251,7 @@ export function useStore() {
     } else {
       return receiveGoodsMutation.mutateAsync({ supplierId, amount, detail, paidCash, shiftId, items })
     }
-  }, [receiveGoodsMutation, isOnline, enqueueOfflineAction, currentShift, qc])
+  }, [receiveGoodsMutation, isOnline, enqueueOfflineAction, currentShift, qc, displayedProducts, setBatchesCache, setProductsCache])
 
   const registerSupplierPayment = useCallback((supplierId, amount, fromCash) => {
     if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero') return Promise.resolve(null)
@@ -1209,18 +1341,69 @@ export function useStore() {
         shiftId,
       }
 
-      enqueueOfflineSale(sale)
+      // 1. Perform FEFO batch deduction for any product with controlLotes
+      let batchesUpdated = false
+      qc.setQueryData(['product_batches'], (oldBatches = []) => {
+        let updated = [...oldBatches]
+        for (const item of args.items) {
+          const prod = displayedProducts.find((p) => p.id === item.productId)
+          if (prod && prod.controlLotes) {
+            batchesUpdated = true
+            // Find active batches for this product
+            let activeBatches = updated
+              .filter((b) => b.productId === item.productId && b.stock > 0)
+              .sort((a, b) => {
+                const dateA = new Date(a.expirationDate).getTime()
+                const dateB = new Date(b.expirationDate).getTime()
+                if (dateA !== dateB) return dateA - dateB
+                const createdA = a.created_at ? new Date(a.created_at).getTime() : 0
+                const createdB = b.created_at ? new Date(b.created_at).getTime() : 0
+                if (createdA !== createdB) return createdA - createdB
+                return a.id.localeCompare(b.id)
+              })
 
-      // Decrement stock locally in cache
+            const totalAvailable = activeBatches.reduce((sum, b) => sum + b.stock, 0)
+            if (totalAvailable < item.qty) {
+              throw new Error(`Stock insuficiente en los lotes para el producto: ${prod.name}`)
+            }
+
+            let qtyToDeduct = item.qty
+            for (const batch of activeBatches) {
+              if (qtyToDeduct <= 0) break
+              const deduct = Math.min(batch.stock, qtyToDeduct)
+              qtyToDeduct -= deduct
+              updated = updated.map((b) => b.id === batch.id ? { ...b, stock: b.stock - deduct } : b)
+            }
+          }
+        }
+        if (batchesUpdated) {
+          setBatchesCache(updated)
+        }
+        return updated
+      })
+
+      // 2. Decrement stock locally in products cache
       qc.setQueryData(['products'], (oldProducts = []) => {
-        return oldProducts.map((p) => {
+        const updated = oldProducts.map((p) => {
           const cartItem = args.items.find((item) => item.productId === p.id)
           if (cartItem) {
-            return { ...p, stock: Math.max(0, p.stock - cartItem.qty) }
+            if (p.controlLotes) {
+              const latestBatches = qc.getQueryData(['product_batches']) || []
+              const totalStock = latestBatches
+                .filter((b) => b.productId === p.id)
+                .reduce((sum, b) => sum + b.stock, 0)
+              return { ...p, stock: totalStock }
+            } else {
+              return { ...p, stock: Math.max(0, p.stock - cartItem.qty) }
+            }
           }
           return p
         })
+        setProductsCache(updated)
+        return updated
       })
+
+      enqueueOfflineSale(sale)
 
       // Register shift movement locally
       if ((args.method === 'efectivo' || args.method === 'qr') && currentShift) {
@@ -1277,7 +1460,7 @@ export function useStore() {
     } else {
       return completeSaleMutation.mutateAsync(args)
     }
-  }, [completeSaleMutation, displayedProducts, currentUser, enqueueOfflineSale, currentShift, qc, isOnline])
+  }, [completeSaleMutation, displayedProducts, currentUser, enqueueOfflineSale, currentShift, qc, isOnline, setBatchesCache, setProductsCache])
 
   const resetData = useCallback(() => {
     resetDataMutation.mutate()
@@ -1367,6 +1550,7 @@ export function useStore() {
   // Combine query and Zustand states
   const state = useMemo(() => ({
     products: displayedProducts,
+    productBatches: displayedProductBatches,
     sales,
     customers,
     suppliers,
@@ -1383,6 +1567,7 @@ export function useStore() {
     isSyncing,
   }), [
     displayedProducts,
+    displayedProductBatches,
     sales,
     customers,
     suppliers,
@@ -1417,6 +1602,7 @@ export function useStore() {
     updateSupplier,
     receiveGoods,
     registerSupplierPayment,
+    updateProductBatch,
     resetData,
     login,
     logout,

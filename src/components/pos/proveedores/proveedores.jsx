@@ -505,7 +505,7 @@ function SupplierDetail({
   canPay,
   canEdit,
 }) {
-  const { state, updateProduct } = useStore()
+  const { state } = useStore()
   const toast = useToast()
   const balance = supplierBalance(supplier)
   const [receiveOpen, setReceiveOpen] = useState(false)
@@ -515,6 +515,8 @@ function SupplierDetail({
   // Items in the current receipt
   const [items, setItems] = useState([])
   const [selectedProdId, setSelectedProdId] = useState('')
+  const [batchCode, setBatchCode] = useState('')
+  const [expirationDate, setExpirationDate] = useState('')
   const [customName, setCustomName] = useState('')
   const [customCost, setCustomCost] = useState('')
   const [addItemType, setAddItemType] = useState('catalog')
@@ -524,6 +526,9 @@ function SupplierDetail({
   const [payAmount, setPayAmount] = useState('')
   const [fromCash, setFromCash] = useState(true)
 
+  const selectedProd = selectedProdId ? state.products.find((p) => p.id === selectedProdId) : null
+  const requiresBatch = selectedProd?.controlLotes
+
   const entries = [...supplier.entries].reverse()
 
   function handleAddCatalogItem() {
@@ -531,10 +536,21 @@ function SupplierDetail({
     const prod = state.products.find((p) => p.id === selectedProdId)
     if (!prod) return
 
-    const existing = items.find((it) => it.productId === selectedProdId)
+    if (prod.controlLotes) {
+      if (!batchCode.trim() || !expirationDate) {
+        toast('El producto seleccionado requiere código de lote y fecha de vencimiento.', 'error')
+        return
+      }
+    }
+
+    const existing = items.find((it) => 
+      it.productId === selectedProdId && 
+      (!prod.controlLotes || it.batchCode === batchCode.trim())
+    )
+
     if (existing) {
       setItems(items.map((it) => {
-        if (it.productId === selectedProdId) {
+        if (it.productId === selectedProdId && (!prod.controlLotes || it.batchCode === batchCode.trim())) {
           const nextQty = it.qty + 1
           const nextUnits = nextQty * prod.unidad
           const nextCost = nextUnits * prod.cost
@@ -548,16 +564,20 @@ function SupplierDetail({
       setItems([...items, {
         id: uid(),
         productId: prod.id,
-        name: prod.name,
+        name: prod.name + (prod.controlLotes ? ` (Lote: ${batchCode.trim()})` : ''),
         qty: 1,
         totalUnits: u,
         cost: initialCost,
         isCustom: false,
         unitSize: u,
-        catalogCost: prod.cost
+        catalogCost: prod.cost,
+        batchCode: prod.controlLotes ? batchCode.trim() : null,
+        expirationDate: prod.controlLotes ? new Date(expirationDate).toISOString() : null,
       }])
     }
     setSelectedProdId('')
+    setBatchCode('')
+    setExpirationDate('')
   }
 
   function handleAddCustomItem() {
@@ -626,32 +646,19 @@ function SupplierDetail({
     }).join(', ')
 
     const cleanItems = items.map(it => ({
+      productId: it.productId || null,
       name: it.name,
       qty: it.qty,
       totalUnits: it.totalUnits,
       cost: it.cost,
       isCustom: it.isCustom,
-      unitSize: it.unitSize
+      unitSize: it.unitSize,
+      batchCode: it.batchCode || null,
+      expirationDate: it.expirationDate || null
     }))
 
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine
     onReceive(supplier.id, totalAmount, detailString, paidCash, cleanItems)
-
-    // Update stock and cost for catalog products
-    items.forEach((item) => {
-      if (item.productId) {
-        const prod = state.products.find((p) => p.id === item.productId)
-        if (prod) {
-          const newStock = prod.stock + item.totalUnits
-          const calculatedUnitCost = Number((item.cost / item.totalUnits).toFixed(2))
-          updateProduct({
-            ...prod,
-            cost: calculatedUnitCost,
-            stock: newStock,
-          })
-        }
-      }
-    })
 
     setItems([])
     setReceiveOpen(false)
@@ -892,23 +899,66 @@ function SupplierDetail({
           </div>
 
           {addItemType === 'catalog' ? (
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Select
-                  value={selectedProdId}
-                  onChange={(e) => setSelectedProdId(e.target.value)}
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Select
+                    value={selectedProdId}
+                    onChange={(e) => {
+                      setSelectedProdId(e.target.value)
+                      setBatchCode('')
+                      setExpirationDate('')
+                    }}
+                  >
+                    <option value="">-- Seleccionar producto --</option>
+                    {state.products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (Bulto: x{p.unidad || 1}) - Costo: {money(p.cost)}/un
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <Button 
+                  type="button" 
+                  onClick={handleAddCatalogItem} 
+                  disabled={!selectedProdId || (requiresBatch && (!batchCode.trim() || !expirationDate))} 
+                  className="h-11 shrink-0"
                 >
-                  <option value="">-- Seleccionar producto --</option>
-                  {state.products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (Bulto: x{p.unidad || 1}) - Costo: {money(p.cost)}/un
-                    </option>
-                  ))}
-                </Select>
+                  <Plus className="size-4 mr-1" /> Cargar
+                </Button>
               </div>
-              <Button type="button" onClick={handleAddCatalogItem} disabled={!selectedProdId} className="h-11 shrink-0">
-                <Plus className="size-4 mr-1" /> Cargar
-              </Button>
+
+              {requiresBatch && (
+                <div className="space-y-3 p-3 bg-muted/40 border border-border/50 rounded-2xl">
+                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-500 flex items-center gap-1.5">
+                    <span>⚠️</span> Este producto requiere control de lotes y vencimiento.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="item-batchCode">Código de Lote</Label>
+                      <Input
+                        id="item-batchCode"
+                        value={batchCode}
+                        onChange={(e) => setBatchCode(e.target.value)}
+                        placeholder="Ej: L123"
+                        className="h-9 text-xs"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="item-expirationDate">Fecha de Vencimiento</Label>
+                      <Input
+                        id="item-expirationDate"
+                        type="date"
+                        value={expirationDate}
+                        onChange={(e) => setExpirationDate(e.target.value)}
+                        className="h-9 text-xs"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">

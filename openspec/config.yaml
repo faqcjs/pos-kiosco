@@ -1,11 +1,13 @@
 project:
-  name: kiosko-pos
+  name: pos-kiosco
   version: 1.0.0
 testing:
-  strict_tdd: false
-  runner: null
-  coverage: null
-  layers: []
+  strict_tdd: true
+  runner: vitest
+  coverage: vitest
+  layers:
+    - unit
+    - integration
 linting:
   linter: eslint
   config: eslint.config.js

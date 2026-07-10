@@ -22,6 +22,40 @@ export function Venta() {
   const { state, completeSale, toggleMostSold, setCart } = useStore()
   const cart = state.cart
   const toast = useToast()
+
+  const getExpirationWarning = (productId) => {
+    if (!productId) return null
+    const prod = state.products.find((p) => p.id === productId)
+    if (!prod || !prod.controlLotes) return null
+
+    // Get all active batches for this product
+    const activeBatches = (state.productBatches || [])
+      .filter((b) => b.productId === productId && b.stock > 0)
+      .sort((a, b) => new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime())
+
+    if (activeBatches.length === 0) return null
+
+    const earliestBatch = activeBatches[0]
+    const expirationTime = new Date(earliestBatch.expirationDate).getTime()
+    const currentTime = new Date().getTime()
+    const timeDiff = expirationTime - currentTime
+    const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24))
+
+    if (daysDiff < 0) {
+      return {
+        type: 'expired',
+        message: `Lote ${earliestBatch.batchCode} VENCIDO`,
+        days: daysDiff
+      }
+    } else if (daysDiff <= 7) {
+      return {
+        type: 'near',
+        message: `Vence pronto (${daysDiff} d)`,
+        days: daysDiff
+      }
+    }
+    return null
+  }
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Todos')
   const [quickAmount, setQuickAmount] = useState('')
@@ -139,6 +173,15 @@ export function Venta() {
     setTimeout(() => {
       setFloatingEffects((prev) => prev.filter((eff) => eff.id !== effectId))
     }, 850)
+
+    const warning = getExpirationWarning(p.id)
+    if (warning) {
+      if (warning.type === 'expired') {
+        toast(`⚠️ ¡ATENCIÓN! El lote de ${p.name} está VENCIDO.`, 'warning')
+      } else {
+        toast(`⚠️ El lote de ${p.name} vence pronto (${warning.days} días).`, 'info')
+      }
+    }
 
     setCart((c) => {
       const existing = c.find((i) => i.productId === p.id)
@@ -539,41 +582,56 @@ function CartPanel({
             <p className="text-sm">El carrito está vacío</p>
           </div>
         ) : (
-          cart.map((item) => (
-            <Card key={item.id} className="flex items-center gap-2 p-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{item.name}</p>
-                <p className="text-xs text-muted-foreground tabular-nums">{money(item.price)} c/u</p>
-              </div>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={() => onChangeQty(item.id, -1)}
-                  className="flex size-6 items-center justify-center rounded-md border border-border text-foreground transition-colors hover:bg-muted"
-                  aria-label="Restar"
-                >
-                  <Minus className="size-3" />
-                </button>
-                <span className="w-7 text-center text-sm font-semibold tabular-nums">{item.qty}</span>
-                <button
-                  onClick={() => onChangeQty(item.id, 1)}
-                  className="flex size-6 items-center justify-center rounded-md border border-border text-foreground transition-colors hover:bg-muted"
-                  aria-label="Sumar"
-                >
-                  <Plus className="size-3" />
-                </button>
-              </div>
-              <div className="w-14 text-right text-xs font-bold tabular-nums">
-                {money(item.price * item.qty)}
-              </div>
-              <button
-                onClick={() => onRemove(item.id)}
-                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                aria-label="Eliminar"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </Card>
-          ))
+          cart.map((item) => {
+            const expWarning = getExpirationWarning(item.productId)
+            return (
+              <Card key={item.id} className="flex flex-col p-2 gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="truncate text-sm font-medium">{item.name}</p>
+                      {expWarning && (
+                        <Badge 
+                          tone={expWarning.type === 'expired' ? 'danger' : 'warning'}
+                          className="text-[10px] px-1 py-0 shrink-0 font-bold"
+                        >
+                          {expWarning.message}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground tabular-nums">{money(item.price)} c/u</p>
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => onChangeQty(item.id, -1)}
+                      className="flex size-6 items-center justify-center rounded-md border border-border text-foreground transition-colors hover:bg-muted"
+                      aria-label="Restar"
+                    >
+                      <Minus className="size-3" />
+                    </button>
+                    <span className="w-7 text-center text-sm font-semibold tabular-nums">{item.qty}</span>
+                    <button
+                      onClick={() => onChangeQty(item.id, 1)}
+                      className="flex size-6 items-center justify-center rounded-md border border-border text-foreground transition-colors hover:bg-muted"
+                      aria-label="Sumar"
+                    >
+                      <Plus className="size-3" />
+                    </button>
+                  </div>
+                  <div className="w-14 text-right text-xs font-bold tabular-nums">
+                    {money(item.price * item.qty)}
+                  </div>
+                  <button
+                    onClick={() => onRemove(item.id)}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    aria-label="Eliminar"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </Card>
+            )
+          })
         )}
       </div>
 
