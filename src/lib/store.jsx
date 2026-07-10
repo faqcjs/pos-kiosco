@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from './supabase'
@@ -160,6 +161,7 @@ export function StoreProvider({ children }) {
     <QueryClientProvider client={queryClient}>
       <RealtimeSync />
       {children}
+      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   )
 }
