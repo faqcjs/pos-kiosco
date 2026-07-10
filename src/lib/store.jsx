@@ -404,6 +404,11 @@ export function useStore() {
             if (error) throw error
             break
           }
+          case 'UPDATE_PRODUCT': {
+            const { error } = await supabase.from('products').update(action.payload).eq('id', action.payload.id)
+            if (error) throw error
+            break
+          }
           case 'RECEIVE_GOODS': {
             const { supplierId, amount, detail, paidCash, date, shiftId } = action.payload
             const { error } = await supabase.rpc('receive_goods_rpc', {
@@ -830,8 +835,13 @@ export function useStore() {
   }, [addProductMutation])
 
   const updateProduct = useCallback((p) => {
-    updateProductMutation.mutate(p)
-  }, [updateProductMutation])
+    if (!isOnline) {
+      enqueueOfflineAction({ id: uid(), type: 'UPDATE_PRODUCT', payload: p })
+      qc.setQueryData(['products'], (old = []) => old.map((x) => x.id === p.id ? { ...x, ...p } : x))
+    } else {
+      updateProductMutation.mutate(p)
+    }
+  }, [updateProductMutation, isOnline, enqueueOfflineAction, qc])
 
   const deleteProduct = useCallback((id) => {
     deleteProductMutation.mutate(id)

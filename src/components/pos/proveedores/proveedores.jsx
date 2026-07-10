@@ -1,12 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet, Pencil, MessageCircle, Calendar } from 'lucide-react'
+import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet, Pencil, MessageCircle, Calendar, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, EmptyState, Input, Label, Modal, Select, StatCard } from '@/components/ui/kit'
 import { PageHeader } from '@/components/pos/page-header'
 import { supplierBalance, useStore } from '@/lib/store'
-import { formatDateTime, money } from '@/lib/format'
+import { formatDateTime, money, uid } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
@@ -505,13 +505,19 @@ function SupplierDetail({
   canPay,
   canEdit,
 }) {
+  const { state, updateProduct } = useStore()
   const toast = useToast()
   const balance = supplierBalance(supplier)
   const [receiveOpen, setReceiveOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
 
-  const [amount, setAmount] = useState('')
-  const [detail, setDetail] = useState('')
+  // Items in the current receipt
+  const [items, setItems] = useState([])
+  const [selectedProdId, setSelectedProdId] = useState('')
+  const [customName, setCustomName] = useState('')
+  const [customCost, setCustomCost] = useState('')
+  const [addItemType, setAddItemType] = useState('catalog')
+
   const [paidCash, setPaidCash] = useState(false)
 
   const [payAmount, setPayAmount] = useState('')
@@ -519,28 +525,141 @@ function SupplierDetail({
 
   const entries = [...supplier.entries].reverse()
 
+  function handleAddCatalogItem() {
+    if (!selectedProdId) return
+    const prod = state.products.find((p) => p.id === selectedProdId)
+    if (!prod) return
+
+    const existing = items.find((it) => it.productId === selectedProdId)
+    if (existing) {
+      setItems(items.map((it) => {
+        if (it.productId === selectedProdId) {
+          const nextQty = it.qty + 1
+          const nextUnits = nextQty * prod.unidad
+          const nextCost = nextUnits * prod.cost
+          return { ...it, qty: nextQty, totalUnits: nextUnits, cost: nextCost }
+        }
+        return it
+      }))
+    } else {
+      const u = prod.unidad || 1
+      const initialCost = u * prod.cost
+      setItems([...items, {
+        id: uid(),
+        productId: prod.id,
+        name: prod.name,
+        qty: 1,
+        totalUnits: u,
+        cost: initialCost,
+        isCustom: false,
+        unitSize: u,
+        catalogCost: prod.cost
+      }])
+    }
+    setSelectedProdId('')
+  }
+
+  function handleAddCustomItem() {
+    const trimmed = customName.trim()
+    const costVal = Number(customCost)
+    if (!trimmed || !costVal || costVal <= 0) return
+
+    setItems([...items, {
+      id: uid(),
+      productId: null,
+      name: trimmed,
+      qty: 1,
+      totalUnits: 1,
+      cost: costVal,
+      isCustom: true,
+      unitSize: 1,
+      catalogCost: costVal
+    }])
+    setCustomName('')
+    setCustomCost('')
+  }
+
+  function handleRemoveItem(id) {
+    setItems(items.filter((it) => it.id !== id))
+  }
+
+  function handleUpdateItemQty(id, nextQty) {
+    setItems(items.map((it) => {
+      if (it.id === id) {
+        const q = Math.max(1, Number(nextQty) || 1)
+        const nextUnits = q * it.unitSize
+        const nextCost = nextUnits * it.catalogCost
+        return { ...it, qty: q, totalUnits: nextUnits, cost: nextCost }
+      }
+      return it
+    }))
+  }
+
+  function handleUpdateItemCost(id, nextCost) {
+    setItems(items.map((it) => {
+      if (it.id === id) {
+        const c = Math.max(0, Number(nextCost) || 0)
+        return { ...it, cost: c }
+      }
+      return it
+    }))
+  }
+
   function submitReceive() {
     if (!canReceive) {
       toast('No tenés permisos para realizar esta acción.', 'destructive')
       return
     }
-    const value = Number(amount)
-    if (!value || value <= 0) return
+    if (items.length === 0) {
+      toast('Agregá al menos un ítem al recibo.', 'error')
+      return
+    }
+
+    const totalAmount = items.reduce((sum, it) => sum + it.cost, 0)
+    const detailString = items.map((it) => {
+      if (it.isCustom) {
+        return it.name
+      } else {
+        return `${it.name} (x${it.totalUnits} un.)`
+      }
+    }).join(', ')
+
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine
-    onReceive(supplier.id, value, detail.trim() || 'Mercadería', paidCash)
-    setAmount('')
-    setDetail('')
-    setPaidCash(false)
+    onReceive(supplier.id, totalAmount, detailString, paidCash)
+
+    // Update stock and cost for catalog products
+    items.forEach((item) => {
+      if (item.productId) {
+        const prod = state.products.find((p) => p.id === item.productId)
+        if (prod) {
+          const newStock = prod.stock + item.totalUnits
+          const calculatedUnitCost = Number((item.cost / item.totalUnits).toFixed(2))
+          updateProduct({
+            ...prod,
+            cost: calculatedUnitCost,
+            stock: newStock,
+          })
+        }
+      }
+    })
+
+    setItems([])
     setReceiveOpen(false)
+
     if (!isOnline) {
       toast(
         paidCash
-          ? 'Mercadería recibida y pagada localmente (Modo Offline)'
-          : 'Mercadería recibida a cuenta localmente (Modo Offline)',
+          ? 'Mercadería recibida, stock actualizado y pagada localmente (Modo Offline)'
+          : 'Mercadería recibida, stock actualizado a cuenta localmente (Modo Offline)',
         'warning',
       )
     } else {
-      toast(paidCash ? 'Mercadería recibida y pagada' : 'Mercadería recibida a cuenta', 'success')
+      toast(
+        paidCash 
+          ? 'Mercadería recibida, stock cargado y pagado' 
+          : 'Mercadería recibida y stock cargado a cuenta', 
+        'success'
+      )
     }
   }
 
@@ -719,27 +838,145 @@ function SupplierDetail({
 
       {/* Recibir mercadería */}
       <Modal open={receiveOpen} onClose={() => setReceiveOpen(false)} title="Recibir mercadería">
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="rec-amount">Importe de la factura</Label>
-            <Input
-              id="rec-amount"
-              inputMode="numeric"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-              placeholder="0"
-              autoFocus
-            />
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {/* Segmented controls: Catalog product vs Custom Concept */}
+          <div className="flex rounded-xl bg-muted p-1 border border-border/40">
+            <button
+              type="button"
+              onClick={() => setAddItemType('catalog')}
+              className={cn(
+                "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                addItemType === 'catalog'
+                  ? "bg-card text-foreground shadow-sm font-bold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Producto del catálogo
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddItemType('custom')}
+              className={cn(
+                "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                addItemType === 'custom'
+                  ? "bg-card text-foreground shadow-sm font-bold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Concepto general / Otro
+            </button>
           </div>
-          <div>
-            <Label htmlFor="rec-detail">Detalle</Label>
-            <Input
-              id="rec-detail"
-              value={detail}
-              onChange={(e) => setDetail(e.target.value)}
-              placeholder="Ej: Bebidas y golosinas"
-            />
-          </div>
+
+          {addItemType === 'catalog' ? (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Select
+                  value={selectedProdId}
+                  onChange={(e) => setSelectedProdId(e.target.value)}
+                >
+                  <option value="">-- Seleccionar producto --</option>
+                  {state.products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} (Bulto: x{p.unidad || 1}) - Costo: {money(p.cost)}/un
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button type="button" onClick={handleAddCatalogItem} disabled={!selectedProdId} className="h-11 shrink-0">
+                <Plus className="size-4 mr-1" /> Cargar
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
+              <div>
+                <Label htmlFor="custom-name">Concepto / Detalle</Label>
+                <Input
+                  id="custom-name"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Ej: Bolsas de consorcio"
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="custom-cost">Costo total</Label>
+                <Input
+                  id="custom-cost"
+                  type="number"
+                  inputMode="numeric"
+                  value={customCost}
+                  onChange={(e) => setCustomCost(e.target.value)}
+                  placeholder="0"
+                  className="h-11"
+                />
+              </div>
+              <Button type="button" onClick={handleAddCustomItem} disabled={!customName.trim() || !Number(customCost)} className="h-11 shrink-0">
+                <Plus className="size-4 mr-1" /> Cargar
+              </Button>
+            </div>
+          )}
+
+          {/* Loaded items list */}
+          {items.length > 0 && (
+            <div className="border border-border rounded-2xl overflow-hidden bg-card/50">
+              <div className="bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider grid grid-cols-[1fr_80px_100px_40px] gap-2 border-b border-border">
+                <span>Detalle / Producto</span>
+                <span className="text-center">Bultos</span>
+                <span className="text-right">Costo Total</span>
+                <span></span>
+              </div>
+              <div className="divide-y divide-border/60 max-h-[30vh] overflow-y-auto pr-1">
+                {items.map((item) => (
+                  <div key={item.id} className="px-3 py-2 text-sm grid grid-cols-[1fr_80px_100px_40px] gap-2 items-center">
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate text-foreground leading-tight">{item.name}</p>
+                      {!item.isCustom && (
+                        <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
+                          Equivale a <span className="font-bold text-foreground">{item.totalUnits}</span> unidades (x{item.unitSize})
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        value={item.qty}
+                        onChange={(e) => handleUpdateItemQty(item.id, e.target.value)}
+                        disabled={item.isCustom}
+                        className="h-8 text-center px-1 py-0.5 rounded-lg border-border"
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        value={item.cost}
+                        onChange={(e) => handleUpdateItemCost(item.id, e.target.value)}
+                        className="h-8 text-right font-mono font-semibold text-foreground border-border"
+                      />
+                    </div>
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="text-destructive hover:bg-destructive/10 p-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-muted/20 px-3 py-2.5 border-t border-border flex items-center justify-between text-sm">
+                <span className="font-bold text-muted-foreground">Total del Recibo:</span>
+                <span className="font-heading text-base font-black text-foreground tabular-nums">
+                  {money(items.reduce((sum, it) => sum + it.cost, 0))}
+                </span>
+              </div>
+            </div>
+          )}
+
           <label className="flex items-center gap-3 rounded-xl border border-border p-3.5">
             <input
               type="checkbox"
@@ -758,10 +995,10 @@ function SupplierDetail({
           </label>
         </div>
         <div className="mt-5 flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={() => setReceiveOpen(false)}>
+          <Button variant="outline" className="flex-1" onClick={() => { setItems([]); setReceiveOpen(false); }}>
             Cancelar
           </Button>
-          <Button className="flex-1" onClick={submitReceive} disabled={!Number(amount)}>
+          <Button className="flex-1" onClick={submitReceive} disabled={items.length === 0}>
             Confirmar
           </Button>
         </div>
