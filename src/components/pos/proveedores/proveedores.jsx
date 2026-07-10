@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet, Pencil, MessageCircle, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge, Card, EmptyState, Input, Label, Modal, StatCard } from '@/components/ui/kit'
+import { Badge, Card, EmptyState, Input, Label, Modal, Select, StatCard } from '@/components/ui/kit'
 import { PageHeader } from '@/components/pos/page-header'
 import { supplierBalance, useStore } from '@/lib/store'
 import { formatDateTime, money } from '@/lib/format'
