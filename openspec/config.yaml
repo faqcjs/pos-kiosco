@@ -1,0 +1,17 @@
+project:
+  name: kiosko-pos
+  version: 1.0.0
+testing:
+  strict_tdd: false
+  runner: null
+  coverage: null
+  layers: []
+linting:
+  linter: eslint
+  config: eslint.config.js
+type_checking:
+  enabled: false
+  config: jsconfig.json
+formatting:
+  enabled: false
+mode: hybrid

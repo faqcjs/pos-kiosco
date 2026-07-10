@@ -1,0 +1,44 @@
+# Archive Report: production-audit
+
+- **Change Name**: `production-audit`
+- **Date**: 2026-07-10
+- **Status**: Completed & Verified
+- **Target Project**: `pos-kiosco`
+
+---
+
+## 1. Executive Summary
+This report documents the archiving of the `production-audit` change. All safety, security, and functional audit requirements identified in the exploration phase have been successfully implemented, verified via unit tests, and are ready for staging.
+
+---
+
+## 2. Implemented Features
+1. **Fix Stock Details Edit Bug**:
+   - File: [stock.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/stock/stock.jsx)
+   - Stock count is now kept unchanged when editing product details, preventing the `unidad` pack size from being incorrectly added.
+2. **Harden Product RLS Policies**:
+   - File: [SUPABASE_SCHEMA.sql](file:///C:/Users/facu/kiosko-pos/SUPABASE_SCHEMA.sql)
+   - Direct `INSERT`, `UPDATE`, and `DELETE` on the `public.products` table now require `administrador` or `repositor` roles. `cajero` is excluded.
+3. **Harden Shift RLS Update Policy**:
+   - File: [SUPABASE_SCHEMA.sql](file:///C:/Users/facu/kiosko-pos/SUPABASE_SCHEMA.sql)
+   - Shift updates are restricted to open shifts owned by the active user or an `administrador`.
+4. **Query Cache Invalidation on Discard**:
+   - File: [store.jsx](file:///C:/Users/facu/kiosko-pos/src/lib/store.jsx)
+   - `discardFailedSale` and `discardFailedAction` both now invoke `qc.invalidateQueries()` to ensure UI state reflects the remote database after sync failures.
+
+---
+
+## 3. Linked Observations
+The following memories from Engram have been linked to this archive:
+- **Observation #55 (architecture)**: `Production-Readiness Audit`
+  - *Description*: Exploration of production-readiness audit of Kiosko POS.
+
+---
+
+## 4. Verification Details
+- **Verification Result**: PASS
+- **Test Status**: PASS (10/10 tests passed in [store.test.js](file:///C:/Users/facu/kiosko-pos/src/lib/store.test.js))
+- **Modified Files**:
+  - [stock.jsx](file:///C:/Users/facu/kiosko-pos/src/components/pos/stock/stock.jsx)
+  - [SUPABASE_SCHEMA.sql](file:///C:/Users/facu/kiosko-pos/SUPABASE_SCHEMA.sql)
+  - [store.jsx](file:///C:/Users/facu/kiosko-pos/src/lib/store.jsx)

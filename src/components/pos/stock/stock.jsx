@@ -78,14 +78,12 @@ export function Stock() {
       toast('Ingresá el nombre del producto', 'error')
       return
     }
+    const u = draft.unidad || 1
+    const finalProduct = { ...draft, stock: Number(draft.stock) || 0, unidad: u }
     if (draft.id) {
-      const u = draft.unidad || 1
-      const finalProduct = { ...draft, stock: draft.stock + u, unidad: u }
       updateProduct(finalProduct)
       toast('Producto actualizado')
     } else {
-      const u = draft.unidad || 1
-      const finalProduct = { ...draft, stock: u, unidad: u }
       addProduct(finalProduct)
       toast('Producto agregado')
     }
@@ -351,7 +349,19 @@ function ProductFormModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <Label htmlFor="stock">{draft.id ? 'Stock' : 'Stock inicial'}</Label>
+              <Input
+                id="stock"
+                type="number"
+                inputMode="numeric"
+                value={draft.stock === 0 ? '0' : (draft.stock || '')}
+                onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) || 0 })}
+                placeholder="0"
+                disabled={Boolean(draft.id && !isAdmin)}
+              />
+            </div>
             <div>
               <Label htmlFor="minStock">Stock mínimo</Label>
               <Input
@@ -371,12 +381,7 @@ function ProductFormModal({
                 type="number"
                 inputMode="numeric"
                 value={draft.unidad || ''}
-                onChange={(e) => {
-                  const val = Number(e.target.value) || 1
-                  // Sync initial stock with box unit size if it's a new product and they haven't manually changed stock from its default
-                  const nextStock = !draft.id && (draft.stock === (draft.unidad || 1)) ? val : draft.stock
-                  setDraft({ ...draft, unidad: val, stock: nextStock })
-                }}
+                onChange={(e) => setDraft({ ...draft, unidad: Number(e.target.value) || 1 })}
                 placeholder="1"
               />
             </div>

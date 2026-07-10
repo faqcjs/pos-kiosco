@@ -9,10 +9,10 @@ This document details the testing capabilities and development validation conven
 - **Strict TDD**: `false` (Disabled as no test runner or testing framework is configured in the project)
 
 ## Tooling & Verification
-- **Linter**: None
-- **Type Checker**: None
-- **Formatter**: None
+- **Linter**: ESLint (Flat Config in `eslint.config.js`)
+- **Type Checker**: None (JavaScript project using `jsconfig.json` for paths/editor configuration)
+- **Formatter**: None (No local configuration, relies on IDE formatters)
 
 ## Configuration Status
 - **Resolved via**: No-runner fallback
-- **Mode**: `engram`
+- **Mode**: `hybrid`
