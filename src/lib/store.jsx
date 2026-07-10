@@ -620,9 +620,7 @@ export function useStore() {
   })
 
   const closeShiftMutation = useMutation({
-    mutationFn: async ({ counted, closedBy }) => {
-      if (!currentShift) return
-      const theoretical = shiftTheoretical(currentShift)
+    mutationFn: async ({ shiftId, counted, closedBy, theoretical }) => {
       const closed = {
         closedAt: new Date().toISOString(),
         closingCounted: counted,
@@ -631,7 +629,7 @@ export function useStore() {
         status: 'closed',
         closedBy,
       }
-      const { data, error } = await supabase.from('shifts').update(closed).eq('id', currentShift.id).select()
+      const { data, error } = await supabase.from('shifts').update(closed).eq('id', shiftId).select()
       if (error) throw error
       return data[0]
     },
@@ -640,14 +638,13 @@ export function useStore() {
   })
 
   const addMovementMutation = useMutation({
-    mutationFn: async ({ type, amount, reason }) => {
-      if (!currentShift) return
+    mutationFn: async ({ shiftId, currentMovements, type, amount, reason }) => {
       const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
       const mov = { id: uid(), date: new Date().toISOString(), type, amount: signed, reason }
       const { data, error } = await supabase
         .from('shifts')
-        .update({ movements: [...(currentShift.movements || []), mov] })
-        .eq('id', currentShift.id)
+        .update({ movements: [...(currentMovements || []), mov] })
+        .eq('id', shiftId)
         .select()
       if (error) throw error
       return data[0]
@@ -922,7 +919,12 @@ export function useStore() {
       })
       return Promise.resolve(null)
     } else {
-      return closeShiftMutation.mutateAsync({ counted, closedBy })
+      return closeShiftMutation.mutateAsync({
+        shiftId: currentShift.id,
+        counted,
+        closedBy,
+        theoretical
+      })
     }
   }, [closeShiftMutation, isOnline, currentShift, enqueueOfflineAction, setCurrentShiftCache, qc])
 
@@ -947,7 +949,13 @@ export function useStore() {
         })
       })
     } else {
-      addMovementMutation.mutate({ type, amount, reason })
+      addMovementMutation.mutate({
+        shiftId: currentShift.id,
+        currentMovements: currentShift.movements,
+        type,
+        amount,
+        reason
+      })
     }
   }, [addMovementMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
