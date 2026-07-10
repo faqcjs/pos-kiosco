@@ -423,13 +423,17 @@ REVOKE EXECUTE ON FUNCTION public.register_customer_payment_rpc(TEXT, NUMERIC, T
 GRANT EXECUTE ON FUNCTION public.register_customer_payment_rpc(TEXT, NUMERIC, TIMESTAMPTZ, TEXT) TO authenticated;
 
 -- 3. Función atómica para mercadería de proveedores
+DROP FUNCTION IF EXISTS public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ, TEXT, JSONB);
+
 CREATE OR REPLACE FUNCTION public.receive_goods_rpc(
     p_supplier_id TEXT,
     p_amount NUMERIC,
     p_detail TEXT,
     p_paid_cash BOOLEAN,
     p_date TIMESTAMPTZ,
-    p_shift_id TEXT
+    p_shift_id TEXT,
+    p_items JSONB DEFAULT '[]'::jsonb
 ) RETURNS VOID AS $$
 DECLARE
     supplier_name TEXT;
@@ -459,7 +463,8 @@ BEGIN
             'type', 'factura',
             'amount', p_amount,
             'detail', p_detail,
-            'paidCash', p_paid_cash
+            'paidCash', p_paid_cash,
+            'items', p_items
         )
     );
     
@@ -509,8 +514,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-REVOKE EXECUTE ON FUNCTION public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ, TEXT) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ, TEXT, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ, TEXT, JSONB) TO authenticated;
 
 -- 4. Función atómica para pagos directos a proveedores
 CREATE OR REPLACE FUNCTION public.register_supplier_payment_rpc(

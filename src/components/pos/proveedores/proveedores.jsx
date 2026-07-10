@@ -510,6 +510,7 @@ function SupplierDetail({
   const balance = supplierBalance(supplier)
   const [receiveOpen, setReceiveOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
+  const [selectedInvoice, setSelectedInvoice] = useState(null)
 
   // Items in the current receipt
   const [items, setItems] = useState([])
@@ -624,8 +625,17 @@ function SupplierDetail({
       }
     }).join(', ')
 
+    const cleanItems = items.map(it => ({
+      name: it.name,
+      qty: it.qty,
+      totalUnits: it.totalUnits,
+      cost: it.cost,
+      isCustom: it.isCustom,
+      unitSize: it.unitSize
+    }))
+
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine
-    onReceive(supplier.id, totalAmount, detailString, paidCash)
+    onReceive(supplier.id, totalAmount, detailString, paidCash, cleanItems)
 
     // Update stock and cost for catalog products
     items.forEach((item) => {
@@ -809,7 +819,21 @@ function SupplierDetail({
             {entries.map((e) => {
               const isInvoice = e.type === 'factura'
               return (
-                <Card key={e.id} className="flex items-center gap-3 p-3.5">
+                <div
+                  key={e.id}
+                  onClick={() => {
+                    if (isInvoice) {
+                      setSelectedInvoice(e)
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 p-3.5 rounded-2xl border bg-card transition-all",
+                    isInvoice
+                      ? "cursor-pointer hover:border-primary/40 hover:bg-muted/30 border-border"
+                      : "border-border"
+                  )}
+                  title={isInvoice ? "Hacé clic para ver el detalle de la factura" : undefined}
+                >
                   <div
                     className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
                       isInvoice ? 'bg-destructive/12 text-destructive' : 'bg-success/15 text-success'
@@ -829,7 +853,7 @@ function SupplierDetail({
                     {isInvoice ? '+' : '−'}
                     {money(e.amount)}
                   </p>
-                </Card>
+                </div>
               )
             })}
           </div>
@@ -1050,6 +1074,87 @@ function SupplierDetail({
           </Button>
           <Button className="flex-1" onClick={submitPay} disabled={!Number(payAmount)}>
             Confirmar pago
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Detalle de factura modal */}
+      <Modal
+        open={Boolean(selectedInvoice)}
+        onClose={() => setSelectedInvoice(null)}
+        title="Detalle de Factura de Compra"
+        variant="center"
+      >
+        {selectedInvoice && (
+          <div className="space-y-4">
+            <div className="flex flex-col items-center justify-center rounded-2xl bg-muted/40 p-4 border border-border/40 text-center">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Importe Total</span>
+              <span className="font-heading text-3xl font-black text-destructive tabular-nums mt-1">
+                {money(selectedInvoice.amount)}
+              </span>
+              <span className="text-xs text-muted-foreground mt-1">
+                {selectedInvoice.paidCash ? '✓ Pago Contado (Efectivo)' : '🔴 Registrado a Cuenta'}
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Información general</p>
+              <div className="rounded-xl border border-border bg-card p-3 text-sm space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Distribuidora:</span>
+                  <span className="font-medium text-foreground">{supplier.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Fecha y hora:</span>
+                  <span className="font-mono text-foreground">{formatDateTime(selectedInvoice.date)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Detalle de compra</p>
+              {selectedInvoice.items && selectedInvoice.items.length > 0 ? (
+                <div className="border border-border rounded-xl overflow-hidden bg-card text-sm">
+                  <div className="bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider grid grid-cols-[1fr_80px_100px] gap-2 border-b border-border">
+                    <span>Producto</span>
+                    <span className="text-center">Cant.</span>
+                    <span className="text-right">Total</span>
+                  </div>
+                  <div className="divide-y divide-border/60 max-h-[30vh] overflow-y-auto">
+                    {selectedInvoice.items.map((it, idx) => (
+                      <div key={idx} className="px-3 py-2 grid grid-cols-[1fr_80px_100px] gap-2 items-center">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate text-foreground leading-tight">{it.name}</p>
+                          {!it.isCustom && (
+                            <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
+                              Equivalente a {it.totalUnits} un. (x{it.unitSize})
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-center font-medium text-foreground">
+                          {it.qty} {it.isCustom ? 'un.' : 'bulto'}{it.qty > 1 && !it.isCustom ? 's' : ''}
+                        </div>
+                        <div className="text-right font-mono font-semibold text-foreground">
+                          {money(it.cost)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border bg-card p-3 text-sm">
+                  <p className="font-medium text-foreground leading-snug">{selectedInvoice.detail}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 italic">
+                    Esta factura fue registrada de manera resumida sin desglose de productos.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="mt-5">
+          <Button className="w-full h-11 bg-primary text-primary-foreground font-bold" onClick={() => setSelectedInvoice(null)}>
+            Cerrar detalle
           </Button>
         </div>
       </Modal>

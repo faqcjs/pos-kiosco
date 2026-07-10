@@ -410,7 +410,7 @@ export function useStore() {
             break
           }
           case 'RECEIVE_GOODS': {
-            const { supplierId, amount, detail, paidCash, date, shiftId } = action.payload
+            const { supplierId, amount, detail, paidCash, date, shiftId, items } = action.payload
             const { error } = await supabase.rpc('receive_goods_rpc', {
               p_supplier_id: supplierId,
               p_amount: amount,
@@ -418,6 +418,7 @@ export function useStore() {
               p_paid_cash: paidCash,
               p_date: date,
               p_shift_id: shiftId,
+              p_items: items || [],
             })
             if (error) throw error
             break
@@ -692,7 +693,7 @@ export function useStore() {
   })
 
   const receiveGoodsMutation = useMutation({
-    mutationFn: async ({ supplierId, amount, detail, paidCash, shiftId }) => {
+    mutationFn: async ({ supplierId, amount, detail, paidCash, shiftId, items = [] }) => {
       const date = new Date().toISOString()
       const { error } = await supabase.rpc('receive_goods_rpc', {
         p_supplier_id: supplierId,
@@ -701,9 +702,10 @@ export function useStore() {
         p_paid_cash: paidCash,
         p_date: date,
         p_shift_id: shiftId,
+        p_items: items,
       })
       if (error) throw error
-      return { supplierId, amount, detail, paidCash, date, shiftId }
+      return { supplierId, amount, detail, paidCash, date, shiftId, items }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] })
@@ -1060,7 +1062,7 @@ export function useStore() {
     }
   }, [updateSupplierMutation, isOnline, enqueueOfflineAction, qc])
 
-  const receiveGoods = useCallback((supplierId, amount, detail, paidCash) => {
+  const receiveGoods = useCallback((supplierId, amount, detail, paidCash, items = []) => {
     if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero' && currentUser?.role !== 'repositor') return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
@@ -1069,7 +1071,7 @@ export function useStore() {
         return Promise.resolve(null)
       }
       const date = new Date().toISOString()
-      const goods = { supplierId, amount, detail, paidCash, date, shiftId }
+      const goods = { supplierId, amount, detail, paidCash, date, shiftId, items }
       enqueueOfflineAction({
         id: uid(),
         type: 'RECEIVE_GOODS',
@@ -1080,7 +1082,7 @@ export function useStore() {
       qc.setQueryData(['suppliers'], (old = []) => {
         return old.map((s) => {
           if (s.id === supplierId) {
-            let entries = [...(s.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash }]
+            let entries = [...(s.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash, items }]
             if (paidCash) {
               entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
             }
@@ -1115,7 +1117,7 @@ export function useStore() {
       }
       return Promise.resolve(goods)
     } else {
-      return receiveGoodsMutation.mutateAsync({ supplierId, amount, detail, paidCash, shiftId })
+      return receiveGoodsMutation.mutateAsync({ supplierId, amount, detail, paidCash, shiftId, items })
     }
   }, [receiveGoodsMutation, isOnline, enqueueOfflineAction, currentShift, qc])
 
