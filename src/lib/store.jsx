@@ -18,7 +18,8 @@ function sanitizeProduct(p) {
     stock: Number(p.stock) || 0,
     "minStock": Number(p.minStock) || 0,
     isMostSold: !!p.isMostSold,
-    unidad: Number(p.unidad) || 1
+    unidad: Number(p.unidad) || 1,
+    controlLotes: !!p.controlLotes
   }
 }
 
