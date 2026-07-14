@@ -487,6 +487,7 @@ export function Venta() {
             onRemove={removeItem}
             onPay={() => setPayOpen(true)}
             onCollapse={toggleCartCollapsed}
+            getExpirationWarning={getExpirationWarning}
           />
         )}
       </aside>
@@ -528,6 +529,7 @@ export function Venta() {
               onChangeQty={changeQty}
               onRemove={removeItem}
               onPay={() => setPayOpen(true)}
+              getExpirationWarning={getExpirationWarning}
             />
           </div>
         </div>
@@ -553,6 +555,7 @@ function CartPanel({
   onRemove,
   onPay,
   onCollapse,
+  getExpirationWarning,
 }) {
   return (
     <>
