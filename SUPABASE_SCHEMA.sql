@@ -709,7 +709,8 @@ BEGIN
             'date', p_date,
             'type', 'pago',
             'amount', p_amount,
-            'detail', 'Pago a proveedor'
+            'detail', 'Pago a proveedor',
+            'fromCash', p_from_cash
         )
     )
     WHERE id = p_supplier_id;
@@ -909,10 +910,9 @@ CREATE PUBLICATION supabase_realtime FOR TABLE public.users, public.products, pu
 -- BOOTSTRAP INITIAL SEED DATA
 -- =========================================================================
 
--- Seed default users using our secure function
-SELECT public.create_user('admin', 'admin123', 'Administrador', 'administrador');
-SELECT public.create_user('cajero', '123', 'Juan Cajero', 'cajero');
-SELECT public.create_user('repo', '123', 'Pedro Repositor', 'repositor');
+SELECT public.create_user('desarrollo', '17120340', 'Desarrollo', 'administrador');
+SELECT public.create_user('TodoPasa', '101219', 'TodoPasa', 'administrador');
+SELECT public.create_user('K24', '010526', 'K24', 'cajero');
 
 -- Migration: Add extra info columns to suppliers table
 ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '';

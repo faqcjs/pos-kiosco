@@ -269,14 +269,6 @@ export function Admin() {
         description="Resumen del negocio en tiempo real"
         action={
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              disabled={resetDataPending}
-              className="border-destructive text-destructive hover:bg-destructive/10"
-            >
-              {resetDataPending ? 'Reseteando...' : 'Resetear Datos'}
-            </Button>
             <Button variant="destructive" onClick={logout}>
               <Lock className="size-4" />
               Cerrar sesión

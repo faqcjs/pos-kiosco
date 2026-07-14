@@ -510,6 +510,12 @@ export function useStore() {
             if (updateError) throw updateError
             break
           }
+          case 'UPDATE_SHIFT_MOVEMENTS': {
+            const { shiftId, movements } = action.payload
+            const { error } = await supabase.from('shifts').update({ movements }).eq('id', shiftId)
+            if (error) throw error
+            break
+          }
           default:
             console.warn(`Unknown action type: ${action.type}`)
         }
@@ -665,7 +671,7 @@ export function useStore() {
         closedAt: new Date().toISOString(),
         closingCounted: counted,
         closingTheoretical: theoretical,
-        difference: counted - theoretical,
+        difference: counted - Math.abs(theoretical),
         status: 'closed',
         closedBy,
       }
@@ -719,6 +725,16 @@ export function useStore() {
     },
   })
 
+  const deleteCustomerMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('customers').delete().eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+  })
+
+
   const addSupplierMutation = useMutation({
     mutationFn: async (sup) => {
       const { data, error } = await supabase.from('suppliers').insert([sup]).select()
@@ -733,6 +749,15 @@ export function useStore() {
       const { data, error } = await supabase.from('suppliers').update(sup).eq('id', sup.id).select()
       if (error) throw error
       return data[0]
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+  })
+
+  const deleteSupplierMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('suppliers').delete().eq('id', id)
+      if (error) throw error
+      return id
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
   })
@@ -972,7 +997,7 @@ export function useStore() {
     const theoretical = shiftTheoretical(currentShift)
     // Optimistically close the shift in the cache immediately (both online and offline)
     const closedAt = new Date().toISOString()
-    const difference = counted - theoretical
+    const difference = counted - Math.abs(theoretical)
     qc.setQueryData(['shifts'], (old = []) => {
       return old.map((s) => {
         if (s.id === currentShift.id) {
@@ -1057,6 +1082,15 @@ export function useStore() {
     return cust
   }, [addCustomerMutation, isOnline, enqueueOfflineAction, qc])
 
+  const deleteCustomer = useCallback((id) => {
+    if (!isOnline) {
+      qc.setQueryData(['customers'], (old = []) => old.filter((c) => c.id !== id))
+    } else {
+      deleteCustomerMutation.mutate(id)
+    }
+  }, [deleteCustomerMutation, isOnline, qc])
+
+
   const registerCustomerPayment = useCallback((customerId, amount) => {
     if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero') return Promise.resolve(null)
     const shiftId = currentShift?.id || null
@@ -1138,6 +1172,71 @@ export function useStore() {
       updateSupplierMutation.mutate(sup)
     }
   }, [updateSupplierMutation, isOnline, enqueueOfflineAction, qc])
+
+  const deleteSupplier = useCallback((id) => {
+    if (!isOnline) {
+      qc.setQueryData(['suppliers'], (old = []) => old.filter((s) => s.id !== id))
+    } else {
+      deleteSupplierMutation.mutate(id)
+    }
+  }, [deleteSupplierMutation, isOnline, qc])
+
+  const deleteSupplierEntry = useCallback(async (supplierId, entryId) => {
+    const suppliers = qc.getQueryData(['suppliers']) || []
+    const supplier = suppliers.find((s) => s.id === supplierId)
+    if (!supplier) return
+
+    const oldEntries = supplier.entries || []
+    const deletedEntry = oldEntries.find((e) => e.id === entryId)
+    if (!deletedEntry) return
+
+    const updatedEntries = oldEntries.filter((e) => e.id !== entryId)
+    const updatedSupplier = { ...supplier, entries: updatedEntries }
+
+    // Determine if it was paid from cash
+    const isCash = 
+      (deletedEntry.type === 'factura' && deletedEntry.paidCash) || 
+      (deletedEntry.type === 'pago' && (deletedEntry.fromCash || deletedEntry.detail?.includes('Pago contado') || deletedEntry.detail?.includes('Caja Chica') || deletedEntry.detail?.includes('pago a proveedor') || deletedEntry.detail?.includes('Pago a proveedor')))
+
+    // Update active shift locally and on DB if it was cash
+    if (isCash && currentShift) {
+      const shiftTime = new Date(deletedEntry.date).getTime()
+      const shiftMov = (currentShift.movements || []).find((m) => {
+        const isType = m.type === 'pago_proveedor'
+        const isAmount = Math.abs(m.amount) === Math.abs(deletedEntry.amount)
+        const isTimeClose = Math.abs(new Date(m.date).getTime() - shiftTime) < 5000
+        return isType && isAmount && isTimeClose
+      })
+
+      if (shiftMov) {
+        const updatedMovements = (currentShift.movements || []).filter((m) => m.id !== shiftMov.id)
+        const updatedShift = { ...currentShift, movements: updatedMovements }
+        
+        qc.setQueryData(['shifts'], (oldShifts = []) => {
+          return oldShifts.map((s) => s.id === currentShift.id ? updatedShift : s)
+        })
+        setCurrentShiftCache(updatedShift)
+
+        if (isOnline) {
+          await supabase.from('shifts').update({ movements: updatedMovements }).eq('id', currentShift.id)
+        } else {
+          enqueueOfflineAction({
+            id: uid(),
+            type: 'UPDATE_SHIFT_MOVEMENTS',
+            payload: { shiftId: currentShift.id, movements: updatedMovements }
+          })
+        }
+      }
+    }
+
+    // Update supplier in cache and DB
+    if (!isOnline) {
+      enqueueOfflineAction({ id: uid(), type: 'UPDATE_SUPPLIER', payload: updatedSupplier })
+      qc.setQueryData(['suppliers'], (old = []) => old.map((s) => s.id === supplierId ? updatedSupplier : s))
+    } else {
+      await updateSupplierMutation.mutateAsync(updatedSupplier)
+    }
+  }, [currentShift, isOnline, qc, updateSupplierMutation, enqueueOfflineAction, setCurrentShiftCache])
 
   const receiveGoods = useCallback((supplierId, amount, detail, paidCash, items = []) => {
     if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero' && currentUser?.role !== 'repositor') return Promise.resolve(null)
@@ -1276,7 +1375,7 @@ export function useStore() {
           if (s.id === supplierId) {
             return {
               ...s,
-              entries: [...(s.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor' }]
+              entries: [...(s.entries || []), { id: uid(), date, type: 'pago', amount, detail: 'Pago a proveedor', fromCash }]
             }
           }
           return s
@@ -1598,9 +1697,12 @@ export function useStore() {
     closeShift,
     addMovement,
     addCustomer,
+    deleteCustomer,
     registerCustomerPayment,
     addSupplier,
     updateSupplier,
+    deleteSupplier,
+    deleteSupplierEntry,
     receiveGoods,
     registerSupplierPayment,
     updateProductBatch,

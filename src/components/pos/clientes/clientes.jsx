@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, HandCoins, Phone, Plus, ShoppingBag, UserPlus, Wallet } from 'lucide-react'
+import { ArrowLeft, HandCoins, Phone, Plus, ShoppingBag, Trash2, UserPlus, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, EmptyState, Input, Label, Modal } from '@/components/ui/kit'
@@ -11,7 +11,7 @@ import { customerBalance, useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 export function Clientes() {
-  const { state, addCustomer, registerCustomerPayment } = useStore()
+  const { state, addCustomer, registerCustomerPayment, deleteCustomer } = useStore()
   const toast = useToast()
   const [selectedId, setSelectedId] = useState(null)
   const [newOpen, setNewOpen] = useState(false)
@@ -48,8 +48,14 @@ export function Clientes() {
             toast(`Pago registrado: ${money(amount)}`)
           }
         }}
+        onDelete={(id) => {
+          deleteCustomer(id)
+          setSelectedId(null)
+          toast('Cliente eliminado', 'info')
+        }}
         hasOpenShift={state.currentShift?.status === 'open'}
         isAdmin={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'cajero'}
+        canDelete={state.currentUser?.role === 'administrador'}
       />
     )
   }
@@ -160,8 +166,10 @@ function CustomerDetail({
   customer,
   onBack,
   onPay,
+  onDelete,
   hasOpenShift,
   isAdmin,
+  canDelete,
 }) {
   const [payOpen, setPayOpen] = useState(false)
   const [amount, setAmount] = useState('')
@@ -194,16 +202,32 @@ function CustomerDetail({
               )}
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Deuda actual</p>
-            <p
-              className={cn(
-                'font-heading text-2xl font-bold tabular-nums',
-                balance > 0 ? 'text-destructive' : 'text-success',
-              )}
-            >
-              {money(balance)}
-            </p>
+          <div className="text-right flex flex-col items-end gap-2">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Deuda actual</p>
+              <p
+                className={cn(
+                  'font-heading text-2xl font-bold tabular-nums',
+                  balance > 0 ? 'text-destructive' : 'text-success',
+                )}
+              >
+                {money(balance)}
+              </p>
+            </div>
+            {canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2.5 gap-1.5 text-xs shrink-0 active:scale-95 border-destructive/50 text-destructive hover:bg-destructive hover:text-white"
+                onClick={() => {
+                  if (window.confirm(`¿Eliminar al cliente "${customer.name}"?\n\nSe borrará todo su historial de deudas y pagos y no se podrá deshacer.`)) {
+                    onDelete(customer.id)
+                  }
+                }}
+              >
+                <Trash2 className="size-3.5" /> Eliminar
+              </Button>
+            )}
           </div>
         </div>
         {isAdmin && (

@@ -4,6 +4,13 @@ export const CATEGORIES = [
   'Snacks',
   'Tabaquería',
   'Helados',
+  'Almacén',
+  'Fiambrería y Lácteos',
+  'Panificados',
+  'Galletitas',
+  'Limpieza y Perfumería',
+  'Bazar',
+  'Librería/Juguetes',
   'Varios',
 ]
 
@@ -13,5 +20,13 @@ export const CATEGORY_ICON = {
   Snacks: '🍿',
   Tabaquería: '🚬',
   Helados: '🍦',
+  Almacén: '🥫',
+  'Fiambrería y Lácteos': '🧀',
+  Panificados: '🍞',
+  Galletitas: '🍪',
+  'Limpieza y Perfumería': '🧼',
+  Bazar: '🍽️',
+  'Librería/Juguetes': '✏️',
   Varios: '📦',
 }
+

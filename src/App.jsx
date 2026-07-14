@@ -282,12 +282,8 @@ function Shell() {
     return <LoginScreen />
   }
 
-  // Shift block checking
-  const isShiftActive = !!state.currentShift
-  const isShiftOwner =
-    state.currentUser?.username === state.currentShift?.openedBy ||
-    state.currentUser?.name === state.currentShift?.openedBy
-  const isBlocked = state.currentUser?.role === 'cajero' && isShiftActive && !isShiftOwner
+  // Shift block checking is disabled since cashiers share a single account ('K24')
+  const isBlocked = false
 
   if (isBlocked) {
     return <BlockScreen currentShift={state.currentShift} logout={logout} />

@@ -43,7 +43,7 @@ function getWhatsAppLink(phone) {
 }
 
 export function Proveedores() {
-  const { state, addSupplier, updateSupplier, receiveGoods, registerSupplierPayment } = useStore()
+  const { state, addSupplier, updateSupplier, deleteSupplier, receiveGoods, registerSupplierPayment } = useStore()
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
@@ -172,6 +172,11 @@ export function Proveedores() {
         onReceive={receiveGoods}
         onPay={registerSupplierPayment}
         onEdit={handleOpenEdit}
+        onDelete={(id) => {
+          deleteSupplier(id)
+          setSelectedId(null)
+          toast('Proveedor eliminado', 'info')
+        }}
         cashOpen={state.currentShift?.status === 'open'}
         canReceive={
           state.currentUser?.role === 'administrador' ||
@@ -180,6 +185,7 @@ export function Proveedores() {
         }
         canPay={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'cajero'}
         canEdit={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'repositor'}
+        canDelete={state.currentUser?.role === 'administrador'}
       />
     )
   }
@@ -500,12 +506,14 @@ function SupplierDetail({
   onReceive,
   onPay,
   onEdit,
+  onDelete,
   cashOpen,
   canReceive,
   canPay,
   canEdit,
+  canDelete,
 }) {
-  const { state } = useStore()
+  const { state, deleteSupplierEntry } = useStore()
   const toast = useToast()
   const balance = supplierBalance(supplier)
   const [receiveOpen, setReceiveOpen] = useState(false)
@@ -527,7 +535,7 @@ function SupplierDetail({
   const [fromCash, setFromCash] = useState(true)
 
   const selectedProd = selectedProdId ? state.products.find((p) => p.id === selectedProdId) : null
-  const requiresBatch = selectedProd?.controlLotes
+  const requiresBatch = false // selectedProd?.controlLotes — disabled while in development
 
   const entries = [...supplier.entries].reverse()
 
@@ -635,6 +643,10 @@ function SupplierDetail({
       toast('Agregá al menos un ítem al recibo.', 'error')
       return
     }
+    if (paidCash && !cashOpen) {
+      toast('No hay una caja abierta. Abrí la caja antes de registrar un pago al contado, o marcá la compra "a cuenta".', 'error')
+      return
+    }
 
     const totalAmount = items.reduce((sum, it) => sum + it.cost, 0)
     const detailString = items.map((it) => {
@@ -698,6 +710,11 @@ function SupplierDetail({
     }
   }
 
+  function handleDeleteEntry(entryId) {
+    if (!window.confirm('¿Eliminar este movimiento?')) return
+    deleteSupplierEntry(supplier.id, entryId)
+  }
+
   return (
     <div className="mx-auto max-w-3xl p-1.5 lg:p-6 space-y-6">
       <button
@@ -725,16 +742,32 @@ function SupplierDetail({
               <p className="text-sm text-muted-foreground">Cuenta corriente</p>
             </div>
           </div>
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-2.5 gap-1.5 text-xs shrink-0 active:scale-95 border-border hover:border-primary/30"
-              onClick={() => onEdit(supplier)}
-            >
-              <Pencil className="size-3.5" /> Editar
-            </Button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 px-2.5 gap-1.5 text-xs shrink-0 active:scale-95 border-border hover:border-primary/30"
+                onClick={() => onEdit(supplier)}
+              >
+                <Pencil className="size-3.5" /> Editar
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 px-2.5 gap-1.5 text-xs shrink-0 active:scale-95 border-destructive/50 text-destructive hover:bg-destructive hover:text-white"
+                onClick={() => {
+                  if (window.confirm(`¿Eliminar al proveedor "${supplier.name}"?\n\nSe eliminarán también todos sus movimientos e historial de cuenta corriente. Esta acción no se puede deshacer.`)) {
+                    onDelete(supplier.id)
+                  }
+                }}
+              >
+                <Trash2 className="size-3.5" /> Eliminar
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Contact info list */}
@@ -860,6 +893,15 @@ function SupplierDetail({
                     {isInvoice ? '+' : '−'}
                     {money(e.amount)}
                   </p>
+                  {canEdit && (
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); handleDeleteEntry(e.id) }}
+                      className="ml-1 p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      title="Eliminar movimiento"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -870,138 +912,84 @@ function SupplierDetail({
       {/* Recibir mercadería */}
       <Modal open={receiveOpen} onClose={() => setReceiveOpen(false)} title="Recibir mercadería">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-          {/* Segmented controls: Catalog product vs Custom Concept */}
-          <div className="flex rounded-xl bg-muted p-1 border border-border/40">
-            <button
-              type="button"
-              onClick={() => setAddItemType('catalog')}
-              className={cn(
-                "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
-                addItemType === 'catalog'
-                  ? "bg-card text-foreground shadow-sm font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Producto del catálogo
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddItemType('custom')}
-              className={cn(
-                "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
-                addItemType === 'custom'
-                  ? "bg-card text-foreground shadow-sm font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Concepto general / Otro
-            </button>
-          </div>
-
-          {addItemType === 'catalog' ? (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Select
-                    value={selectedProdId}
-                    onChange={(e) => {
-                      setSelectedProdId(e.target.value)
-                      setBatchCode('')
-                      setExpirationDate('')
-                    }}
-                  >
-                    <option value="">-- Seleccionar producto --</option>
-                    {state.products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (Bulto: x{p.unidad || 1}) - Costo: {money(p.cost)}/un
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <Button 
-                  type="button" 
-                  onClick={handleAddCatalogItem} 
-                  disabled={!selectedProdId || (requiresBatch && (!batchCode.trim() || !expirationDate))} 
-                  className="h-11 shrink-0"
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Select
+                  value={selectedProdId}
+                  onChange={(e) => {
+                    setSelectedProdId(e.target.value)
+                    setBatchCode('')
+                    setExpirationDate('')
+                  }}
                 >
-                  <Plus className="size-4 mr-1" /> Cargar
-                </Button>
+                  <option value="">-- Seleccionar producto --</option>
+                  {state.products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} (Bulto: x{p.unidad || 1}) - Costo: {money(p.cost)}/un
+                    </option>
+                  ))}
+                </Select>
               </div>
-
-              {requiresBatch && (
-                <div className="space-y-3 p-3 bg-muted/40 border border-border/50 rounded-2xl">
-                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-500 flex items-center gap-1.5">
-                    <span>⚠️</span> Este producto requiere control de lotes y vencimiento.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="item-batchCode">Código de Lote</Label>
-                      <Input
-                        id="item-batchCode"
-                        value={batchCode}
-                        onChange={(e) => setBatchCode(e.target.value)}
-                        placeholder="Ej: L123"
-                        className="h-9 text-xs"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="item-expirationDate">Fecha de Vencimiento</Label>
-                      <Input
-                        id="item-expirationDate"
-                        type="date"
-                        value={expirationDate}
-                        onChange={(e) => setExpirationDate(e.target.value)}
-                        className="h-9 text-xs"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
-              <div>
-                <Label htmlFor="custom-name">Concepto / Detalle</Label>
-                <Input
-                  id="custom-name"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="Ej: Bolsas de consorcio"
-                  className="h-11"
-                />
-              </div>
-              <div>
-                <Label htmlFor="custom-cost">Costo total</Label>
-                <Input
-                  id="custom-cost"
-                  type="number"
-                  inputMode="numeric"
-                  value={customCost}
-                  onChange={(e) => setCustomCost(e.target.value)}
-                  placeholder="0"
-                  className="h-11"
-                />
-              </div>
-              <Button type="button" onClick={handleAddCustomItem} disabled={!customName.trim() || !Number(customCost)} className="h-11 shrink-0">
+              <Button 
+                type="button" 
+                onClick={handleAddCatalogItem} 
+                disabled={!selectedProdId}
+                className="h-11 shrink-0"
+              >
                 <Plus className="size-4 mr-1" /> Cargar
               </Button>
             </div>
-          )}
+
+            {/* Batch fields — disabled while in development
+            {requiresBatch && (
+              <div className="space-y-3 p-3 bg-muted/40 border border-border/50 rounded-2xl">
+                <p className="text-xs font-semibold text-amber-600 dark:text-amber-500 flex items-center gap-1.5">
+                  <span>⚠️</span> Este producto requiere control de lotes y vencimiento.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="item-batchCode">Código de Lote</Label>
+                    <Input
+                      id="item-batchCode"
+                      value={batchCode}
+                      onChange={(e) => setBatchCode(e.target.value)}
+                      placeholder="Ej: L123"
+                      className="h-9 text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="item-expirationDate">Fecha de Vencimiento</Label>
+                    <Input
+                      id="item-expirationDate"
+                      type="date"
+                      value={expirationDate}
+                      onChange={(e) => setExpirationDate(e.target.value)}
+                      className="h-9 text-xs"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            */}
+          </div>
+
 
           {/* Loaded items list */}
           {items.length > 0 && (
             <div className="border border-border rounded-2xl overflow-hidden bg-card/50">
-              <div className="bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider grid grid-cols-[1fr_80px_100px_40px] gap-2 border-b border-border">
+              <div className="bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider grid grid-cols-[1fr_60px_80px_100px_40px] gap-2 border-b border-border">
                 <span>Detalle / Producto</span>
                 <span className="text-center">Bultos</span>
+                <span className="text-right">Costo/Un.</span>
                 <span className="text-right">Costo Total</span>
                 <span></span>
               </div>
               <div className="divide-y divide-border/60 max-h-[30vh] overflow-y-auto pr-1">
                 {items.map((item) => (
-                  <div key={item.id} className="px-3 py-2 text-sm grid grid-cols-[1fr_80px_100px_40px] gap-2 items-center">
+                  <div key={item.id} className="px-3 py-2 text-sm grid grid-cols-[1fr_60px_80px_100px_40px] gap-2 items-center">
                     <div className="min-w-0">
                       <p className="font-semibold truncate text-foreground leading-tight">{item.name}</p>
                       {!item.isCustom && (
@@ -1020,6 +1008,11 @@ function SupplierDetail({
                         disabled={item.isCustom}
                         className="h-8 text-center px-1 py-0.5 rounded-lg border-border"
                       />
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                        {item.totalUnits > 0 ? money(item.cost / item.totalUnits) : '—'}
+                      </span>
                     </div>
                     <div>
                       <Input

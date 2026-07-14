@@ -61,9 +61,15 @@ export function Stock() {
 
     const existing = state.products.find((p) => p.barcode === code)
     if (existing) {
-      const inc = existing.unidad || 1
-      adjustStock(existing.id, inc)
-      toast(`Se sumó ${inc} unidad${inc === 1 ? '' : 'es'} a ${existing.name} (Stock actual: ${existing.stock + inc})`, 'success')
+      if (existing.controlLotes) {
+        // Batch-controlled products must have stock added via a batch entry, not directly
+        openEdit(existing)
+        toast(`${existing.name} usa control de lotes. Agregá el stock desde el panel de lotes.`, 'info')
+      } else {
+        const inc = existing.unidad || 1
+        adjustStock(existing.id, inc)
+        toast(`Se sumó ${inc} unidad${inc === 1 ? '' : 'es'} a ${existing.name} (Stock actual: ${existing.stock + inc})`, 'success')
+      }
     } else {
       setDraft({ ...EMPTY, barcode: code, stock: 1, unidad: 1 })
       setFormOpen(true)
@@ -81,12 +87,11 @@ export function Stock() {
       return
     }
     const u = draft.unidad || 1
-    const finalProduct = { ...draft, stock: Number(draft.stock) || 0, unidad: u }
     if (draft.id) {
-      updateProduct(finalProduct)
+      updateProduct({ ...draft, unidad: u })
       toast('Producto actualizado')
     } else {
-      addProduct(finalProduct)
+      addProduct({ ...draft, stock: Number(draft.stock) || 0, unidad: u })
       toast('Producto agregado')
     }
     setFormOpen(false)
@@ -162,19 +167,6 @@ export function Stock() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <p className="truncate text-sm font-medium">{p.name}</p>
-                        {p.controlLotes && (
-                          <button
-                            onClick={() => setExpandedProductId(isExpanded ? null : p.id)}
-                            className={cn(
-                              "ml-2 rounded px-2 py-0.5 text-[10px] font-semibold border transition-colors",
-                              isExpanded 
-                                ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700" 
-                                : "border-border text-muted-foreground hover:bg-muted"
-                            )}
-                          >
-                            {isExpanded ? 'Cerrar lotes' : 'Ver lotes'}
-                          </button>
-                        )}
                       </div>
                       <p className="truncate text-xs text-muted-foreground">
                         {p.category} · {p.barcode || 'sin código'}
@@ -237,143 +229,8 @@ export function Stock() {
                     </button>
                   </div>
                 </div>
-                {isExpanded && (
-                  <div className="border-t border-border bg-muted/20 px-4 py-4 text-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-2">
-                      <h4 className="font-heading font-bold text-foreground">Control de Lotes - {p.name}</h4>
-                      <div className="text-xs text-muted-foreground">
-                        Total Stock en Lotes: <span className="font-bold">{p.stock} u.</span>
-                      </div>
-                    </div>
+                {/* Batch panel — disabled while batch control is in development */}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Active Batches */}
-                      <div className="space-y-2">
-                        <h5 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Lotes Activos</h5>
-                        {(() => {
-                          const active = (state.productBatches || [])
-                            .filter((b) => b.productId === p.id && b.stock > 0)
-                          if (active.length === 0) return <p className="text-xs text-muted-foreground italic">No hay lotes activos con stock.</p>
-                          return (
-                            <div className="space-y-1.5">
-                              {active.map((b) => {
-                                const isExpired = new Date(b.expirationDate) < new Date()
-                                return (
-                                  <div key={b.id} className="flex items-center justify-between bg-card border border-border p-2 rounded-lg">
-                                    <div>
-                                      <span className="font-mono font-bold text-xs bg-muted px-1.5 py-0.5 rounded text-foreground mr-2">{b.batchCode}</span>
-                                      <span className={cn("text-xs font-medium", isExpired ? "text-destructive font-bold" : "text-muted-foreground")}>
-                                        Vence: {new Date(b.expirationDate).toLocaleDateString()}
-                                        {isExpired && " (VENCIDO)"}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <button
-                                        disabled={!isAdmin}
-                                        onClick={() => updateProductBatch({ ...b, stock: Math.max(0, b.stock - 1) })}
-                                        className="size-6 flex items-center justify-center rounded border border-border bg-card hover:bg-muted disabled:opacity-40"
-                                      >
-                                        -
-                                      </button>
-                                      <span className="w-8 text-center font-bold font-mono text-xs">{b.stock}</span>
-                                      <button
-                                        disabled={!isAdmin}
-                                        onClick={() => updateProductBatch({ ...b, stock: b.stock + 1 })}
-                                        className="size-6 flex items-center justify-center rounded border border-border bg-card hover:bg-muted disabled:opacity-40"
-                                      >
-                                        +
-                                      </button>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )
-                        })()}
-                      </div>
-
-                      {/* Empty/Expired Batches */}
-                      <div className="space-y-2">
-                        <h5 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Historial de Lotes / Vacíos</h5>
-                        {(() => {
-                          const historical = (state.productBatches || [])
-                            .filter((b) => b.productId === p.id && b.stock <= 0)
-                          if (historical.length === 0) return <p className="text-xs text-muted-foreground italic">No hay historial de lotes vacíos.</p>
-                          return (
-                            <div className="space-y-1.5">
-                              {historical.map((b) => (
-                                <div key={b.id} className="flex items-center justify-between bg-card/60 border border-border/60 p-2 rounded-lg opacity-70">
-                                  <div>
-                                    <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground mr-2">{b.batchCode}</span>
-                                    <span className="text-xs text-muted-foreground">Vence: {new Date(b.expirationDate).toLocaleDateString()}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-medium text-muted-foreground">Vacío</span>
-                                    <button
-                                      disabled={!isAdmin}
-                                      onClick={() => updateProductBatch({ ...b, stock: 1 })}
-                                      className="size-6 flex items-center justify-center rounded border border-border bg-card hover:bg-muted ml-2 text-xs"
-                                    >
-                                      +
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    </div>
-
-                    {isAdmin && (
-                      <div className="border-t border-border pt-3 mt-2">
-                        <h5 className="font-semibold text-xs text-muted-foreground mb-2">Agregar Lote Manualmente</h5>
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault()
-                            const form = e.target
-                            const code = form.batchCode.value.trim()
-                            const dateStr = form.expirationDate.value
-                            const qty = Number(form.stock.value)
-                            if (!code || !dateStr || isNaN(qty) || qty < 0) {
-                              toast('Completar todos los campos del lote correctamente', 'error')
-                              return
-                            }
-                            updateProductBatch({
-                              id: `b-${Date.now()}`,
-                              productId: p.id,
-                              batchCode: code,
-                              expirationDate: new Date(dateStr).toISOString(),
-                              stock: qty
-                            }).then(() => {
-                              toast('Lote agregado con éxito', 'success')
-                              form.reset()
-                            }).catch((err) => {
-                              toast(err.message || 'Error al agregar lote', 'error')
-                            })
-                          }}
-                          className="flex flex-wrap items-end gap-3"
-                        >
-                          <div className="flex-1 min-w-[120px]">
-                            <Label htmlFor={`code-${p.id}`} className="text-[10px] uppercase text-muted-foreground">Código Lote</Label>
-                            <Input id={`code-${p.id}`} name="batchCode" placeholder="B123" className="h-8 text-xs mt-0.5" required />
-                          </div>
-                          <div className="flex-1 min-w-[120px]">
-                            <Label htmlFor={`exp-${p.id}`} className="text-[10px] uppercase text-muted-foreground">Fecha Venc.</Label>
-                            <Input id={`exp-${p.id}`} name="expirationDate" type="date" className="h-8 text-xs mt-0.5" required />
-                          </div>
-                          <div className="w-20">
-                            <Label htmlFor={`qty-${p.id}`} className="text-[10px] uppercase text-muted-foreground">Stock</Label>
-                            <Input id={`qty-${p.id}`} name="stock" type="number" defaultValue="1" className="h-8 text-xs mt-0.5" required />
-                          </div>
-                          <Button type="submit" className="h-8 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white">
-                            Agregar
-                          </Button>
-                        </form>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             )
           })}
@@ -507,6 +364,7 @@ function ProductFormModal({
           )}
 
           <div className="grid grid-cols-3 gap-3">
+            {(!draft.controlLotes || draft.id) && (
             <div>
               <Label htmlFor="stock">{draft.id ? 'Stock' : 'Stock inicial'}</Label>
               <Input
@@ -519,6 +377,7 @@ function ProductFormModal({
                 disabled={Boolean(draft.id && !isAdmin)}
               />
             </div>
+            )}
             <div>
               <Label htmlFor="minStock">Stock mínimo</Label>
               <Input
@@ -544,6 +403,7 @@ function ProductFormModal({
             </div>
           </div>
 
+          {/* Batch control checkbox — disabled while in development
           <div className="flex items-center space-x-2 pt-2 border-t border-border">
             <input
               type="checkbox"
@@ -556,6 +416,13 @@ function ProductFormModal({
               Control de Lotes y Vencimiento
             </Label>
           </div>
+          {draft.controlLotes && !draft.id && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+              ⚠️ Al guardar el producto, agregá el stock inicial desde el panel <strong>Ver lotes</strong> en el catálogo.
+            </p>
+          )}
+          */}
+
         </div>
       </Modal>
 

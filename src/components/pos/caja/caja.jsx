@@ -71,7 +71,7 @@ function ClosedShiftView({
   openShiftPending,
 }) {
   const [amount, setAmount] = useState('')
-  const cashierName = currentUser?.name || 'Desconocido'
+  const [cashierName, setCashierName] = useState('')
   return (
     <Card className="flex flex-col items-center gap-4 p-8 text-center">
       <div className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
@@ -79,14 +79,21 @@ function ClosedShiftView({
       </div>
       <div>
         <h2 className="font-heading text-lg font-bold">La caja está cerrada</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground text-pretty">
-          El cajero <strong className="text-foreground">{cashierName}</strong> va a abrir el turno.
-        </p>
         <p className="text-xs text-muted-foreground mt-1">
-          Ingresá el monto de efectivo inicial en caja para iniciar las operaciones.
+          Ingresá tu nombre y el monto de efectivo inicial en caja para abrir el turno.
         </p>
       </div>
       <div className="w-full max-w-xs text-left space-y-3">
+        <div>
+          <Label htmlFor="cashier-name">Nombre del cajero/a</Label>
+          <Input
+            id="cashier-name"
+            value={cashierName}
+            onChange={(e) => setCashierName(e.target.value)}
+            placeholder="Ej: Juan"
+            required
+          />
+        </div>
         <div>
           <Label htmlFor="opening">Monto de apertura</Label>
           <Input
@@ -102,13 +109,14 @@ function ClosedShiftView({
       </div>
       <Button
         className="h-12 w-full max-w-xs bg-success text-base font-bold text-success-foreground hover:bg-success/90"
-        disabled={openShiftPending}
+        disabled={openShiftPending || !cashierName.trim()}
         onClick={() => {
           const n = Number(amount)
           if (n < 0 || Number.isNaN(n)) return
-          onOpen(n, currentUser?.username || 'admin')
+          onOpen(n, cashierName.trim())
           toast('Caja abierta')
           setAmount('')
+          setCashierName('')
         }}
       >
         <LockOpen className="size-5" />
@@ -138,6 +146,7 @@ function OpenShiftView({
   const [movReason, setMovReason] = useState('')
   const [closeOpen, setCloseOpen] = useState(false)
   const [counted, setCounted] = useState('')
+  const [closeCashierName, setCloseCashierName] = useState('')
   const [selectedSale, setSelectedSale] = useState(null)
 
   const shiftSales = useMemo(() => {
@@ -177,7 +186,7 @@ function OpenShiftView({
   }
 
   const countedNum = Number(counted)
-  const diff = countedNum - theoretical
+  const diff = countedNum - Math.abs(theoretical)
 
   return (
     <div className="space-y-5">
@@ -416,16 +425,16 @@ function OpenShiftView({
         footer={
           <Button
             className="h-12 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
-            disabled={counted === '' || closeShiftPending}
+            disabled={counted === '' || !closeCashierName.trim() || closeShiftPending}
             onClick={async () => {
-              const cashierName = state.currentUser?.name || 'Administrador'
               try {
-                await onClose(countedNum, cashierName)
+                await onClose(countedNum, closeCashierName.trim())
                 const label =
                   diff === 0 ? 'Caja perfecta' : diff > 0 ? `Sobrante ${money(diff)}` : `Faltante ${money(Math.abs(diff))}`
                 toast(`Caja cerrada. ${label}`, diff === 0 ? 'success' : 'info')
                 setCloseOpen(false)
                 setCounted('')
+                setCloseCashierName('')
               } catch (err) {
                 console.error(err)
                 toast(err?.message || 'Error al cerrar la caja. Intentá de nuevo.', 'error')
@@ -440,6 +449,16 @@ function OpenShiftView({
           <div className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
             <span className="text-sm text-muted-foreground">Total teórico</span>
             <span className="font-heading text-lg font-bold tabular-nums">{money(theoretical)}</span>
+          </div>
+          <div>
+            <Label htmlFor="close-cashier-name">Nombre del cajero/a que cierra</Label>
+            <Input
+              id="close-cashier-name"
+              value={closeCashierName}
+              onChange={(e) => setCloseCashierName(e.target.value)}
+              placeholder="Ej: María"
+              required
+            />
           </div>
           <div>
             <Label htmlFor="counted">Monto físico real en caja</Label>
