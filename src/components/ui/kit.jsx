@@ -113,15 +113,18 @@ export function Modal({
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
-    // iOS Safari fix: use class instead of overflow:hidden
+
+    // iOS Safari scroll-lock: position:fixed resets scrollY to 0, causing a
+    // visual jump. Fix: store scrollY, set body top to -scrollY BEFORE adding
+    // the class so the browser keeps the visual position intact.
     const scrollY = window.scrollY
+    document.body.style.top = `-${scrollY}px`
     document.body.classList.add('modal-open')
-    // Restore scroll position — mobile browsers jump to top when focusing
-    // inputs inside fixed overlays; this counteracts that.
-    window.scrollTo({ top: scrollY, behavior: 'instant' })
+
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.classList.remove('modal-open')
+      document.body.style.top = ''
       window.scrollTo({ top: scrollY, behavior: 'instant' })
     }
   }, [open, onClose])
