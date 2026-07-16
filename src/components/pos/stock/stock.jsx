@@ -43,13 +43,37 @@ async function fetchOpenFoodFacts(barcode) {
     const data = await res.json()
     if (data.status !== 1 || !data.product) return null
     const p = data.product
-    const name =
-      p.product_name_es ||
-      p.product_name ||
-      p.abbreviated_product_name ||
+
+    // Brand: first item from comma-separated list
+    const brand = p.brands?.split(',')[0]?.trim() ?? ''
+
+    // Name: explicit fields first, then compose from brand or keywords
+    let name =
+      p.product_name_es?.trim() ||
+      p.product_name?.trim() ||
+      p.abbreviated_product_name?.trim() ||
+      ''
+
+    if (!name) {
+      // Try to build from brand + first meaningful keyword
+      const keyword = (p._keywords ?? [])
+        .filter((k) => k.length > 2)
+        .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
+        .join(' ')
+      name = brand ? `${brand}${keyword ? ` ${keyword}` : ''}` : keyword
+    }
+
+    const quantity = p.quantity?.trim() ?? ''
+    const image =
+      p.selected_images?.front?.display?.es ||
+      p.image_front_url ||
       ''
     const category = mapOffCategory(p.categories_tags)
-    return name ? { name: name.trim(), category } : null
+
+    // Return null only if there's truly nothing useful
+    if (!name && category === 'Varios' && !brand) return null
+
+    return { name, category, brand, quantity, image }
   } catch {
     return null
   }
@@ -350,6 +374,9 @@ function ProductFormModal({
           barcode: code,
           name: prev.name || offData.name,
           category: offData.category,
+          brand: offData.brand || prev.brand || '',
+          quantity: offData.quantity || prev.quantity || '',
+          image: offData.image || prev.image || '',
           offFound: true,
         }))
       } else {
@@ -372,9 +399,37 @@ function ProductFormModal({
       >
         <div className="space-y-4">
           {draft.offFound && (
-            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
-              <CheckCircle className="size-4 shrink-0" />
-              <span>Datos completados desde <strong>OpenFoodFacts</strong>. Revisá y ajustá si es necesario.</span>
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+              <div className="flex items-start gap-3">
+                {draft.image && (
+                  <img
+                    src={draft.image}
+                    alt="Producto"
+                    className="h-14 w-14 shrink-0 rounded-lg border border-emerald-500/20 object-contain bg-white"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <CheckCircle className="size-3.5 shrink-0" />
+                    Datos desde <strong>OpenFoodFacts</strong>
+                  </div>
+                  {(draft.brand || draft.quantity) && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {draft.brand && (
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium">
+                          🏭 {draft.brand}
+                        </span>
+                      )}
+                      {draft.quantity && (
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium">
+                          📦 {draft.quantity}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <p className="mt-1 text-xs opacity-75">Revisá y ajustá si es necesario.</p>
+                </div>
+              </div>
             </div>
           )}
 
