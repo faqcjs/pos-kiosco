@@ -1,7 +1,7 @@
 'use client'
 
-import { AlertTriangle, Camera, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { AlertTriangle, Camera, CheckCircle, Loader2, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
@@ -11,6 +11,49 @@ import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
 import { cn } from '@/lib/utils'
+
+// Maps OpenFoodFacts categories_tags keywords → kiosk categories
+const OFF_CATEGORY_MAP = [
+  { keys: ['beverages', 'drinks', 'sodas', 'juices', 'waters', 'energy-drinks', 'aguas', 'bebidas', 'gaseosas', 'jugos'], cat: 'Bebidas' },
+  { keys: ['candies', 'sweets', 'chocolates', 'gummies', 'lollipops', 'caramelos', 'golosinas', 'chicles', 'chewing-gums'], cat: 'Golosinas' },
+  { keys: ['snacks', 'chips', 'crackers', 'popcorn', 'nuts', 'papas-fritas', 'maní'], cat: 'Snacks' },
+  { keys: ['tobacco', 'cigarettes', 'cigars', 'tabaco', 'cigarrillos'], cat: 'Tabaquería' },
+  { keys: ['ice-creams', 'frozen-desserts', 'helados', 'gelatos'], cat: 'Helados' },
+  { keys: ['biscuits', 'cookies', 'wafers', 'galletitas', 'bizcochos'], cat: 'Galletitas' },
+  { keys: ['breads', 'baked-goods', 'pastries', 'panes', 'facturas', 'medialunas'], cat: 'Panificados' },
+  { keys: ['cheeses', 'dairy', 'yogurts', 'milks', 'cold-cuts', 'deli', 'lacteos', 'quesos', 'fiambres', 'yogures'], cat: 'Fiambrería y Lácteos' },
+  { keys: ['cleaning', 'hygiene', 'personal-care', 'cosmetics', 'detergents', 'limpieza', 'perfumeria', 'higiene'], cat: 'Limpieza y Perfumería' },
+  { keys: ['stationery', 'toys', 'school-supplies', 'librería', 'juguetes'], cat: 'Librería/Juguetes' },
+  { keys: ['tableware', 'kitchenware', 'bazar'], cat: 'Bazar' },
+  { keys: ['canned', 'condiments', 'sauces', 'pastas', 'cereals', 'coffee', 'teas', 'almacen', 'conservas', 'condimentos'], cat: 'Almacén' },
+]
+
+function mapOffCategory(categoriesTags = []) {
+  const joined = categoriesTags.join(' ').toLowerCase()
+  for (const { keys, cat } of OFF_CATEGORY_MAP) {
+    if (keys.some((k) => joined.includes(k))) return cat
+  }
+  return 'Varios'
+}
+
+async function fetchOpenFoodFacts(barcode) {
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`)
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data.status !== 1 || !data.product) return null
+    const p = data.product
+    const name =
+      p.product_name_es ||
+      p.product_name ||
+      p.abbreviated_product_name ||
+      ''
+    const category = mapOffCategory(p.categories_tags)
+    return name ? { name: name.trim(), category } : null
+  } catch {
+    return null
+  }
+}
 
 const EMPTY = {
   barcode: '',
@@ -34,6 +77,7 @@ export function Stock() {
   const [draft, setDraft] = useState(EMPTY)
   const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
   const [expandedProductId, setExpandedProductId] = useState(null)
+  const [offLookupLoading, setOffLookupLoading] = useState(false)
 
   const alerts = useMemo(
     () => state.products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock),
@@ -71,8 +115,21 @@ export function Stock() {
         toast(`Se sumó ${inc} unidad${inc === 1 ? '' : 'es'} a ${existing.name} (Stock actual: ${existing.stock + inc})`, 'success')
       }
     } else {
-      setDraft({ ...EMPTY, barcode: code, stock: 1, unidad: 1 })
-      setFormOpen(true)
+      // New product — try to pre-fill from OpenFoodFacts
+      setOffLookupLoading(true)
+      setBarcodeSearchOpen(false)
+      fetchOpenFoodFacts(code).then((offData) => {
+        setOffLookupLoading(false)
+        setDraft({
+          ...EMPTY,
+          barcode: code,
+          stock: 1,
+          unidad: 1,
+          ...(offData ?? {}),
+          offFound: Boolean(offData),
+        })
+        setFormOpen(true)
+      })
     }
   }
 
@@ -99,6 +156,15 @@ export function Stock() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-1.5 lg:p-6">
+      {offLookupLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-4 shadow-xl">
+            <Loader2 className="size-5 animate-spin text-primary" />
+            <span className="text-sm font-medium">Buscando en OpenFoodFacts…</span>
+          </div>
+        </div>
+      )}
+
       <PageHeader
         title="Stock"
         description="Catálogo e inventario de productos."
@@ -267,8 +333,30 @@ function ProductFormModal({
   const { state } = useStore()
   const isAdmin = state.currentUser?.role === 'administrador'
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [offLoading, setOffLoading] = useState(false)
+  const lastFetchedBarcode = useRef('')
   const margin = draft.price - draft.cost
   const marginPct = draft.cost > 0 ? Math.round((margin / draft.cost) * 100) : 0
+
+  function lookupBarcode(code) {
+    if (!code || code === lastFetchedBarcode.current) return
+    lastFetchedBarcode.current = code
+    setOffLoading(true)
+    fetchOpenFoodFacts(code).then((offData) => {
+      setOffLoading(false)
+      if (offData) {
+        setDraft((prev) => ({
+          ...prev,
+          barcode: code,
+          name: prev.name || offData.name,
+          category: offData.category,
+          offFound: true,
+        }))
+      } else {
+        setDraft((prev) => ({ ...prev, offFound: false }))
+      }
+    })
+  }
 
   return (
     <>
@@ -283,6 +371,13 @@ function ProductFormModal({
         }
       >
         <div className="space-y-4">
+          {draft.offFound && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+              <CheckCircle className="size-4 shrink-0" />
+              <span>Datos completados desde <strong>OpenFoodFacts</strong>. Revisá y ajustá si es necesario.</span>
+            </div>
+          )}
+
           <div>
             <Label htmlFor="barcode">Código de barras</Label>
             <div className="flex gap-2">
@@ -290,6 +385,7 @@ function ProductFormModal({
                 id="barcode"
                 value={draft.barcode}
                 onChange={(e) => setDraft({ ...draft, barcode: e.target.value })}
+                onBlur={(e) => lookupBarcode(e.target.value.trim())}
                 placeholder="Escaneá o escribí el código"
                 inputMode="numeric"
               />
@@ -298,8 +394,9 @@ function ProductFormModal({
                 className="h-11 w-11 shrink-0 p-0"
                 onClick={() => setScannerOpen(true)}
                 aria-label="Escanear"
+                disabled={offLoading}
               >
-                <Camera className="size-5" />
+                {offLoading ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-5" />}
               </Button>
             </div>
           </div>
@@ -430,8 +527,9 @@ function ProductFormModal({
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
         onDetect={(code) => {
-          setDraft({ ...draft, barcode: code })
+          setDraft((prev) => ({ ...prev, barcode: code }))
           setScannerOpen(false)
+          lookupBarcode(code)
         }}
       />
     </>
