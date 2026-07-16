@@ -3,7 +3,7 @@
 import { AlertTriangle, Camera, CheckCircle, Loader2, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge, Card, Input, Label, Modal, Select } from '@/components/ui/kit'
+import { Badge, Card, Input, Label, Modal, Select, Skeleton } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
@@ -91,8 +91,45 @@ const EMPTY = {
   controlLotes: false,
 }
 
+function StockSkeleton() {
+  return (
+    <div className="mx-auto max-w-5xl space-y-5 p-1.5 lg:p-6 animate-in fade-in duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="h-4 w-52" />
+        </div>
+        <Skeleton className="h-10 w-36 rounded-xl" />
+      </div>
+      {/* Search */}
+      <Skeleton className="h-11 w-full rounded-xl" />
+      {/* Table */}
+      <Card className="overflow-hidden">
+        <div className="border-b border-border bg-muted/50 px-4 py-2.5">
+          <Skeleton className="h-3 w-48 rounded" />
+        </div>
+        <div className="divide-y divide-border">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3">
+              <Skeleton className="size-8 shrink-0 rounded-lg" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-4 w-2/5 rounded" />
+                <Skeleton className="h-3 w-1/4 rounded" />
+              </div>
+              <Skeleton className="h-4 w-14 rounded" />
+              <Skeleton className="h-4 w-14 rounded" />
+              <Skeleton className="h-7 w-24 rounded-lg" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 export function Stock() {
-  const { state, addProduct, updateProduct, deleteProduct, adjustStock, updateProductBatch } = useStore()
+  const { state, addProduct, updateProduct, deleteProduct, adjustStock, updateProductBatch, loadingProducts } = useStore()
   const role = state.currentUser?.role
   const isAdmin = role === 'administrador'
   const toast = useToast()
@@ -187,6 +224,8 @@ export function Stock() {
     }
     setFormOpen(false)
   }
+
+  if (loadingProducts) return <StockSkeleton />
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-1.5 lg:p-6">

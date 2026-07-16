@@ -1723,5 +1723,6 @@ export function useStore() {
     openShiftPending: openShiftMutation.isPending,
     closeShiftPending: closeShiftMutation.isPending,
     resetDataPending: resetDataMutation.isPending,
+    loadingProducts,
   }
 }

@@ -295,15 +295,17 @@ function Shell() {
   }
 
   return (
-    <AppShell active={active} onChange={handleRouteChange}>
-      {active === 'venta' && !state.currentUser?.role?.includes('repositor') ? (
-        <Screen active={active} />
-      ) : (
-        <div className="px-1.5 py-2.5 sm:px-6 lg:px-8 lg:py-8">
+    <div className="animate-in fade-in duration-300">
+      <AppShell active={active} onChange={handleRouteChange}>
+        {active === 'venta' && !state.currentUser?.role?.includes('repositor') ? (
           <Screen active={active} />
-        </div>
-      )}
-    </AppShell>
+        ) : (
+          <div className="px-1.5 py-2.5 sm:px-6 lg:px-8 lg:py-8">
+            <Screen active={active} />
+          </div>
+        )}
+      </AppShell>
+    </div>
   )
 }
 
