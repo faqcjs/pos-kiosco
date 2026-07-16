@@ -114,10 +114,15 @@ export function Modal({
     }
     document.addEventListener('keydown', onKey)
     // iOS Safari fix: use class instead of overflow:hidden
+    const scrollY = window.scrollY
     document.body.classList.add('modal-open')
+    // Restore scroll position — mobile browsers jump to top when focusing
+    // inputs inside fixed overlays; this counteracts that.
+    window.scrollTo({ top: scrollY, behavior: 'instant' })
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.classList.remove('modal-open')
+      window.scrollTo({ top: scrollY, behavior: 'instant' })
     }
   }, [open, onClose])
 
