@@ -9,12 +9,19 @@ const ToastContext = createContext(null)
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
-  const toast = useCallback((message, tone = 'success') => {
+  // toast(message, tone?, action?)
+  // action = { label: string, onClick: () => void }
+  const toast = useCallback((message, tone = 'success', action = null) => {
     const id = Date.now() + Math.random()
-    setToasts((t) => [...t, { id, message, tone }])
+    const duration = action ? 4500 : 2800
+    setToasts((t) => [...t, { id, message, tone, action }])
     setTimeout(() => {
       setToasts((t) => t.filter((x) => x.id !== id))
-    }, 2800)
+    }, duration)
+  }, [])
+
+  const dismiss = useCallback((id) => {
+    setToasts((t) => t.filter((x) => x.id !== id))
   }, [])
 
   const icons = {
@@ -35,7 +42,15 @@ export function ToastProvider({ children }) {
             )}
           >
             {icons[t.tone]}
-            <span className="text-pretty">{t.message}</span>
+            <span className="flex-1 text-pretty">{t.message}</span>
+            {t.action && (
+              <button
+                onClick={() => { t.action.onClick(); dismiss(t.id) }}
+                className="ml-1 shrink-0 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold hover:bg-muted transition-colors"
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>

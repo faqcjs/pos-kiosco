@@ -102,6 +102,7 @@ export function Stock() {
   const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
   const [expandedProductId, setExpandedProductId] = useState(null)
   const [offLookupLoading, setOffLookupLoading] = useState(false)
+  const [alertsVisible, setAlertsVisible] = useState(15)
 
   const alerts = useMemo(
     () => state.products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock),
@@ -136,7 +137,14 @@ export function Stock() {
       } else {
         const inc = existing.unidad || 1
         adjustStock(existing.id, inc)
-        toast(`Se sumó ${inc} unidad${inc === 1 ? '' : 'es'} a ${existing.name} (Stock actual: ${existing.stock + inc})`, 'success')
+        toast(
+          `+${inc} a ${existing.name} (stock: ${existing.stock + inc})`,
+          'success',
+          {
+            label: 'Deshacer',
+            onClick: () => adjustStock(existing.id, -inc),
+          },
+        )
       }
     } else {
       // New product — try to pre-fill from OpenFoodFacts
@@ -217,7 +225,7 @@ export function Stock() {
             Alertas de stock ({alerts.length})
           </h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            {alerts.map((p) => (
+            {alerts.slice(0, alertsVisible).map((p) => (
               <button
                 key={p.id}
                 onClick={() => openEdit(p)}
@@ -231,6 +239,14 @@ export function Stock() {
               </button>
             ))}
           </div>
+          {alertsVisible < alerts.length && (
+            <button
+              onClick={() => setAlertsVisible((v) => v + 15)}
+              className="mt-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Ver {Math.min(15, alerts.length - alertsVisible)} más ({alerts.length - alertsVisible} restantes)
+            </button>
+          )}
         </Card>
       )}
 
