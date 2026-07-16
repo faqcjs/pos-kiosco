@@ -102,7 +102,9 @@ export function Stock() {
   const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
   const [expandedProductId, setExpandedProductId] = useState(null)
   const [offLookupLoading, setOffLookupLoading] = useState(false)
-  const [alertsVisible, setAlertsVisible] = useState(15)
+  const [alertsVisible, setAlertsVisible] = useState(() =>
+    window.innerWidth < 640 ? 3 : 15,
+  )
 
   const alerts = useMemo(
     () => state.products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock),
