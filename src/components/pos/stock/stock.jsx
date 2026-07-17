@@ -1,83 +1,18 @@
 'use client'
 
-import { AlertTriangle, Camera, CheckCircle, Loader2, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, Camera, CheckCircle, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select, Skeleton } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
+import { CargaRapida } from '@/components/pos/stock/carga-rapida'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-// Maps OpenFoodFacts categories_tags keywords → kiosk categories
-const OFF_CATEGORY_MAP = [
-  { keys: ['beverages', 'drinks', 'sodas', 'juices', 'waters', 'energy-drinks', 'aguas', 'bebidas', 'gaseosas', 'jugos'], cat: 'Bebidas' },
-  { keys: ['candies', 'sweets', 'chocolates', 'gummies', 'lollipops', 'caramelos', 'golosinas', 'chicles', 'chewing-gums'], cat: 'Golosinas' },
-  { keys: ['snacks', 'chips', 'crackers', 'popcorn', 'nuts', 'papas-fritas', 'maní'], cat: 'Snacks' },
-  { keys: ['tobacco', 'cigarettes', 'cigars', 'tabaco', 'cigarrillos'], cat: 'Tabaquería' },
-  { keys: ['ice-creams', 'frozen-desserts', 'helados', 'gelatos'], cat: 'Helados' },
-  { keys: ['biscuits', 'cookies', 'wafers', 'galletitas', 'bizcochos'], cat: 'Galletitas' },
-  { keys: ['breads', 'baked-goods', 'pastries', 'panes', 'facturas', 'medialunas'], cat: 'Panificados' },
-  { keys: ['cheeses', 'dairy', 'yogurts', 'milks', 'cold-cuts', 'deli', 'lacteos', 'quesos', 'fiambres', 'yogures'], cat: 'Fiambrería y Lácteos' },
-  { keys: ['cleaning', 'hygiene', 'personal-care', 'cosmetics', 'detergents', 'limpieza', 'perfumeria', 'higiene'], cat: 'Limpieza y Perfumería' },
-  { keys: ['stationery', 'toys', 'school-supplies', 'librería', 'juguetes'], cat: 'Librería/Juguetes' },
-  { keys: ['tableware', 'kitchenware', 'bazar'], cat: 'Bazar' },
-  { keys: ['canned', 'condiments', 'sauces', 'pastas', 'cereals', 'coffee', 'teas', 'almacen', 'conservas', 'condimentos'], cat: 'Almacén' },
-]
-
-function mapOffCategory(categoriesTags = []) {
-  const joined = categoriesTags.join(' ').toLowerCase()
-  for (const { keys, cat } of OFF_CATEGORY_MAP) {
-    if (keys.some((k) => joined.includes(k))) return cat
-  }
-  return 'Varios'
-}
-
-async function fetchOpenFoodFacts(barcode) {
-  try {
-    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`)
-    if (!res.ok) return null
-    const data = await res.json()
-    if (data.status !== 1 || !data.product) return null
-    const p = data.product
-
-    // Brand: first item from comma-separated list
-    const brand = p.brands?.split(',')[0]?.trim() ?? ''
-
-    // Name: explicit fields first, then compose from brand or keywords
-    let name =
-      p.product_name_es?.trim() ||
-      p.product_name?.trim() ||
-      p.abbreviated_product_name?.trim() ||
-      ''
-
-    if (!name) {
-      // Try to build from brand + first meaningful keyword
-      const keyword = (p._keywords ?? [])
-        .filter((k) => k.length > 2)
-        .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
-        .join(' ')
-      name = brand ? `${brand}${keyword ? ` ${keyword}` : ''}` : keyword
-    }
-
-    const quantity = p.quantity?.trim() ?? ''
-    const image =
-      p.selected_images?.front?.display?.es ||
-      p.image_front_url ||
-      ''
-    const category = mapOffCategory(p.categories_tags)
-
-    // Return null only if there's truly nothing useful
-    if (!name && category === 'Varios' && !brand) return null
-
-    return { name, category, brand, quantity, image }
-  } catch {
-    return null
-  }
-}
+import { fetchOpenFoodFacts } from '@/lib/open-food-facts'
 
 const EMPTY = {
   barcode: '',
@@ -142,6 +77,7 @@ export function Stock() {
   const [alertsVisible, setAlertsVisible] = useState(() =>
     window.innerWidth < 640 ? 3 : 15,
   )
+  const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false)
 
   const alerts = useMemo(
     () => state.products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock),
@@ -242,12 +178,22 @@ export function Stock() {
         title="Stock"
         description="Catálogo e inventario de productos."
         action={
-          <Button onClick={openNew}>
-            <Plus className="size-4" />
-            Nuevo producto
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCargaRapidaOpen(true)}>
+              <Zap className="size-4" />
+              Carga rápida
+            </Button>
+            <Button onClick={openNew}>
+              <Plus className="size-4" />
+              Nuevo
+            </Button>
+          </div>
         }
       />
+
+      {cargaRapidaOpen && (
+        <CargaRapida onClose={() => setCargaRapidaOpen(false)} />
+      )}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
