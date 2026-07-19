@@ -12,11 +12,8 @@ import { cn } from '@/lib/utils'
 import { PaymentModal } from './payment-modal'
 import { ScannerModal } from './scanner-modal'
 
-const LOCAL_CATEGORIES = ['Todos', 'Más Vendidos', ...CATEGORIES]
-const LOCAL_CATEGORY_ICON = {
-  ...CATEGORY_ICON,
-  'Más Vendidos': '🔥'
-}
+const LOCAL_CATEGORIES = ['Todos', ...CATEGORIES]
+const LOCAL_CATEGORY_ICON = CATEGORY_ICON
 
 export function Venta() {
   const { state, completeSale, toggleMostSold, setCart } = useStore()
@@ -113,27 +110,15 @@ export function Venta() {
     const matches = state.products.filter((p) => {
       const matchesCat =
         category === 'Todos' ||
-        (category === 'Más Vendidos' && p.isMostSold) ||
         p.category === category
       const matchesQ = !q || p.name.toLowerCase().includes(q) || p.barcode.includes(q)
       return matchesCat && matchesQ
     })
 
-    if (category === 'Más Vendidos') {
-      return [...matches].sort((a, b) => {
-        const countA = salesCount[a.id] || 0
-        const countB = salesCount[b.id] || 0
-        if (countB !== countA) {
-          return countB - countA
-        }
-        return a.name.localeCompare(b.name)
-      })
-    }
-
     if (!q && category === 'Todos') {
       return [...matches]
         .sort((a, b) => (salesCount[b.id] || 0) - (salesCount[a.id] || 0))
-        .slice(0, 12)
+        .slice(0, 24)
     }
 
     return matches

@@ -1,7 +1,7 @@
 'use client'
 
-import { AlertTriangle, Camera, CheckCircle, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select, Skeleton } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
@@ -25,6 +25,8 @@ const EMPTY = {
   unidad: 1,
   controlLotes: false,
 }
+
+const LOCAL_CATEGORIES = ['Todos', ...CATEGORIES]
 
 function StockSkeleton() {
   return (
@@ -69,6 +71,8 @@ export function Stock() {
   const isAdmin = role === 'administrador'
   const toast = useToast()
   const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('Todos')
+  const [page, setPage] = useState(1)
   const [formOpen, setFormOpen] = useState(false)
   const [draft, setDraft] = useState(EMPTY)
   const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
@@ -79,6 +83,29 @@ export function Stock() {
   )
   const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false)
 
+  const categoryContainerRef = useRef(null)
+
+  useEffect(() => {
+    const container = categoryContainerRef.current
+    if (!container) return
+
+    const handleWheel = (e) => {
+      if (e.deltaY !== 0) {
+        container.scrollLeft += e.deltaY
+        e.preventDefault()
+      }
+    }
+
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+    }
+  }, [])
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, category])
+
   const alerts = useMemo(
     () => state.products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock),
     [state.products],
@@ -87,9 +114,21 @@ export function Stock() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return [...state.products]
-      .filter((p) => !q || p.name.toLowerCase().includes(q) || p.barcode.includes(q))
+      .filter((p) => {
+        const matchesCat = category === 'Todos' || p.category === category
+        const matchesQ = !q || p.name.toLowerCase().includes(q) || p.barcode.includes(q)
+        return matchesCat && matchesQ
+      })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [state.products, query])
+  }, [state.products, query, category])
+
+  const ITEMS_PER_PAGE = 15
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * ITEMS_PER_PAGE
+    return filtered.slice(start, start + ITEMS_PER_PAGE)
+  }, [filtered, page])
 
   function openNew() {
     setBarcodeSearchOpen(true)
@@ -205,6 +244,25 @@ export function Stock() {
         />
       </div>
 
+      {/* category filters */}
+      <div ref={categoryContainerRef} className="no-scrollbar -mx-1.5 lg:-mx-6 flex flex-row flex-nowrap gap-2 overflow-x-auto px-1.5 lg:px-6 pb-1 touch-pan-x select-none">
+        {LOCAL_CATEGORIES.map((c) => (
+          <button
+            key={c}
+            onClick={() => setCategory(c)}
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors',
+              category === c
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-muted-foreground hover:bg-muted',
+            )}
+          >
+            {c !== 'Todos' && <span>{CATEGORY_ICON[c]}</span>}
+            {c}
+          </button>
+        ))}
+      </div>
+
       {alerts.length > 0 && (
         <Card className="border-warning/40 bg-warning/5 p-4">
           <h3 className="flex items-center gap-2 font-heading text-base font-bold text-warning">
@@ -247,7 +305,7 @@ export function Stock() {
           <span className="text-right">Acciones</span>
         </div>
         <div className="divide-y divide-border">
-          {filtered.map((p) => {
+          {paginated.map((p) => {
             const low = p.stock <= p.minStock
             const isExpanded = expandedProductId === p.id
             return (
@@ -331,6 +389,60 @@ export function Stock() {
             <p className="px-4 py-10 text-center text-sm text-muted-foreground">Sin productos.</p>
           )}
         </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-3 sm:px-6">
+            <div className="flex flex-1 justify-between sm:hidden">
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                disabled={page === 1}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                disabled={page === totalPages}
+              >
+                Siguiente
+              </Button>
+            </div>
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Mostrando <span className="font-medium">{(page - 1) * ITEMS_PER_PAGE + 1}</span> a{' '}
+                  <span className="font-medium">
+                    {Math.min(page * ITEMS_PER_PAGE, filtered.length)}
+                  </span>{' '}
+                  de <span className="font-medium">{filtered.length}</span> productos
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                  disabled={page === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <span className="sr-only">Anterior</span>
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <span className="text-sm font-medium px-2">
+                  Pág. {page} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={page === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <span className="sr-only">Siguiente</span>
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       <ProductFormModal

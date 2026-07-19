@@ -152,7 +152,9 @@ export function Modal({
           'relative z-10 flex w-full flex-col bg-card text-card-foreground shadow-2xl duration-300 animate-in zoom-in-95 slide-in-from-bottom-8 ease-out',
           variant === 'sheet'
             ? 'mt-auto max-h-[92vh] rounded-t-3xl sm:mx-auto sm:my-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-3xl'
-            : 'm-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-lg rounded-3xl',
+            : variant === 'large'
+              ? 'm-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-3xl rounded-3xl'
+              : 'm-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-lg rounded-3xl',
         )}
       >
         {/* Drag handle for sheet variant on mobile */}
