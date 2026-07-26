@@ -65,6 +65,75 @@ function StockSkeleton() {
   )
 }
 
+function PriceEditRow({ product, onSave }) {
+  const [cost, setCost] = useState(product.cost === 0 ? '0' : (product.cost || ''))
+  const [price, setPrice] = useState(product.price === 0 ? '0' : (product.price || ''))
+
+  useEffect(() => {
+    setCost(product.cost === 0 ? '0' : (product.cost || ''))
+    setPrice(product.price === 0 ? '0' : (product.price || ''))
+  }, [product.cost, product.price])
+
+  const c = Number(cost) || 0
+  const p = Number(price) || 0
+  const margin = p - c
+  const marginPct = c > 0 ? Math.round((margin / c) * 100) : 0
+
+  function handleBlur() {
+    const updatedCost = Number(cost) || 0
+    const updatedPrice = Number(price) || 0
+    if (updatedCost !== product.cost || updatedPrice !== product.price) {
+      onSave({
+        ...product,
+        cost: updatedCost,
+        price: updatedPrice,
+      })
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-[1fr_80px_80px_90px] sm:grid-cols-[1fr_110px_110px_130px] gap-2 items-center px-2 py-2.5 sm:px-4">
+      <div className="min-w-0 flex items-center gap-2">
+        <span className="text-xl shrink-0">{CATEGORY_ICON[product.category]}</span>
+        <div className="min-w-0 flex-1 truncate">
+          <p className="truncate text-sm font-medium">{product.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{product.barcode || 'sin código'}</p>
+        </div>
+      </div>
+      <div>
+        <Input
+          type="number"
+          inputMode="numeric"
+          value={cost}
+          onChange={(e) => setCost(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+          onFocus={(e) => e.target.select()}
+          className="h-8 font-mono text-sm text-right px-2"
+        />
+      </div>
+      <div>
+        <Input
+          type="number"
+          inputMode="numeric"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+          onFocus={(e) => e.target.select()}
+          className="h-8 font-mono text-sm text-right px-2"
+        />
+      </div>
+      <div className={cn(
+        "text-right text-xs font-semibold tabular-nums",
+        margin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+      )}>
+        {margin >= 0 ? `+$${margin.toFixed(0)} (${marginPct}%)` : `-$${Math.abs(margin).toFixed(0)}`}
+      </div>
+    </div>
+  )
+}
+
 export function Stock() {
   const { state, addProduct, updateProduct, deleteProduct, adjustStock, updateProductBatch, loadingProducts } = useStore()
   const role = state.currentUser?.role
@@ -73,6 +142,7 @@ export function Stock() {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Todos')
   const [page, setPage] = useState(1)
+  const [viewMode, setViewMode] = useState('inventory')
   const [formOpen, setFormOpen] = useState(false)
   const [draft, setDraft] = useState(EMPTY)
   const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
@@ -189,12 +259,20 @@ export function Stock() {
       toast('Ingresá el nombre del producto', 'error')
       return
     }
-    const u = draft.unidad || 1
+    const u = draft.unidad === '' ? 1 : (Number(draft.unidad) || 1)
+    const finalProduct = {
+      ...draft,
+      cost: draft.cost === '' ? 0 : Number(draft.cost),
+      price: draft.price === '' ? 0 : Number(draft.price),
+      stock: draft.stock === '' ? 0 : Number(draft.stock),
+      minStock: draft.minStock === '' ? 0 : Number(draft.minStock),
+      unidad: u,
+    }
     if (draft.id) {
-      updateProduct({ ...draft, unidad: u })
+      updateProduct(finalProduct)
       toast('Producto actualizado')
     } else {
-      addProduct({ ...draft, stock: Number(draft.stock) || 0, unidad: u })
+      addProduct(finalProduct)
       toast('Producto agregado')
     }
     setFormOpen(false)
@@ -233,6 +311,31 @@ export function Stock() {
       {cargaRapidaOpen && (
         <CargaRapida onClose={() => setCargaRapidaOpen(false)} />
       )}
+
+      <div className="flex border-b border-border">
+        <button
+          onClick={() => setViewMode('inventory')}
+          className={cn(
+            'px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors',
+            viewMode === 'inventory'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Inventario
+        </button>
+        <button
+          onClick={() => setViewMode('prices')}
+          className={cn(
+            'px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors',
+            viewMode === 'prices'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Lista de Precios
+        </button>
+      </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
@@ -297,98 +400,124 @@ export function Stock() {
 
       {/* Inventory table */}
       <Card className="overflow-hidden">
-        <div className="hidden grid-cols-[1fr_110px_110px_140px_80px] gap-2 border-b border-border bg-muted/50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
-          <span>Producto</span>
-          <span className="text-right">Costo</span>
-          <span className="text-right">Venta</span>
-          <span className="text-center">Stock</span>
-          <span className="text-right">Acciones</span>
-        </div>
-        <div className="divide-y divide-border">
-          {paginated.map((p) => {
-            const low = p.stock <= p.minStock
-            const isExpanded = expandedProductId === p.id
-            return (
-              <div key={p.id} className="flex flex-col">
-                <div
-                  className="grid grid-cols-2 items-center gap-2 px-4 py-3 sm:grid-cols-[1fr_110px_110px_140px_80px]"
-                >
-                  <div className="col-span-2 flex items-center gap-2.5 sm:col-span-1">
-                    <span className="text-xl">{CATEGORY_ICON[p.category]}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="truncate text-sm font-medium">{p.name}</p>
+        {viewMode === 'inventory' ? (
+          <>
+            <div className="hidden grid-cols-[1fr_110px_110px_140px_80px] gap-2 border-b border-border bg-muted/50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
+              <span>Producto</span>
+              <span className="text-right">Costo</span>
+              <span className="text-right">Venta</span>
+              <span className="text-center">Stock</span>
+              <span className="text-right">Acciones</span>
+            </div>
+            <div className="divide-y divide-border">
+              {paginated.map((p) => {
+                const low = p.stock <= p.minStock
+                const isExpanded = expandedProductId === p.id
+                return (
+                  <div key={p.id} className="flex flex-col">
+                    <div
+                      className="grid grid-cols-2 items-center gap-2 px-4 py-3 sm:grid-cols-[1fr_110px_110px_140px_80px]"
+                    >
+                      <div className="col-span-2 flex items-center gap-2.5 sm:col-span-1">
+                        <span className="text-xl">{CATEGORY_ICON[p.category]}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="truncate text-sm font-medium">{p.name}</p>
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {p.category} · {p.barcode || 'sin código'}
+                          </p>
+                        </div>
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {p.category} · {p.barcode || 'sin código'}
-                      </p>
+                      <span className="text-sm tabular-nums text-muted-foreground sm:text-right">
+                        <span className="sm:hidden">Costo: </span>
+                        {money(p.cost)}
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums sm:text-right">
+                        <span className="font-normal text-muted-foreground sm:hidden">Venta: </span>
+                        {money(p.price)}
+                      </span>
+                      <div className="flex items-center justify-start gap-1.5 sm:justify-center">
+                        <button
+                          disabled={!isAdmin || p.controlLotes}
+                          onClick={() => adjustStock(p.id, -1)}
+                          className="flex size-9 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed sm:size-7"
+                          aria-label="Restar stock"
+                        >
+                          <Minus className="size-3.5" />
+                        </button>
+                        <span
+                          className={cn(
+                            'w-10 text-center text-sm font-bold tabular-nums',
+                            low && 'text-warning',
+                          )}
+                        >
+                          {p.stock}
+                        </span>
+                        <button
+                          disabled={p.controlLotes}
+                          onClick={() => adjustStock(p.id, 1)}
+                          className="flex size-9 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed sm:size-7"
+                          aria-label="Sumar stock"
+                        >
+                          <Plus className="size-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          aria-label="Editar"
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`¿Estás seguro de que querés eliminar el producto "${p.name}"?`)) {
+                              deleteProduct(p.id)
+                              toast('Producto eliminado', 'info')
+                            }
+                          }}
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          aria-label="Eliminar"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-sm tabular-nums text-muted-foreground sm:text-right">
-                    <span className="sm:hidden">Costo: </span>
-                    {money(p.cost)}
-                  </span>
-                  <span className="text-sm font-semibold tabular-nums sm:text-right">
-                    <span className="font-normal text-muted-foreground sm:hidden">Venta: </span>
-                    {money(p.price)}
-                  </span>
-                  <div className="flex items-center justify-start gap-1.5 sm:justify-center">
-                    <button
-                      disabled={!isAdmin || p.controlLotes}
-                      onClick={() => adjustStock(p.id, -1)}
-                      className="flex size-9 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed sm:size-7"
-                      aria-label="Restar stock"
-                    >
-                      <Minus className="size-3.5" />
-                    </button>
-                    <span
-                      className={cn(
-                        'w-10 text-center text-sm font-bold tabular-nums',
-                        low && 'text-warning',
-                      )}
-                    >
-                      {p.stock}
-                    </span>
-                    <button
-                      disabled={p.controlLotes}
-                      onClick={() => adjustStock(p.id, 1)}
-                      className="flex size-9 items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed sm:size-7"
-                      aria-label="Sumar stock"
-                    >
-                      <Plus className="size-3.5" />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={() => openEdit(p)}
-                      className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label="Editar"
-                    >
-                      <Pencil className="size-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`¿Estás seguro de que querés eliminar el producto "${p.name}"?`)) {
-                          deleteProduct(p.id)
-                          toast('Producto eliminado', 'info')
-                        }
-                      }}
-                      className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      aria-label="Eliminar"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                </div>
-                {/* Batch panel — disabled while batch control is in development */}
-
-              </div>
-            )
-          })}
-          {filtered.length === 0 && (
-            <p className="px-4 py-10 text-center text-sm text-muted-foreground">Sin productos.</p>
-          )}
-        </div>
+                )
+              })}
+              {filtered.length === 0 && (
+                <p className="px-4 py-10 text-center text-sm text-muted-foreground">Sin productos.</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-[1fr_80px_80px_90px] sm:grid-cols-[1fr_110px_110px_130px] gap-2 border-b border-border bg-muted/50 px-2 py-2.5 sm:px-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <span>Producto</span>
+              <span className="text-right">Costo</span>
+              <span className="text-right">Venta</span>
+              <span className="text-right">Margen</span>
+            </div>
+            <div className="divide-y divide-border">
+              {paginated.map((p) => (
+                <PriceEditRow
+                  key={p.id}
+                  product={p}
+                  onSave={(updated) => {
+                    updateProduct(updated)
+                    toast(`${updated.name} actualizado`, 'success')
+                  }}
+                />
+              ))}
+              {filtered.length === 0 && (
+                <p className="px-4 py-10 text-center text-sm text-muted-foreground">Sin productos.</p>
+              )}
+            </div>
+          </>
+        )}
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-3 sm:px-6">
             <div className="flex flex-1 justify-between sm:hidden">
@@ -603,8 +732,8 @@ function ProductFormModal({
                 id="cost"
                 type="number"
                 inputMode="numeric"
-                value={draft.cost || ''}
-                onChange={(e) => setDraft({ ...draft, cost: Number(e.target.value) || 0 })}
+                value={draft.cost ?? ''}
+                onChange={(e) => setDraft({ ...draft, cost: e.target.value })}
                 placeholder="0"
               />
             </div>
@@ -614,8 +743,8 @@ function ProductFormModal({
                 id="price"
                 type="number"
                 inputMode="numeric"
-                value={draft.price || ''}
-                onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || 0 })}
+                value={draft.price ?? ''}
+                onChange={(e) => setDraft({ ...draft, price: e.target.value })}
                 placeholder="0"
               />
             </div>
@@ -638,8 +767,8 @@ function ProductFormModal({
                 id="stock"
                 type="number"
                 inputMode="numeric"
-                value={draft.stock === 0 ? '0' : (draft.stock || '')}
-                onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) || 0 })}
+                value={draft.stock ?? ''}
+                onChange={(e) => setDraft({ ...draft, stock: e.target.value })}
                 placeholder="0"
                 disabled={Boolean(draft.id && !isAdmin)}
               />
@@ -651,8 +780,8 @@ function ProductFormModal({
                 id="minStock"
                 type="number"
                 inputMode="numeric"
-                value={draft.minStock || ''}
-                onChange={(e) => setDraft({ ...draft, minStock: Number(e.target.value) || 0 })}
+                value={draft.minStock ?? ''}
+                onChange={(e) => setDraft({ ...draft, minStock: e.target.value })}
                 placeholder="0"
                 disabled={Boolean(draft.id && !isAdmin)}
               />
@@ -663,8 +792,8 @@ function ProductFormModal({
                 id="unidad"
                 type="number"
                 inputMode="numeric"
-                value={draft.unidad || ''}
-                onChange={(e) => setDraft({ ...draft, unidad: Number(e.target.value) || 1 })}
+                value={draft.unidad ?? ''}
+                onChange={(e) => setDraft({ ...draft, unidad: e.target.value })}
                 placeholder="1"
               />
             </div>

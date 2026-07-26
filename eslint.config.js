@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import reactPlugin from 'eslint-plugin-react';
+import globals from 'globals';
 
 export default [
   js.configs.recommended,
@@ -9,20 +10,7 @@ export default [
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: {
-        window: 'readonly',
-        document: 'readonly',
-        localStorage: 'readonly',
-        console: 'readonly',
-        navigator: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        CustomEvent: 'readonly',
-        import: 'readonly',
-        process: 'readonly',
-        requestAnimationFrame: 'readonly',
-        cancelAnimationFrame: 'readonly',
+        ...globals.browser,
       },
       parserOptions: {
         ecmaFeatures: {

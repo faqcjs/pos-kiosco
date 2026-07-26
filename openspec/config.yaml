@@ -1,13 +1,16 @@
 project:
   name: pos-kiosco
   version: 1.0.0
+  context: |
+    React POS frontend application for retail shop kiosk operations.
+    Integrates with Supabase for data persistence and authentication.
+    Uses Zustand for state management and Tailwind CSS v4 for UI layout.
 testing:
   strict_tdd: true
   runner: vitest
-  coverage: vitest
+  coverage: none
   layers:
     - unit
-    - integration
 linting:
   linter: eslint
   config: eslint.config.js

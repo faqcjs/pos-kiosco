@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet, Pencil, MessageCircle, Calendar, Trash2 } from 'lucide-react'
+import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet, Pencil, MessageCircle, Calendar, Trash2, Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, EmptyState, Input, Label, Modal, Select, StatCard } from '@/components/ui/kit'
 import { PageHeader } from '@/components/pos/page-header'
@@ -9,6 +9,7 @@ import { supplierBalance, useStore } from '@/lib/store'
 import { formatDateTime, money, uid } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import { ScannerModal } from '@/components/pos/venta/scanner-modal'
 
 const SUPPLIER_CATEGORIES = [
   'Varios',
@@ -544,6 +545,7 @@ function SupplierDetail({
   const [receiveOpen, setReceiveOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
 
   // Wizard steps & Invoice details
   const [step, setStep] = useState(1)
@@ -720,8 +722,80 @@ function SupplierDetail({
   }
 
   function handleSelectSuggestion(p) {
-    setSelectedProdId(p.id)
-    setProdQuery(p.name)
+    const existing = items.find((it) => it.productId === p.id)
+    if (existing) {
+      setItems(items.map((it) => {
+        if (it.productId === p.id) {
+          const nextQty = it.qty + 1
+          const nextUnits = nextQty * it.unitSize
+          const nextCost = nextUnits * it.catalogCost
+          return { ...it, qty: nextQty, totalUnits: nextUnits, cost: nextCost }
+        }
+        return it
+      }))
+      toast(`+1 bulto a ${p.name}`, 'success')
+    } else {
+      const u = p.unidad || 1
+      const initialCost = u * p.cost
+      setItems([...items, {
+        id: uid(),
+        productId: p.id,
+        name: p.name,
+        qty: 1,
+        totalUnits: u,
+        cost: initialCost,
+        isCustom: false,
+        unitSize: u,
+        catalogCost: p.cost,
+        batchCode: null,
+        expirationDate: null,
+      }])
+      toast(`Agregado: ${p.name}`, 'success')
+    }
+    setSelectedProdId('')
+    setProdQuery('')
+  }
+
+  function handleScan(code) {
+    setScannerOpen(false)
+    const prod = state.products.find((p) => p.barcode === code)
+    if (prod) {
+      // Agregar directamente a la lista de recibo
+      const existing = items.find((it) => it.productId === prod.id)
+      if (existing) {
+        setItems(items.map((it) => {
+          if (it.productId === prod.id) {
+            const nextQty = it.qty + 1
+            const nextUnits = nextQty * it.unitSize
+            const nextCost = nextUnits * it.catalogCost
+            return { ...it, qty: nextQty, totalUnits: nextUnits, cost: nextCost }
+          }
+          return it
+        }))
+        toast(`+1 bulto a ${prod.name}`, 'success')
+      } else {
+        const u = prod.unidad || 1
+        const initialCost = u * prod.cost
+        setItems([...items, {
+          id: uid(),
+          productId: prod.id,
+          name: prod.name,
+          qty: 1,
+          totalUnits: u,
+          cost: initialCost,
+          isCustom: false,
+          unitSize: u,
+          catalogCost: prod.cost,
+          batchCode: null,
+          expirationDate: null,
+        }])
+        toast(`Agregado: ${prod.name}`, 'success')
+      }
+      setSelectedProdId('')
+      setProdQuery('')
+    } else {
+      toast('Producto no encontrado en el catálogo', 'error')
+    }
   }
 
   function submitReceive() {
@@ -1174,19 +1248,20 @@ function SupplierDetail({
                   <div className="flex gap-2 items-end">
                     <div className="relative flex-1">
                       <Label htmlFor="search-prod-input" className="text-xs">Buscar Producto (Nombre o Código)</Label>
-                      <div className="relative mt-1">
-                        <Input
-                          id="search-prod-input"
-                          value={prodQuery}
-                          onChange={(e) => {
-                            setProdQuery(e.target.value)
-                            if (selectedProdId) setSelectedProdId('')
-                          }}
-                          placeholder="Escribí para buscar..."
-                          className="h-11"
-                          autoComplete="off"
-                        />
-                        {productSuggestions.length > 0 && (
+                      <div className="relative mt-1 flex gap-2">
+                        <div className="relative flex-1">
+                          <Input
+                            id="search-prod-input"
+                            value={prodQuery}
+                            onChange={(e) => {
+                              setProdQuery(e.target.value)
+                              if (selectedProdId) setSelectedProdId('')
+                            }}
+                            placeholder="Escribí para buscar..."
+                            className="h-11"
+                            autoComplete="off"
+                          />
+                          {productSuggestions.length > 0 && (
                           <div className="absolute left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
                             {productSuggestions.map((p) => (
                               <button
@@ -1208,6 +1283,16 @@ function SupplierDetail({
                             ))}
                           </div>
                         )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          type="button"
+                          className="h-11 w-11 shrink-0 p-0"
+                          onClick={() => setScannerOpen(true)}
+                          aria-label="Escanear código"
+                        >
+                          <Camera className="size-5" />
+                        </Button>
                       </div>
                     </div>
                     <Button 
@@ -1375,6 +1460,12 @@ function SupplierDetail({
           )}
         </div>
       </Modal>
+
+      <ScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetect={handleScan}
+      />
 
       {/* Pagar */}
       <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Registrar pago" variant="center">
