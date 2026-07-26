@@ -697,6 +697,23 @@ function UsersTab({ state, createUser, deleteUser }) {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('cajero')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedEmp, setSelectedEmp] = useState(null)
+
+  // Obtener ventas asociadas al empleado seleccionado
+  const selectedEmpSales = useMemo(() => {
+    if (!selectedEmp) return []
+    const allShifts = state.shiftHistory || []
+    const empShifts = new Set(
+      allShifts.filter((s) => s.openedBy === selectedEmp).map((s) => s.id)
+    )
+    return (state.sales || [])
+      .filter((s) => empShifts.has(s.shiftId))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [selectedEmp, state.sales, state.shiftHistory])
+
+  const selectedEmpTotal = useMemo(() => {
+    return selectedEmpSales.reduce((sum, s) => sum + s.total, 0)
+  }, [selectedEmpSales])
 
   const activeUsers = useMemo(() => {
     return (state.users || []).filter((u) => u.role !== 'administrador')
@@ -735,6 +752,50 @@ function UsersTab({ state, createUser, deleteUser }) {
     return metrics
   }, [activeUsers, state.sales, state.shiftHistory, state.users])
 
+  // Calcular métricas agrupadas por el nombre tipeado en los turnos de caja
+  const employeeMetrics = useMemo(() => {
+    const metrics = {}
+    
+    const excludeNames = new Set(['admin', 'desarrollo', 'TodoPasa', 'Todo Pasa', 'Desarrollo', 'admin@kiosko.com', 'cajero@kiosko.com'])
+    const allShifts = state.shiftHistory || []
+    
+    for (const shift of allShifts) {
+      if (shift.openedBy && !excludeNames.has(shift.openedBy)) {
+        metrics[shift.openedBy] = { name: shift.openedBy, totalSales: 0, salesCount: 0, shiftsCount: 0, totalDiff: 0 }
+      }
+      if (shift.closedBy && !excludeNames.has(shift.closedBy)) {
+        metrics[shift.closedBy] = { name: shift.closedBy, totalSales: 0, salesCount: 0, shiftsCount: 0, totalDiff: 0 }
+      }
+    }
+    
+    for (const shift of allShifts) {
+      const opName = shift.openedBy
+      const clName = shift.closedBy
+      
+      if (opName && metrics[opName]) {
+        metrics[opName].shiftsCount += 1
+      }
+      if (clName && metrics[clName]) {
+        metrics[clName].totalDiff += (shift.difference || 0)
+      }
+    }
+    
+    const shiftsMap = {}
+    for (const shift of allShifts) {
+      shiftsMap[shift.id] = shift.openedBy
+    }
+    
+    for (const sale of state.sales || []) {
+      const shiftOwner = shiftsMap[sale.shiftId]
+      if (shiftOwner && metrics[shiftOwner]) {
+        metrics[shiftOwner].totalSales += sale.total
+        metrics[shiftOwner].salesCount += 1
+      }
+    }
+    
+    return Object.values(metrics).sort((a, b) => b.totalSales - a.totalSales)
+  }, [state.shiftHistory, state.sales])
+
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!name.trim() || !username.trim() || !password.trim()) return
@@ -758,116 +819,37 @@ function UsersTab({ state, createUser, deleteUser }) {
 
   return (
     <div className="grid gap-6 md:grid-cols-3 animate-in fade-in slide-in-from-bottom-2 duration-350">
-      {/* List */}
-      <Card className="p-5 md:col-span-2 space-y-4">
-        <div>
-          <h3 className="font-heading font-semibold text-lg">Usuarios Registrados</h3>
-          <p className="text-xs text-muted-foreground">
-            Lista de cuentas de usuarios y métricas de desempeño acumuladas.
-          </p>
-        </div>
-        {activeUsers.length === 0 ? (
-          <EmptyState title="Sin usuarios" description="No hay usuarios registrados todavía." />
-        ) : (
-          <div className="space-y-4">
-            {/* Mobile layout (cards) - visible on < md */}
-            <div className="grid gap-3 md:hidden">
-              {activeUsers.map((c) => {
-                const isRepo = c.role === 'repositor'
-                const m = userMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
-                const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
-                return (
-                  <div key={c.id} className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-semibold text-foreground text-base">{c.name}</h4>
-                        <p className="text-xs text-muted-foreground">@{c.username}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge tone={c.role === 'repositor' ? 'accent' : 'muted'} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
-                          {c.role === 'repositor' ? 'Repositor' : 'Empleado'}
-                        </Badge>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`¿Estás seguro de que querés eliminar el usuario "${c.name}"?`)) {
-                              deleteUser(c.id, {
-                                onSuccess: () => toast('Usuario eliminado', 'info'),
-                                onError: (err) => toast(`Error: ${err.message || 'No se pudo eliminar'}`, 'error')
-                              })
-                            }
-                          }}
-                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition-all inline-flex items-center justify-center"
-                          title="Eliminar usuario"
-                          aria-label="Eliminar usuario"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border text-center text-xs">
-                      <div>
-                        <p className="text-muted-foreground font-medium">Ventas</p>
-                        <p className="font-semibold text-foreground mt-0.5">
-                          {isRepo ? '—' : money(m.totalSales)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground font-medium">Operac.</p>
-                        <p className="font-semibold text-foreground mt-0.5">
-                          {isRepo ? '—' : m.salesCount}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground font-medium">Diff. Caja</p>
-                        <p className={`font-semibold mt-0.5 ${isRepo ? 'text-muted-foreground' : diffColor}`}>
-                          {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Desktop layout (table) - visible on >= md */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground font-semibold">
-                    <th className="py-2.5">Nombre</th>
-                    <th className="py-2.5">Usuario</th>
-                    <th className="py-2.5">Rol</th>
-                    <th className="py-2.5 text-right">Ventas</th>
-                    <th className="py-2.5 text-right">Operac.</th>
-                    <th className="py-2.5 text-right">Diff. Caja</th>
-                    <th className="py-2.5 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {activeUsers.map((c) => {
-                    const isRepo = c.role === 'repositor'
-                    const m = userMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
-                    const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
-                    return (
-                      <tr key={c.id} className="hover:bg-muted/10 transition-colors">
-                        <td className="py-3 font-medium text-foreground">{c.name}</td>
-                        <td className="py-3 text-muted-foreground">{c.username}</td>
-                        <td className="py-3">
+      {/* Columna izquierda: tarjetas de datos apiladas */}
+      <div className="md:col-span-2 space-y-6">
+        {/* Tarjeta 1: Cuentas Registradas */}
+        <Card className="p-5 space-y-4">
+          <div>
+            <h3 className="font-heading font-semibold text-lg">Usuarios Registrados</h3>
+            <p className="text-xs text-muted-foreground">
+              Lista de cuentas de usuarios y métricas de desempeño acumuladas.
+            </p>
+          </div>
+          {activeUsers.length === 0 ? (
+            <EmptyState title="Sin usuarios" description="No hay usuarios registrados todavía." />
+          ) : (
+            <div className="space-y-4">
+              {/* Mobile layout (cards) - visible on < md */}
+              <div className="grid gap-3 md:hidden">
+                {activeUsers.map((c) => {
+                  const isRepo = c.role === 'repositor'
+                  const m = userMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
+                  const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
+                  return (
+                    <div key={c.id} className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-foreground text-base">{c.name}</h4>
+                          <p className="text-xs text-muted-foreground">@{c.username}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <Badge tone={c.role === 'repositor' ? 'accent' : 'muted'} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
                             {c.role === 'repositor' ? 'Repositor' : 'Empleado'}
                           </Badge>
-                        </td>
-                        <td className="py-3 text-right font-semibold tabular-nums text-foreground">
-                          {isRepo ? '—' : money(m.totalSales)}
-                        </td>
-                        <td className="py-3 text-right tabular-nums text-muted-foreground">
-                          {isRepo ? '—' : m.salesCount}
-                        </td>
-                        <td className={`py-3 text-right tabular-nums ${isRepo ? 'text-muted-foreground' : diffColor}`}>
-                          {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
-                        </td>
-                        <td className="py-3 text-right">
                           <button
                             onClick={() => {
                               if (window.confirm(`¿Estás seguro de que querés eliminar el usuario "${c.name}"?`)) {
@@ -883,16 +865,246 @@ function UsersTab({ state, createUser, deleteUser }) {
                           >
                             <Trash2 className="size-4" />
                           </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border text-center text-xs">
+                        <div>
+                          <p className="text-muted-foreground font-medium">Ventas</p>
+                          <p className="font-semibold text-foreground mt-0.5">
+                            {isRepo ? '—' : money(m.totalSales)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium">Operac.</p>
+                          <p className="font-semibold text-foreground mt-0.5">
+                            {isRepo ? '—' : m.salesCount}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium">Diff. Caja</p>
+                          <p className={`font-semibold mt-0.5 ${isRepo ? 'text-muted-foreground' : diffColor}`}>
+                            {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop layout (table) - visible on >= md */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-border text-muted-foreground font-semibold">
+                      <th className="py-2.5">Nombre</th>
+                      <th className="py-2.5">Usuario</th>
+                      <th className="py-2.5">Rol</th>
+                      <th className="py-2.5 text-right">Ventas</th>
+                      <th className="py-2.5 text-right">Operac.</th>
+                      <th className="py-2.5 text-right">Diff. Caja</th>
+                      <th className="py-2.5 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {activeUsers.map((c) => {
+                      const isRepo = c.role === 'repositor'
+                      const m = userMetrics[c.username] || { totalSales: 0, salesCount: 0, totalDiff: 0 }
+                      const diffColor = m.totalDiff < 0 ? 'text-destructive font-bold' : m.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
+                      return (
+                        <tr key={c.id} className="hover:bg-muted/10 transition-colors">
+                          <td className="py-3 font-medium text-foreground">{c.name}</td>
+                          <td className="py-3 text-muted-foreground">{c.username}</td>
+                          <td className="py-3">
+                            <Badge tone={c.role === 'repositor' ? 'accent' : 'muted'} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
+                              {c.role === 'repositor' ? 'Repositor' : 'Empleado'}
+                            </Badge>
+                          </td>
+                          <td className="py-3 text-right font-semibold tabular-nums text-foreground">
+                            {isRepo ? '—' : money(m.totalSales)}
+                          </td>
+                          <td className="py-3 text-right tabular-nums text-muted-foreground">
+                            {isRepo ? '—' : m.salesCount}
+                          </td>
+                          <td className={`py-3 text-right tabular-nums ${isRepo ? 'text-muted-foreground' : diffColor}`}>
+                            {isRepo ? '—' : (m.totalDiff === 0 ? '$0' : (m.totalDiff > 0 ? '+' : '') + money(m.totalDiff))}
+                          </td>
+                          <td className="py-3 text-right">
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`¿Estás seguro de que querés eliminar el usuario "${c.name}"?`)) {
+                                  deleteUser(c.id, {
+                                    onSuccess: () => toast('Usuario eliminado', 'info'),
+                                    onError: (err) => toast(`Error: ${err.message || 'No se pudo eliminar'}`, 'error')
+                                  })
+                                }
+                              }}
+                              className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:scale-95 transition-all inline-flex items-center justify-center"
+                              title="Eliminar usuario"
+                              aria-label="Eliminar usuario"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          )}
+        </Card>
+
+        {/* Tarjeta 2: Desempeño por Nombre de Turno (Tipeado por empleados) */}
+        <Card className="p-5 space-y-4">
+          <div>
+            <h3 className="font-heading font-semibold text-lg">Rendimiento por Turno de Empleado</h3>
+            <p className="text-xs text-muted-foreground">
+              Métricas consolidadas por el nombre ingresado al abrir y cerrar la caja (cajeros con cuenta compartida).
+            </p>
           </div>
-        )}
-      </Card>
+
+          {employeeMetrics.length === 0 ? (
+            <EmptyState 
+              title="Sin turnos registrados" 
+              description="Las estadísticas aparecerán cuando los empleados abran y cierren turnos en la caja." 
+            />
+          ) : (
+            <div className="space-y-4">
+              {/* Mobile layout (cards) - visible on < md */}
+              <div className="grid gap-3 md:hidden">
+                {employeeMetrics.map((emp) => {
+                  const diffColor = emp.totalDiff < 0 ? 'text-destructive font-bold' : emp.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
+                  return (
+                    <div 
+                      key={emp.name} 
+                      className="rounded-xl border border-border p-4 space-y-2 bg-muted/10 hover:bg-muted/20 active:scale-[0.99] transition-all cursor-pointer select-none"
+                      onClick={() => setSelectedEmp(emp.name)}
+                    >
+                      <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                        <h4 className="font-semibold text-foreground text-base">{emp.name}</h4>
+                        <Badge tone="muted" className="text-[10px] px-1.5 py-0.5">
+                          {emp.shiftsCount} {emp.shiftsCount === 1 ? 'Turno' : 'Turnos'}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
+                        <div>
+                          <p className="text-muted-foreground font-medium">Ventas</p>
+                          <p className="font-semibold text-foreground mt-0.5">{money(emp.totalSales)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium">Operac.</p>
+                          <p className="font-semibold text-foreground mt-0.5">{emp.salesCount}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium">Diff. Caja</p>
+                          <p className={`font-semibold mt-0.5 ${diffColor}`}>
+                            {emp.totalDiff === 0 ? '$0' : (emp.totalDiff > 0 ? '+' : '') + money(emp.totalDiff)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop layout (table) - visible on >= md */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-border text-muted-foreground font-semibold">
+                      <th className="py-2.5">Empleado (Nombre de Caja)</th>
+                      <th className="py-2.5 text-center">Turnos Trabajados</th>
+                      <th className="py-2.5 text-right">Ventas Totales</th>
+                      <th className="py-2.5 text-right">Operaciones</th>
+                      <th className="py-2.5 text-right">Diferencia de Caja</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {employeeMetrics.map((emp) => {
+                      const diffColor = emp.totalDiff < 0 ? 'text-destructive font-bold' : emp.totalDiff > 0 ? 'text-success font-bold' : 'text-muted-foreground'
+                      return (
+                        <tr 
+                          key={emp.name} 
+                          className="hover:bg-muted/20 active:bg-muted/30 transition-colors cursor-pointer select-none"
+                          onClick={() => setSelectedEmp(emp.name)}
+                        >
+                          <td className="py-3 font-semibold text-foreground">{emp.name}</td>
+                          <td className="py-3 text-center text-muted-foreground">{emp.shiftsCount}</td>
+                          <td className="py-3 text-right font-semibold text-foreground">{money(emp.totalSales)}</td>
+                          <td className="py-3 text-right text-muted-foreground">{emp.salesCount}</td>
+                          <td className={`py-3 text-right ${diffColor}`}>
+                            {emp.totalDiff === 0 ? '$0' : (emp.totalDiff > 0 ? '+' : '') + money(emp.totalDiff)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Modal de Detalle de Ventas por Empleado */}
+        <Modal
+          open={!!selectedEmp}
+          onClose={() => setSelectedEmp(null)}
+          title={selectedEmp ? `Detalle de Ventas - ${selectedEmp}` : ''}
+          variant="large"
+        >
+          {selectedEmp && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-border">
+                <span className="text-sm font-medium text-muted-foreground">Total facturado:</span>
+                <span className="font-heading text-lg font-bold text-success">{money(selectedEmpTotal)}</span>
+              </div>
+              
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {selectedEmpSales.length === 0 ? (
+                  <p className="text-center text-xs text-muted-foreground py-10">
+                    No hay ventas registradas para este empleado.
+                  </p>
+                ) : (
+                  selectedEmpSales.map((sale) => {
+                    const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[sale.method]
+                    const tone = sale.method === 'efectivo' ? 'success' : sale.method === 'qr' ? 'default' : 'warning'
+                    
+                    return (
+                      <div key={sale.id} className="p-3 rounded-xl border border-border bg-muted/30 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold bg-muted px-2 py-0.5 rounded text-foreground font-mono">
+                              {formatDate(sale.date)} {formatTime(sale.date)}
+                            </span>
+                            <Badge tone={tone}>{label}</Badge>
+                          </div>
+                          <span className="font-heading text-sm font-bold tabular-nums">{money(sale.total)}</span>
+                        </div>
+                        
+                        <div className="pl-2 border-l-2 border-border space-y-1">
+                          {sale.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-xs">
+                              <span className="text-foreground font-medium">
+                                {item.qty}x {item.name}
+                              </span>
+                              <span className="text-muted-foreground tabular-nums">
+                                {money(item.price * item.qty)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </Modal>
+      </div>
 
       {/* Form */}
       <Card className="p-5 h-fit space-y-4">
