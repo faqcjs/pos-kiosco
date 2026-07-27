@@ -211,10 +211,24 @@ export function Stock() {
     setPage(1)
   }, [query, category])
 
-  const alerts = useMemo(
+  const stockAlerts = useMemo(
     () => state.products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock),
     [state.products],
   )
+
+  const priceAlerts = useMemo(
+    () => state.products.filter((p) => p.price === 0 || !p.price).sort((a, b) => a.name.localeCompare(b.name)),
+    [state.products],
+  )
+
+  const alerts = useMemo(
+    () => (viewMode === 'inventory' ? stockAlerts : priceAlerts),
+    [viewMode, stockAlerts, priceAlerts],
+  )
+
+  useEffect(() => {
+    setAlertsVisible(window.innerWidth < 640 ? 3 : 15)
+  }, [viewMode])
 
   const filtered = useMemo(() => {
     return [...state.products]
@@ -414,7 +428,7 @@ export function Stock() {
         <Card className="border-warning/40 bg-warning/5 p-4">
           <h3 className="flex items-center gap-2 font-heading text-base font-bold text-warning">
             <AlertTriangle className="size-5" />
-            Alertas de stock ({alerts.length})
+            {viewMode === 'inventory' ? `Alertas de stock (${alerts.length})` : `Productos sin precio (${alerts.length})`}
           </h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {alerts.slice(0, alertsVisible).map((p) => (
@@ -425,8 +439,8 @@ export function Stock() {
               >
                 <span>{CATEGORY_ICON[p.category]}</span>
                 <span className="font-medium">{p.name}</span>
-                <Badge tone={p.stock === 0 ? 'danger' : 'warning'}>
-                  {p.stock === 0 ? 'Sin stock' : `${p.stock} u.`}
+                <Badge tone={viewMode === 'inventory' ? (p.stock === 0 ? 'danger' : 'warning') : 'danger'}>
+                  {viewMode === 'inventory' ? (p.stock === 0 ? 'Sin stock' : `${p.stock} u.`) : 'Sin precio'}
                 </Badge>
               </button>
             ))}
