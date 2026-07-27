@@ -1119,7 +1119,7 @@ function SupplierDetail({
             /* STEP 1: INVOICE DETAILS */
             <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                Completá los datos generales de la boleta de compra. Podés confirmar la carga simplificada acá mismo.
+                Completá los datos generales de la boleta de compra para continuar a la carga de productos.
               </p>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1201,14 +1201,6 @@ function SupplierDetail({
               <div className="mt-6 flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/60">
                 <Button variant="outline" className="flex-1" onClick={() => setReceiveOpen(false)}>
                   Cancelar
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="flex-1 bg-amber-500/10 text-amber-600 hover:bg-amber-500/25 border-amber-500/25 font-bold"
-                  onClick={submitReceive}
-                  disabled={!totalInvoiceAmount || Number(totalInvoiceAmount) <= 0}
-                >
-                  Carga Simplificada
                 </Button>
                 <Button 
                   className="flex-1 font-bold"
@@ -1423,13 +1415,19 @@ function SupplierDetail({
                             </div>
                             <div className="space-y-1 sm:contents">
                               <label className="text-[10px] text-muted-foreground font-semibold sm:hidden">Costo Total</label>
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                value={item.cost}
-                                onChange={(e) => handleUpdateItemCost(item.id, e.target.value)}
-                                className="h-8 text-right font-mono font-semibold text-foreground border-border"
-                              />
+                              {item.isCustom ? (
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={item.cost}
+                                  onChange={(e) => handleUpdateItemCost(item.id, e.target.value)}
+                                  className="h-8 text-right font-mono font-semibold text-foreground border-border"
+                                />
+                              ) : (
+                                <div className="h-8 flex items-center justify-end font-mono font-semibold text-foreground pr-2 text-right w-full sm:pr-0 sm:py-2">
+                                  {money(item.cost)}
+                                </div>
+                              )}
                             </div>
                           </div>
                           
