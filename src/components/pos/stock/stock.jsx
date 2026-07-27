@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
+import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select, Skeleton } from '@/components/ui/kit'
@@ -539,21 +539,33 @@ export function Stock() {
         )}
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-3 sm:px-6">
-            <div className="flex flex-1 justify-between sm:hidden">
+            <div className="flex flex-1 justify-between gap-2 sm:hidden">
               <Button
                 variant="outline"
-                onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                onClick={() => setPage(1)}
                 disabled={page === 1}
+                className="px-2.5 text-xs font-semibold"
               >
-                Anterior
+                Inicio
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                disabled={page === totalPages}
-              >
-                Siguiente
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                  disabled={page === 1}
+                  className="text-xs"
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={page === totalPages}
+                  className="text-xs"
+                >
+                  Siguiente
+                </Button>
+              </div>
             </div>
             <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
               <div>
@@ -566,6 +578,16 @@ export function Stock() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1}
+                  className="h-8 w-8 p-0"
+                  title="Volver al inicio (Primera página)"
+                >
+                  <span className="sr-only">Primera página</span>
+                  <ChevronsLeft className="size-4" />
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setPage((p) => Math.max(p - 1, 1))}
