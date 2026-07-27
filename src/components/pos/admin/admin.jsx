@@ -33,6 +33,7 @@ import { PageHeader } from '@/components/pos/page-header'
 import { useToast } from '@/components/ui/toast'
 import { customerBalance, supplierBalance, useStore } from '@/lib/store'
 import { formatDate, formatTime, money, moneyShort } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 const CHART_COLORS = [
   'var(--chart-1)',
@@ -59,6 +60,8 @@ export function Admin() {
   const [visibleDays, setVisibleDays] = useState(10)
   const [selectedDay, setSelectedDay] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [topProductsModalOpen, setTopProductsModalOpen] = useState(false)
+  const [topProdCategory, setTopProdCategory] = useState('Todos')
 
   useEffect(() => {
     setIsLoading(true)
@@ -223,6 +226,43 @@ export function Admin() {
     }
     return [...map.values()].sort((a, b) => b.qty - a.qty).slice(0, 5)
   }, [state.sales])
+
+  // Todos los productos vendidos con su categoría para filtros del modal
+  const allSoldProducts = useMemo(() => {
+    const map = new Map()
+    for (const s of state.sales) {
+      for (const item of s.items) {
+        const key = item.productId ?? item.name
+        if (!map.has(key)) {
+          const prod = state.products.find((p) => p.id === item.productId || p.name === item.name)
+          map.set(key, {
+            id: key,
+            name: item.name,
+            qty: 0,
+            total: 0,
+            category: prod?.category || 'Varios'
+          })
+        }
+        const entry = map.get(key)
+        entry.qty += item.qty
+        entry.total += item.price * item.qty
+      }
+    }
+    return [...map.values()]
+  }, [state.sales, state.products])
+
+  const topCategories = useMemo(() => {
+    const cats = new Set(allSoldProducts.map((p) => p.category))
+    return ['Todos', ...cats]
+  }, [allSoldProducts])
+
+  const filteredTopProducts = useMemo(() => {
+    let list = allSoldProducts
+    if (topProdCategory !== 'Todos') {
+      list = list.filter((p) => p.category === topProdCategory)
+    }
+    return list.sort((a, b) => b.qty - a.qty).slice(0, 10)
+  }, [allSoldProducts, topProdCategory])
 
   // historical sales grouped by day
   const salesByDayList = useMemo(() => {
@@ -590,7 +630,19 @@ export function Admin() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="p-4 sm:p-5 lg:col-span-2 overflow-hidden w-full min-w-0">
-          <h3 className="mb-4 font-heading font-semibold">Productos más vendidos</h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-heading font-semibold text-base">Productos más vendidos</h3>
+            {hasData && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs font-semibold px-2.5"
+                onClick={() => setTopProductsModalOpen(true)}
+              >
+                Ver más
+              </Button>
+            )}
+          </div>
           {isLoading ? (
             <div className="h-[220px] flex flex-col justify-between py-2">
               <div className="flex items-center gap-3">
@@ -741,6 +793,74 @@ export function Admin() {
           )}
         </Card>
       </div>
+
+      {/* Modal de Productos Más Vendidos (Top 10) */}
+      <Modal
+        open={topProductsModalOpen}
+        onClose={() => {
+          setTopProductsModalOpen(false)
+          setTopProdCategory('Todos')
+        }}
+        title="Productos más vendidos"
+        variant="large"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Ranking de los 10 productos con mayor cantidad de unidades vendidas en el período seleccionado.
+          </p>
+
+          {/* Filtro de Categorías */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-border">
+            {topCategories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setTopProdCategory(cat)}
+                className={cn(
+                  "rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all shrink-0 active:scale-95",
+                  topProdCategory === cat
+                    ? "bg-primary border-primary text-primary-foreground font-bold shadow-sm"
+                    : "bg-card border-border text-muted-foreground hover:border-primary/20 hover:text-foreground"
+                )}
+              >
+                {cat === 'Todos' ? 'Todos los rubros' : cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Listado con barras de progreso */}
+          <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1 pt-1">
+            {filteredTopProducts.length === 0 ? (
+              <p className="text-center text-xs text-muted-foreground py-10">
+                No hay ventas registradas en esta categoría.
+              </p>
+            ) : (
+              filteredTopProducts.map((p, idx) => {
+                const maxQty = filteredTopProducts[0]?.qty || 1
+                const percent = Math.round((p.qty / maxQty) * 100)
+                return (
+                  <div key={p.id} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                      <span className="font-medium text-foreground truncate pr-2">
+                        {idx + 1}. {p.name}
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold ml-2 bg-muted px-1.5 py-0.5 rounded">
+                          {p.category}
+                        </span>
+                      </span>
+                      <span className="font-semibold text-foreground shrink-0">
+                        {p.qty} u. <span className="text-xs text-muted-foreground font-normal">({money(p.total)})</span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${percent}%` }} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={!!selectedDay}
