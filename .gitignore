@@ -26,6 +26,11 @@ dist-ssr/
 
 # Local Agent Configurations
 .agents/
+.atl/
+.gga
+openspec/
+sdd/
+skills-lock.json
 
 # Data spreadsheets
 *.csv
