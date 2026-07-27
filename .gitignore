@@ -31,6 +31,7 @@ dist-ssr/
 openspec/
 sdd/
 skills-lock.json
+importar-precios.js
 
 # Data spreadsheets
 *.csv
