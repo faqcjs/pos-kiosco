@@ -165,237 +165,235 @@ export function Proveedores() {
     }
   }
 
-  if (selected) {
-    return (
-      <SupplierDetail
-        supplier={selected}
-        onBack={() => setSelectedId(null)}
-        onReceive={receiveGoods}
-        onPay={registerSupplierPayment}
-        onEdit={handleOpenEdit}
-        onDelete={(id) => {
-          deleteSupplier(id)
-          setSelectedId(null)
-          toast('Proveedor eliminado', 'info')
-        }}
-        cashOpen={state.currentShift?.status === 'open'}
-        canReceive={
-          state.currentUser?.role === 'administrador' ||
-          state.currentUser?.role === 'repositor' ||
-          state.currentUser?.role === 'cajero'
-        }
-        canPay={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'cajero'}
-        canEdit={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'repositor'}
-        canDelete={state.currentUser?.role === 'administrador'}
-      />
-    )
-  }
-
   return (
-    <div className="mx-auto max-w-5xl p-1.5 lg:p-6 space-y-6">
-      <PageHeader
-        title="Proveedores"
-        description="Cuenta corriente con tus proveedores y agenda de visitas."
-        action={
-          <Button onClick={handleOpenNew} className="active:scale-[0.98]">
-            <Plus className="size-4" /> Nuevo proveedor
-          </Button>
-        }
-      />
+    <>
+      {selected ? (
+        <SupplierDetail
+          supplier={selected}
+          onBack={() => setSelectedId(null)}
+          onReceive={receiveGoods}
+          onPay={registerSupplierPayment}
+          onEdit={handleOpenEdit}
+          onDelete={(id) => {
+            deleteSupplier(id)
+            setSelectedId(null)
+            toast('Proveedor eliminado', 'info')
+          }}
+          cashOpen={state.currentShift?.status === 'open'}
+          canReceive={
+            state.currentUser?.role === 'administrador' ||
+            state.currentUser?.role === 'repositor' ||
+            state.currentUser?.role === 'cajero'
+          }
+          canPay={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'cajero'}
+          canEdit={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'repositor'}
+          canDelete={state.currentUser?.role === 'administrador'}
+        />
+      ) : (
+        <div className="mx-auto max-w-5xl p-1.5 lg:p-6 space-y-6">
+          <PageHeader
+            title="Proveedores"
+            description="Cuenta corriente con tus proveedores and agenda de visitas."
+            action={
+              <Button onClick={handleOpenNew} className="active:scale-[0.98]">
+                <Plus className="size-4" /> Nuevo proveedor
+              </Button>
+            }
+          />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard 
-          label="Deuda total" 
-          value={money(totalDebt)} 
-          tone="danger" 
-          icon={<Wallet className="size-4" />} 
-        />
-        <StatCard 
-          label="Total proveedores" 
-          value={String(suppliers.length)} 
-          icon={<Truck className="size-4" />} 
-        />
-        <StatCard 
-          label="Visitas de hoy" 
-          value={String(visitingTodayCount)} 
-          tone={visitingTodayCount > 0 ? "warning" : "muted"}
-          icon={<Calendar className="size-4" />} 
-          sub={todayDayName}
-        />
-      </div>
+          {/* KPI Summary Cards */}
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+            <Card className="p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
+              <span className="absolute top-2 right-2 text-2xl">💰</span>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Deuda Total</p>
+              <p className="mt-2 font-heading text-lg sm:text-2xl font-black tabular-nums text-destructive">
+                {money(totalDebt)}
+              </p>
+            </Card>
 
-      {/* Search and Quick Filters */}
-      <div className="space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por distribuidora o vendedor..."
-              className="pl-10 h-11"
-            />
+            <Card className="p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
+              <span className="absolute top-2 right-2 text-2xl">🚚</span>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Visitas hoy</p>
+              <p className="mt-2 font-heading text-lg sm:text-2xl font-black text-foreground">
+                {visitingTodayCount}
+              </p>
+            </Card>
           </div>
 
-          {/* Quick Filters Segment */}
-          <div className="flex rounded-xl bg-muted/60 p-1 shrink-0 border border-border/40">
-            <button
-              onClick={() => setViewFilter('todos')}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all active:scale-[0.97]",
-                viewFilter === 'todos' 
-                  ? "bg-card text-foreground shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Todos
-            </button>
-            <button
-              onClick={() => setViewFilter('deuda')}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all active:scale-[0.97] flex items-center gap-1",
-                viewFilter === 'deuda' 
-                  ? "bg-destructive/10 text-destructive shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Con deuda
-            </button>
-            <button
-              onClick={() => setViewFilter('visita_hoy')}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all active:scale-[0.97] flex items-center gap-1",
-                viewFilter === 'visita_hoy' 
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Visitan hoy
-            </button>
-          </div>
-        </div>
-
-        {/* Category Pills (Horizontal scrolling) */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <button
-            onClick={() => setSelectedCategory('Todos')}
-            className={cn(
-              "rounded-xl px-3.5 py-1.5 text-xs font-semibold border transition-all shrink-0 active:scale-95",
-              selectedCategory === 'Todos'
-                ? "bg-primary border-primary text-primary-foreground"
-                : "bg-card border-border text-muted-foreground hover:border-primary/20 hover:text-foreground"
-            )}
-          >
-            Todos los rubros
-          </button>
-          {SUPPLIER_CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={cn(
-                "rounded-xl px-3.5 py-1.5 text-xs font-semibold border transition-all shrink-0 active:scale-95",
-                selectedCategory === cat
-                  ? "bg-primary border-primary text-primary-foreground"
-                  : "bg-card border-border text-muted-foreground hover:border-primary/20 hover:text-foreground"
-              )}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Supplier List */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {filtered.length === 0 ? (
-          <div className="col-span-full">
-            <EmptyState
-              icon={<Truck className="size-10 text-muted-foreground/60" />}
-              title="No se encontraron proveedores"
-              description="Intentá buscando otro rubro, nombre o ajustando tus filtros."
-            />
-          </div>
-        ) : (
-          filtered.map((s) => {
-            const balance = supplierBalance(s)
-            const isVisitingToday = s.delivery_days?.includes(todayDayName)
-            
-            return (
-              <div
-                key={s.id}
-                onClick={() => setSelectedId(s.id)}
-                className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-md hover:scale-[1.005] cursor-pointer"
-              >
-                <div className="flex items-start gap-3">
-                  {/* Category icon / avatar */}
-                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-heading text-base font-bold text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
-                    {s.name.slice(0, 2).toUpperCase()}
-                  </div>
-
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <p className="truncate font-heading font-semibold text-foreground">{s.name}</p>
-                      {s.category && s.category !== 'Varios' && (
-                        <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground uppercase tracking-wide">
-                          {s.category}
-                        </span>
-                      )}
-                    </div>
-                    {s.contact_name && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        Vendedor: <span className="font-medium text-foreground">{s.contact_name}</span>
-                      </p>
-                    )}
-                    
-                    {/* Delivery Days Summary */}
-                    {s.delivery_days && s.delivery_days.length > 0 ? (
-                      <p className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                        <span>🚚</span>
-                        <span className="truncate">
-                          {isVisitingToday ? 'Visita hoy!' : `Reparto: ${s.delivery_days.join(', ')}`}
-                        </span>
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground italic">Sin días programados</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3">
-                  <div className="flex items-center gap-2">
-                    {s.phone && (
-                      <a
-                        href={getWhatsAppLink(s.phone)}
-                        onClick={(e) => e.stopPropagation()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex size-8 items-center justify-center rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 transition-colors"
-                        title={`Escribir a ${s.name}`}
-                      >
-                        <MessageCircle className="size-4" />
-                      </a>
-                    )}
-                  </div>
-
-                  <div className="text-right">
-                    {balance > 0 ? (
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-xs text-muted-foreground">Debés:</span>
-                        <span className="font-heading text-base font-bold tabular-nums text-destructive">
-                          {money(balance)}
-                        </span>
-                      </div>
-                    ) : (
-                      <Badge tone="success" className="text-[10px]">Al día</Badge>
-                    )}
-                  </div>
-                </div>
+          {/* Search, Filters, Category Tabs */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar distribuidora o vendedor..."
+                  className="pl-9 h-11 focus-visible:ring-primary/20"
+                />
               </div>
-            )
-          })
-        )}
-      </div>
+
+              {/* Status Filter Tab Group */}
+              <div className="flex rounded-xl bg-muted/65 p-1 shrink-0 border border-border/20">
+                <button
+                  onClick={() => setViewFilter('todos')}
+                  className={cn(
+                    "rounded-lg px-4 py-1.5 text-xs font-semibold transition-all active:scale-[0.97]",
+                    viewFilter === 'todos' 
+                      ? "bg-card text-foreground shadow-sm font-bold" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setViewFilter('deuda')}
+                  className={cn(
+                    "rounded-lg px-4 py-1.5 text-xs font-semibold transition-all active:scale-[0.97]",
+                    viewFilter === 'deuda' 
+                      ? "bg-destructive text-white shadow-sm font-bold" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Con Deuda
+                </button>
+                <button
+                  onClick={() => setViewFilter('visita_hoy')}
+                  className={cn(
+                    "rounded-lg px-4 py-1.5 text-xs font-semibold transition-all active:scale-[0.97]",
+                    viewFilter === 'visita_hoy' 
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-sm" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Visitan hoy
+                </button>
+              </div>
+            </div>
+
+            {/* Category Pills (Horizontal scrolling) */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                onClick={() => setSelectedCategory('Todos')}
+                className={cn(
+                  "rounded-xl px-3.5 py-1.5 text-xs font-semibold border transition-all shrink-0 active:scale-95",
+                  selectedCategory === 'Todos'
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "bg-card border-border text-muted-foreground hover:border-primary/20 hover:text-foreground"
+                )}
+              >
+                Todos los rubros
+              </button>
+              {SUPPLIER_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={cn(
+                    "rounded-xl px-3.5 py-1.5 text-xs font-semibold border transition-all shrink-0 active:scale-95",
+                    selectedCategory === cat
+                      ? "bg-primary border-primary text-primary-foreground"
+                      : "bg-card border-border text-muted-foreground hover:border-primary/20 hover:text-foreground"
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Supplier List */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {filtered.length === 0 ? (
+              <div className="col-span-full">
+                <EmptyState
+                  icon={<Truck className="size-10 text-muted-foreground/60" />}
+                  title="No se encontraron proveedores"
+                  description="Intentá buscando otro rubro, nombre o ajustando tus filtros."
+                />
+              </div>
+            ) : (
+              filtered.map((s) => {
+                const balance = supplierBalance(s)
+                const isVisitingToday = s.delivery_days?.includes(todayDayName)
+                
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => setSelectedId(s.id)}
+                    className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-md hover:scale-[1.005] cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Category icon / avatar */}
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-heading text-base font-bold text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+                        {s.name.slice(0, 2).toUpperCase()}
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate font-heading font-semibold text-foreground">{s.name}</p>
+                          {s.category && s.category !== 'Varios' && (
+                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground uppercase tracking-wide">
+                              {s.category}
+                            </span>
+                          )}
+                        </div>
+                        {s.contact_name && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            Vendedor: <span className="font-medium text-foreground">{s.contact_name}</span>
+                          </p>
+                        )}
+                        
+                        {/* Delivery Days Summary */}
+                        {s.delivery_days && s.delivery_days.length > 0 ? (
+                          <p className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                            <span>🚚</span>
+                            <span className="truncate">
+                              {isVisitingToday ? 'Visita hoy!' : `Reparto: ${s.delivery_days.join(', ')}`}
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground italic">Sin días programados</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3">
+                      <div className="flex items-center gap-2">
+                        {s.phone && (
+                          <a
+                            href={getWhatsAppLink(s.phone)}
+                            onClick={(e) => e.stopPropagation()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex size-8 items-center justify-center rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 transition-colors"
+                            title={`Escribir a ${s.name}`}
+                          >
+                            <MessageCircle className="size-4" />
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        {balance > 0 ? (
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-xs text-muted-foreground">Debés:</span>
+                            <span className="font-heading text-base font-bold tabular-nums text-destructive">
+                              {money(balance)}
+                            </span>
+                          </div>
+                        ) : (
+                          <Badge tone="success" className="text-[10px]">Al día</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Creation/Edit Form Modal */}
       <Modal
@@ -497,7 +495,7 @@ export function Proveedores() {
           </Button>
         </div>
       </Modal>
-    </div>
+    </>
   )
 }
 
