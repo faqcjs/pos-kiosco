@@ -243,6 +243,36 @@ export function Admin() {
     return Object.values(groups).sort((a, b) => b.date.getTime() - a.date.getTime())
   }, [state.sales])
 
+  // Métricas de ventas agrupadas por turno de caja (últimos 8 turnos)
+  const shiftSalesData = useMemo(() => {
+    const allShifts = state.shiftHistory || []
+    
+    const data = allShifts.map((shift) => {
+      const dateObj = new Date(shift.openedAt)
+      const day = String(dateObj.getDate()).padStart(2, '0')
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+      const dateLabel = `${day}/${month}`
+      
+      const cashierName = shift.openedBy || 'Cajero'
+      
+      const shiftSales = (state.sales || [])
+        .filter((sale) => sale.shiftId === shift.id)
+        .reduce((sum, sale) => sum + sale.total, 0)
+        
+      return {
+        label: `${cashierName.slice(0, 8)} (${dateLabel})`,
+        cashier: cashierName,
+        dateLabel,
+        ventas: shiftSales,
+        difference: shift.difference || 0,
+        sales: shiftSales,
+        ganancia: 0,
+      }
+    })
+    
+    return data.slice(-8)
+  }, [state.shiftHistory, state.sales])
+
   function formatDayLabel(date) {
     const today = startOfDay(new Date())
     const yesterday = startOfDay(new Date(Date.now() - 86400000))
@@ -476,6 +506,82 @@ export function Admin() {
                 ))}
               </div>
             </>
+          ) : (
+            <EmptyState title="Sin datos" />
+          )}
+        </Card>
+      </div>
+
+      {/* Ventas por Turno de Caja */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <Card className="p-4 sm:p-5 lg:col-span-2 overflow-hidden w-full min-w-0">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-heading font-semibold text-base">Ventas por Turno de Caja</h3>
+              <p className="text-xs text-muted-foreground">
+                Facturación total en cada uno de los últimos turnos de caja cerrados.
+              </p>
+            </div>
+          </div>
+          {isLoading ? (
+            <div className="h-[240px] flex items-end justify-between gap-2 pt-8 pb-2 px-4 animate-pulse">
+              <div className="h-[30%] bg-zinc-200 dark:bg-zinc-800 rounded w-full" />
+              <div className="h-[60%] bg-zinc-200 dark:bg-zinc-800 rounded w-full" />
+              <div className="h-[45%] bg-zinc-200 dark:bg-zinc-800 rounded w-full" />
+              <div className="h-[80%] bg-zinc-200 dark:bg-zinc-800 rounded w-full" />
+              <div className="h-[50%] bg-zinc-200 dark:bg-zinc-800 rounded w-full" />
+            </div>
+          ) : shiftSalesData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={shiftSalesData} margin={{ left: -18, right: 8, top: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => moneyShort(Number(v))}
+                />
+                <Tooltip content={<ChartTooltip />} />
+                <Bar dataKey="ventas" name="Ventas" radius={[6, 6, 0, 0]} fill="var(--chart-1)" barSize={32} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState title="Sin turnos registrados" description="Las estadísticas aparecerán cuando los empleados operen la caja." />
+          )}
+        </Card>
+
+        {/* Resumen de Diferencias de Caja */}
+        <Card className="p-4 sm:p-5 overflow-hidden w-full min-w-0">
+          <h3 className="mb-1 font-heading font-semibold text-base">Últimos Cierres</h3>
+          <p className="mb-3 text-xs text-muted-foreground">Estado y descuadre de los últimos turnos</p>
+          {isLoading ? (
+            <div className="py-2 space-y-4">
+              <div className="h-10 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse w-full" />
+              <div className="h-10 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse w-full" />
+              <div className="h-10 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse w-full" />
+            </div>
+          ) : shiftSalesData.length > 0 ? (
+            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+              {[...shiftSalesData].reverse().slice(0, 5).map((s, idx) => {
+                const diffColor = s.difference < 0 ? 'text-destructive font-bold' : s.difference > 0 ? 'text-success font-bold' : 'text-muted-foreground'
+                return (
+                  <div key={idx} className="flex items-center justify-between text-xs pb-2 border-b border-border/50 last:border-0 last:pb-0">
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-semibold text-foreground truncate">{s.cashier}</p>
+                      <p className="text-muted-foreground text-[10px]">{s.dateLabel}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-semibold text-foreground">{money(s.ventas)}</p>
+                      <p className={`text-[10px] ${diffColor}`}>
+                        {s.difference === 0 ? 'Perfecto' : (s.difference > 0 ? '+' : '') + money(s.difference)}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <EmptyState title="Sin datos" />
           )}
