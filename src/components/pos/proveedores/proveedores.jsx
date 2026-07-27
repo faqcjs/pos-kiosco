@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/pos/page-header'
 import { supplierBalance, useStore } from '@/lib/store'
 import { formatDateTime, money, uid } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
-import { cn } from '@/lib/utils'
+import { cn, matchProduct } from '@/lib/utils'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
 
 const SUPPLIER_CATEGORIES = [
@@ -558,7 +558,7 @@ function SupplierDetail({
     const q = prodQuery.trim().toLowerCase()
     if (!q) return []
     return state.products
-      .filter((p) => p.name.toLowerCase().includes(q) || (p.barcode && p.barcode.includes(q)))
+      .filter((p) => matchProduct(p, prodQuery))
       .slice(0, 6)
   }, [state.products, prodQuery])
 

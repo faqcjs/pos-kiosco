@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, matchProduct } from '@/lib/utils'
 import { PaymentModal } from './payment-modal'
 import { ScannerModal } from './scanner-modal'
 
@@ -112,7 +112,7 @@ export function Venta() {
       const matchesCat =
         category === 'Todos' ||
         p.category === category
-      const matchesQ = !q || p.name.toLowerCase().includes(q) || p.barcode.includes(q)
+      const matchesQ = matchProduct(p, query)
       return matchesCat && matchesQ
     })
 

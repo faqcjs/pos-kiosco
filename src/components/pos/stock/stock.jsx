@@ -11,7 +11,7 @@ import { CargaRapida } from '@/components/pos/stock/carga-rapida'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, matchProduct } from '@/lib/utils'
 import { fetchOpenFoodFacts } from '@/lib/open-food-facts'
 
 const EMPTY = {
@@ -217,11 +217,10 @@ export function Stock() {
   )
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
     return [...state.products]
       .filter((p) => {
         const matchesCat = category === 'Todos' || p.category === category
-        const matchesQ = !q || p.name.toLowerCase().includes(q) || p.barcode.includes(q)
+        const matchesQ = matchProduct(p, query)
         return matchesCat && matchesQ
       })
       .sort((a, b) => a.name.localeCompare(b.name))
