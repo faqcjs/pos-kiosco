@@ -1404,7 +1404,7 @@ function SupplierDetail({
                           </div>
                           
                           <div className="grid grid-cols-3 sm:contents gap-2 items-end">
-                            <div className="space-y-1 sm:space-y-0">
+                            <div className="space-y-1 sm:contents">
                               <label className="text-[10px] text-muted-foreground font-semibold sm:hidden">Cant.</label>
                               <Input
                                 type="number"
@@ -1412,23 +1412,23 @@ function SupplierDetail({
                                 min="1"
                                 value={item.qty}
                                 onChange={(e) => handleUpdateItemQty(item.id, e.target.value)}
-                                className="h-8 text-center px-1 py-0.5 rounded-lg border-border w-full sm:w-auto"
+                                className="h-8 text-center px-1 py-0.5 rounded-lg border-border"
                               />
                             </div>
-                            <div className="space-y-1 sm:space-y-0 text-center sm:text-right flex flex-col justify-end h-8 sm:h-auto">
+                            <div className="space-y-1 sm:contents text-center sm:text-right">
                               <span className="text-[10px] text-muted-foreground font-semibold sm:hidden mb-1 block">Costo/Un</span>
-                              <span className="text-xs font-mono text-muted-foreground tabular-nums leading-none mb-1.5 sm:mb-0">
+                              <span className="text-xs font-mono text-muted-foreground tabular-nums leading-none mb-1.5 sm:mb-0 sm:text-right sm:w-full sm:block sm:py-2">
                                 {item.totalUnits > 0 ? money(item.cost / item.totalUnits) : '—'}
                               </span>
                             </div>
-                            <div className="space-y-1 sm:space-y-0">
+                            <div className="space-y-1 sm:contents">
                               <label className="text-[10px] text-muted-foreground font-semibold sm:hidden">Costo Total</label>
                               <Input
                                 type="number"
                                 inputMode="numeric"
                                 value={item.cost}
                                 onChange={(e) => handleUpdateItemCost(item.id, e.target.value)}
-                                className="h-8 text-right font-mono font-semibold text-foreground border-border w-full sm:w-auto"
+                                className="h-8 text-right font-mono font-semibold text-foreground border-border"
                               />
                             </div>
                           </div>
