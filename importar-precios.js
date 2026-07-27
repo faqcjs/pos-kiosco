@@ -4,14 +4,20 @@ import { createClient } from '@supabase/supabase-js';
 // 1. Leer credenciales desde .env.local
 let supabaseUrl = '';
 let supabaseKey = '';
+let importEmail = '';
+let importPassword = '';
 
 try {
   const envContent = fs.readFileSync('.env.local', 'utf-8');
   const urlMatch = envContent.match(/VITE_SUPABASE_URL\s*=\s*(.*)/);
   const keyMatch = envContent.match(/VITE_SUPABASE_ANON_KEY\s*=\s*(.*)/);
+  const emailMatch = envContent.match(/IMPORT_EMAIL\s*=\s*(.*)/);
+  const passwordMatch = envContent.match(/IMPORT_PASSWORD\s*=\s*(.*)/);
   
   if (urlMatch) supabaseUrl = urlMatch[1].trim();
   if (keyMatch) supabaseKey = keyMatch[1].trim();
+  if (emailMatch) importEmail = emailMatch[1].trim();
+  if (passwordMatch) importPassword = passwordMatch[1].trim();
 } catch (err) {
   console.error('❌ Error al leer .env.local:', err.message);
   process.exit(1);
@@ -80,10 +86,16 @@ async function run() {
   console.log('🔑 Iniciando sesión en Supabase...');
   let authError = null;
 
+  if (!importEmail || !importPassword) {
+    console.error('❌ Error: No se configuró IMPORT_EMAIL o IMPORT_PASSWORD en .env.local');
+    console.log('\n👉 Para iniciar sesión y actualizar precios:\nAgregá estas dos líneas al final de tu archivo ".env.local" (que está ignorado por Git):\n\nIMPORT_EMAIL=todopasa@kiosko.com\nIMPORT_PASSWORD=tu_contraseña_de_admin_aca\n');
+    process.exit(1);
+  }
+
   try {
     const { error } = await supabase.auth.signInWithPassword({
-      email: 'todopasa@kiosko.com',
-      password: '101219'
+      email: importEmail,
+      password: importPassword
     });
     authError = error;
   } catch (e) {
@@ -91,20 +103,8 @@ async function run() {
   }
 
   if (authError) {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: 'desarrollo@kiosko.com',
-        password: '17120340'
-      });
-      authError = error;
-    } catch (e) {
-      authError = e;
-    }
-  }
-
-  if (authError) {
     console.error('❌ Error de autenticación (RLS):', authError.message || authError);
-    console.log('Asegurate de tener el usuario TodoPasa o desarrollo creado en la base de datos.');
+    console.log('Verificá que el email y contraseña en .env.local sean correctos.');
     process.exit(1);
   }
   console.log('✅ Sesión iniciada con éxito.');
