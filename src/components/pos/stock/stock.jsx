@@ -92,40 +92,66 @@ function PriceEditRow({ product, onSave }) {
   }
 
   return (
-    <div className="grid grid-cols-[1fr_80px_80px_90px] sm:grid-cols-[1fr_110px_110px_130px] gap-2 items-center px-2 py-2.5 sm:px-4">
-      <div className="min-w-0 flex items-center gap-2">
-        <span className="text-xl shrink-0">{CATEGORY_ICON[product.category]}</span>
-        <div className="min-w-0 flex-1 truncate">
-          <p className="truncate text-sm font-medium">{product.name}</p>
-          <p className="truncate text-xs text-muted-foreground">{product.barcode || 'sin código'}</p>
+    <div className="flex flex-col gap-2.5 p-3 sm:grid sm:grid-cols-[1fr_110px_110px_130px] sm:gap-2 sm:items-center sm:px-4 sm:py-2.5">
+      {/* Product Name & Margin (on mobile) or just Product (on desktop) */}
+      <div className="flex items-start justify-between gap-2 sm:contents">
+        <div className="min-w-0 flex items-center gap-2.5">
+          <span className="text-xl shrink-0">{CATEGORY_ICON[product.category]}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground truncate sm:whitespace-normal">{product.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{product.barcode || 'sin código'}</p>
+          </div>
+        </div>
+
+        {/* Margin display for mobile - aligned to the right of name */}
+        <div className={cn(
+          "text-right text-xs font-bold tabular-nums sm:hidden py-1",
+          margin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+        )}>
+          {margin >= 0 ? `+$${margin.toFixed(0)} (${marginPct}%)` : `-$${Math.abs(margin).toFixed(0)}`}
         </div>
       </div>
-      <div>
-        <Input
-          type="number"
-          inputMode="numeric"
-          value={cost}
-          onChange={(e) => setCost(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-          onFocus={(e) => e.target.select()}
-          className="h-8 font-mono text-sm text-right px-2"
-        />
+
+      {/* Inputs (grouped horizontally on mobile, separate grid cells on desktop) */}
+      <div className="grid grid-cols-2 gap-2 sm:contents">
+        <div className="flex items-center gap-1.5 sm:block">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase sm:hidden">Costo</span>
+          <div className="relative flex-1">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground sm:hidden">$</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+              onFocus={(e) => e.target.select()}
+              className="h-8 font-mono text-sm text-right px-2 pl-6 sm:pl-2 w-full"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 sm:block">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase sm:hidden">Venta</span>
+          <div className="relative flex-1">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground sm:hidden">$</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+              onFocus={(e) => e.target.select()}
+              className="h-8 font-mono text-sm text-right px-2 pl-6 sm:pl-2 w-full font-semibold"
+            />
+          </div>
+        </div>
       </div>
-      <div>
-        <Input
-          type="number"
-          inputMode="numeric"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-          onFocus={(e) => e.target.select()}
-          className="h-8 font-mono text-sm text-right px-2"
-        />
-      </div>
+
+      {/* Margin display for desktop only */}
       <div className={cn(
-        "text-right text-xs font-semibold tabular-nums",
+        "hidden sm:block text-right text-xs font-semibold tabular-nums",
         margin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
       )}>
         {margin >= 0 ? `+$${margin.toFixed(0)} (${marginPct}%)` : `-$${Math.abs(margin).toFixed(0)}`}
@@ -514,7 +540,7 @@ export function Stock() {
           </>
         ) : (
           <>
-            <div className="grid grid-cols-[1fr_80px_80px_90px] sm:grid-cols-[1fr_110px_110px_130px] gap-2 border-b border-border bg-muted/50 px-2 py-2.5 sm:px-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="hidden sm:grid sm:grid-cols-[1fr_110px_110px_130px] gap-2 border-b border-border bg-muted/50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>Producto</span>
               <span className="text-right">Costo</span>
               <span className="text-right">Venta</span>

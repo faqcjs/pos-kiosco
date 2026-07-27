@@ -193,7 +193,7 @@ export function Proveedores() {
         <div className="mx-auto max-w-5xl p-1.5 lg:p-6 space-y-6">
           <PageHeader
             title="Proveedores"
-            description="Cuenta corriente con tus proveedores and agenda de visitas."
+            description="Cuenta corriente con tus proveedores y agenda de visitas."
             action={
               <Button onClick={handleOpenNew} className="active:scale-[0.98]">
                 <Plus className="size-4" /> Nuevo proveedor
@@ -1122,7 +1122,7 @@ function SupplierDetail({
                 Completá los datos generales de la boleta de compra. Podés confirmar la carga simplificada acá mismo.
               </p>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="inv-number">Número de Boleta</Label>
                   <Input
@@ -1150,7 +1150,7 @@ function SupplierDetail({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="inv-date">Fecha de Emisión</Label>
                   <Input
@@ -1264,21 +1264,23 @@ function SupplierDetail({
                             autoComplete="off"
                           />
                           {productSuggestions.length > 0 && (
-                          <div className="absolute left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
+                          <div className="absolute left-0 right-0 w-[calc(100vw-5rem)] sm:w-full max-w-[400px] z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
                             {productSuggestions.map((p) => (
                               <button
                                 key={p.id}
                                 type="button"
                                 onClick={() => handleSelectSuggestion(p)}
-                                className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs hover:bg-muted transition-colors cursor-pointer"
+                                className="flex w-full items-start justify-between rounded-lg px-3 py-2 text-left hover:bg-muted transition-colors cursor-pointer gap-2"
                               >
                                 <div className="min-w-0 flex-1">
-                                  <p className="font-semibold truncate text-foreground">{p.name}</p>
-                                  <p className="text-[10px] text-muted-foreground truncate">
+                                  <p className="font-semibold text-foreground text-xs leading-tight whitespace-normal sm:truncate">
+                                    {p.name}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground truncate mt-0.5">
                                     {p.category} {p.barcode && `· Código: ${p.barcode}`}
                                   </p>
                                 </div>
-                                <span className="text-[11px] font-medium text-primary shrink-0 ml-2 font-mono">
+                                <span className="text-[11px] font-bold text-primary shrink-0 ml-2 font-mono bg-primary/5 dark:bg-primary/10 px-2 py-0.5 rounded">
                                   Costo: {money(p.cost)}/un
                                 </span>
                               </button>
@@ -1304,44 +1306,46 @@ function SupplierDetail({
                         setProdQuery('')
                       }} 
                       disabled={!selectedProdId}
-                      className="h-11 shrink-0"
+                      className="h-11 shrink-0 hidden sm:inline-flex"
                     >
                       <Plus className="size-4 mr-1" /> Cargar
                     </Button>
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-2 items-end">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-end w-full">
                   <div className="flex-1 space-y-1">
-                    <Label htmlFor="custom-name" className="text-xs">Nombre del Producto</Label>
+                    <Label htmlFor="custom-name" className="text-xs font-semibold">Nombre del Producto</Label>
                     <Input
                       id="custom-name"
                       value={customName}
                       onChange={(e) => setCustomName(e.target.value)}
                       placeholder="Ej: Artículos varios"
-                      className="h-11"
+                      className="h-11 w-full"
                     />
                   </div>
-                  <div className="w-32 space-y-1">
-                    <Label htmlFor="custom-cost" className="text-xs">Costo Total</Label>
-                    <Input
-                      id="custom-cost"
-                      type="number"
-                      inputMode="numeric"
-                      value={customCost}
-                      onChange={(e) => setCustomCost(e.target.value)}
-                      placeholder="0"
-                      className="h-11"
-                    />
+                  <div className="flex gap-2 items-end w-full sm:w-auto">
+                    <div className="flex-1 sm:w-32 space-y-1">
+                      <Label htmlFor="custom-cost" className="text-xs font-semibold">Costo Total</Label>
+                      <Input
+                        id="custom-cost"
+                        type="number"
+                        inputMode="numeric"
+                        value={customCost}
+                        onChange={(e) => setCustomCost(e.target.value)}
+                        placeholder="0"
+                        className="h-11 w-full"
+                      />
+                    </div>
+                    <Button 
+                      type="button" 
+                      onClick={handleAddCustomItem} 
+                      disabled={!customName.trim() || !Number(customCost)}
+                      className="h-11 shrink-0 px-4"
+                    >
+                      <Plus className="size-4 mr-1.5" /> Cargar
+                    </Button>
                   </div>
-                  <Button 
-                    type="button" 
-                    onClick={handleAddCustomItem} 
-                    disabled={!customName.trim() || !Number(customCost)}
-                    className="h-11 shrink-0"
-                  >
-                    <Plus className="size-4 mr-1" /> Cargar
-                  </Button>
                 </div>
               )}
 
@@ -1355,7 +1359,7 @@ function SupplierDetail({
                   </div>
                 ) : (
                   <>
-                    <div className="bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider grid grid-cols-[1fr_70px_85px_100px_40px] gap-2 border-b border-border">
+                    <div className="hidden sm:grid bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider grid-cols-[1fr_70px_85px_100px_40px] gap-2 border-b border-border">
                       <span>Detalle / Producto</span>
                       <span className="text-center">Cant.</span>
                       <span className="text-right">Costo/Un.</span>
@@ -1364,54 +1368,72 @@ function SupplierDetail({
                     </div>
                     <div className="divide-y divide-border/60 max-h-[40vh] overflow-y-auto pr-1">
                       {items.map((item) => (
-                        <div key={item.id} className="px-3 py-2 text-sm grid grid-cols-[1fr_70px_85px_100px_40px] gap-2 items-center">
-                          <div className="min-w-0">
-                            <p className="font-semibold truncate text-foreground leading-tight">{item.name}</p>
-                            {!item.isCustom ? (
-                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                <p className="text-[10px] text-muted-foreground leading-none">
-                                  Equivale a <span className="font-bold text-foreground">{item.totalUnits}</span> un.
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleItemUnitType(item.id)}
-                                  className="rounded bg-primary/10 hover:bg-primary/20 text-primary px-1.5 py-0.5 text-[9px] font-bold uppercase transition-colors shrink-0 cursor-pointer"
-                                  title="Cambiar entre caja o unidad suelta"
-                                >
-                                  {item.unitSize === 1 ? 'Unidades' : `Caja (x${item.unitSize})`} ⇄
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground uppercase mt-1 inline-block shrink-0">
-                                Custom (Unidad)
+                        <div key={item.id} className="p-3 sm:px-3 sm:py-2 text-sm flex flex-col sm:grid sm:grid-cols-[1fr_70px_85px_100px_40px] gap-3 sm:gap-2 items-stretch sm:items-center">
+                          <div className="min-w-0 flex-1 flex justify-between items-start gap-2 sm:block">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-foreground text-xs leading-tight truncate sm:whitespace-normal">{item.name}</p>
+                              {!item.isCustom ? (
+                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                  <p className="text-[10px] text-muted-foreground leading-none">
+                                    Equivale a <span className="font-bold text-foreground">{item.totalUnits}</span> un.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleItemUnitType(item.id)}
+                                    className="rounded bg-primary/10 hover:bg-primary/20 text-primary px-1.5 py-0.5 text-[9px] font-bold uppercase transition-colors shrink-0 cursor-pointer"
+                                    title="Cambiar entre caja o unidad suelta"
+                                  >
+                                    {item.unitSize === 1 ? 'Unidades' : `Caja (x${item.unitSize})`} ⇄
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground uppercase mt-1 inline-block shrink-0">
+                                  Custom (Unidad)
+                                </span>
+                              )}
+                            </div>
+                            <div className="sm:hidden">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(item.id)}
+                                className="text-destructive hover:bg-destructive/10 p-2 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="size-4.5" />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 sm:contents gap-2 items-end">
+                            <div className="space-y-1 sm:space-y-0">
+                              <label className="text-[10px] text-muted-foreground font-semibold sm:hidden">Cant.</label>
+                              <Input
+                                type="number"
+                                inputMode="numeric"
+                                min="1"
+                                value={item.qty}
+                                onChange={(e) => handleUpdateItemQty(item.id, e.target.value)}
+                                className="h-8 text-center px-1 py-0.5 rounded-lg border-border w-full sm:w-auto"
+                              />
+                            </div>
+                            <div className="space-y-1 sm:space-y-0 text-center sm:text-right flex flex-col justify-end h-8 sm:h-auto">
+                              <span className="text-[10px] text-muted-foreground font-semibold sm:hidden mb-1 block">Costo/Un</span>
+                              <span className="text-xs font-mono text-muted-foreground tabular-nums leading-none mb-1.5 sm:mb-0">
+                                {item.totalUnits > 0 ? money(item.cost / item.totalUnits) : '—'}
                               </span>
-                            )}
+                            </div>
+                            <div className="space-y-1 sm:space-y-0">
+                              <label className="text-[10px] text-muted-foreground font-semibold sm:hidden">Costo Total</label>
+                              <Input
+                                type="number"
+                                inputMode="numeric"
+                                value={item.cost}
+                                onChange={(e) => handleUpdateItemCost(item.id, e.target.value)}
+                                className="h-8 text-right font-mono font-semibold text-foreground border-border w-full sm:w-auto"
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <Input
-                              type="number"
-                              inputMode="numeric"
-                              min="1"
-                              value={item.qty}
-                              onChange={(e) => handleUpdateItemQty(item.id, e.target.value)}
-                              className="h-8 text-center px-1 py-0.5 rounded-lg border-border"
-                            />
-                          </div>
-                          <div className="text-right">
-                            <span className="text-xs font-mono text-muted-foreground tabular-nums">
-                              {item.totalUnits > 0 ? money(item.cost / item.totalUnits) : '—'}
-                            </span>
-                          </div>
-                          <div>
-                            <Input
-                              type="number"
-                              inputMode="numeric"
-                              value={item.cost}
-                              onChange={(e) => handleUpdateItemCost(item.id, e.target.value)}
-                              className="h-8 text-right font-mono font-semibold text-foreground border-border"
-                            />
-                          </div>
-                          <div className="flex justify-center">
+                          
+                          <div className="hidden sm:flex justify-center">
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(item.id)}
