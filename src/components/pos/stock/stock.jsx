@@ -146,7 +146,16 @@ export function Stock() {
   const [formOpen, setFormOpen] = useState(false)
   const [draft, setDraft] = useState(EMPTY)
   const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
+  const [stockScannerOpen, setStockScannerOpen] = useState(false)
   const [expandedProductId, setExpandedProductId] = useState(null)
+
+  function handleStockScan(code) {
+    setStockScannerOpen(false)
+    if (code) {
+      setQuery(code)
+      toast(`Buscando código: ${code}`, 'success')
+    }
+  }
   const [offLookupLoading, setOffLookupLoading] = useState(false)
   const [alertsVisible, setAlertsVisible] = useState(() =>
     window.innerWidth < 640 ? 3 : 15,
@@ -337,14 +346,24 @@ export function Stock() {
         </button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar..."
-          className="pl-10"
-        />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar..."
+            className="pl-10"
+          />
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => setStockScannerOpen(true)}
+          className="h-11 px-3 border-border hover:bg-muted active:scale-[0.98]"
+          title="Escanear código de barras"
+        >
+          <Camera className="size-5 text-muted-foreground" />
+        </Button>
       </div>
 
       {/* category filters */}
@@ -586,6 +605,12 @@ export function Stock() {
         open={barcodeSearchOpen}
         onClose={() => setBarcodeSearchOpen(false)}
         onSelectBarcode={handleSelectBarcode}
+      />
+
+      <ScannerModal
+        open={stockScannerOpen}
+        onClose={() => setStockScannerOpen(false)}
+        onDetect={handleStockScan}
       />
     </div>
   )

@@ -929,29 +929,33 @@ function SupplierDetail({
               <p className="text-sm text-muted-foreground">Cuenta corriente</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {canEdit && (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 px-2.5 gap-1.5 text-xs shrink-0 active:scale-95 border-border hover:border-primary/30"
+                className="h-9 px-2 sm:px-2.5 gap-1 sm:gap-1.5 text-xs shrink-0 active:scale-95 border-border hover:border-primary/30"
                 onClick={() => onEdit(supplier)}
+                title="Editar proveedor"
               >
-                <Pencil className="size-3.5" /> Editar
+                <Pencil className="size-3.5" />
+                <span className="hidden sm:inline">Editar</span>
               </Button>
             )}
             {canDelete && (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 px-2.5 gap-1.5 text-xs shrink-0 active:scale-95 border-destructive/50 text-destructive hover:bg-destructive hover:text-white"
+                className="h-9 px-2 sm:px-2.5 gap-1 sm:gap-1.5 text-xs shrink-0 active:scale-95 border-destructive/50 text-destructive hover:bg-destructive hover:text-white"
                 onClick={() => {
                   if (window.confirm(`¿Eliminar al proveedor "${supplier.name}"?\n\nSe eliminarán también todos sus movimientos e historial de cuenta corriente. Esta acción no se puede deshacer.`)) {
                     onDelete(supplier.id)
                   }
                 }}
+                title="Eliminar proveedor"
               >
-                <Trash2 className="size-3.5" /> Eliminar
+                <Trash2 className="size-3.5" />
+                <span className="hidden sm:inline">Eliminar</span>
               </Button>
             )}
           </div>
