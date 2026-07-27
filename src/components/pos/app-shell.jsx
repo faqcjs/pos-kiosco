@@ -471,12 +471,12 @@ export function AppShell({
                 </button>
               )}
               {!isOnline ? (
-                <Badge tone="danger" className="text-[10px] px-1.5 py-0.5 animate-pulse">
+                <Badge tone="danger" className="text-[10px] px-1.5 py-0.5 animate-pulse bg-destructive text-white border-none">
                   Offline
                 </Badge>
               ) : (
-                <Badge tone={isMockMode ? "warning" : "success"} className="text-[10px] px-1.5 py-0.5">
-                  {isMockMode ? "Mock" : "Supabase"}
+                <Badge tone="success" className="text-[10px] px-1.5 py-0.5 bg-success text-success-foreground border-none">
+                  Online
                 </Badge>
               )}
               {hasPendingSync && (

@@ -1198,7 +1198,7 @@ function SupplierDetail({
                 </div>
               </label>
 
-              <div className="mt-6 flex gap-2 pt-2 border-t border-border/60">
+              <div className="mt-6 flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/60">
                 <Button variant="outline" className="flex-1" onClick={() => setReceiveOpen(false)}>
                   Cancelar
                 </Button>

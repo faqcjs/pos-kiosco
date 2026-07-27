@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
+import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select, Skeleton } from '@/components/ui/kit'
@@ -565,45 +565,20 @@ export function Stock() {
         )}
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-3 sm:px-6">
-            <div className="flex flex-1 justify-between gap-2 sm:hidden">
-              <Button
-                variant="outline"
-                onClick={() => setPage(1)}
-                disabled={page === 1}
-                className="px-2.5 text-xs font-semibold"
-              >
-                Inicio
-              </Button>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                  disabled={page === 1}
-                  className="text-xs"
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                  disabled={page === totalPages}
-                  className="text-xs"
-                >
-                  Siguiente
-                </Button>
-              </div>
+            {/* Left side info (desktop only) */}
+            <div className="hidden sm:block">
+              <p className="text-sm text-muted-foreground">
+                Mostrando <span className="font-medium">{(page - 1) * ITEMS_PER_PAGE + 1}</span> a{' '}
+                <span className="font-medium">
+                  {Math.min(page * ITEMS_PER_PAGE, filtered.length)}
+                </span>{' '}
+                de <span className="font-medium">{filtered.length}</span> productos
+              </p>
             </div>
-            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Mostrando <span className="font-medium">{(page - 1) * ITEMS_PER_PAGE + 1}</span> a{' '}
-                  <span className="font-medium">
-                    {Math.min(page * ITEMS_PER_PAGE, filtered.length)}
-                  </span>{' '}
-                  de <span className="font-medium">{filtered.length}</span> productos
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
+
+            {/* Pagination Controls (centered on mobile, right-aligned on desktop) */}
+            <div className="flex flex-1 justify-center sm:justify-end sm:flex-initial">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <Button
                   variant="outline"
                   onClick={() => setPage(1)}
@@ -619,21 +594,33 @@ export function Stock() {
                   onClick={() => setPage((p) => Math.max(p - 1, 1))}
                   disabled={page === 1}
                   className="h-8 w-8 p-0"
+                  title="Página anterior"
                 >
                   <span className="sr-only">Anterior</span>
                   <ChevronLeft className="size-4" />
                 </Button>
-                <span className="text-sm font-medium px-2">
-                  Pág. {page} de {totalPages}
+                <span className="text-sm font-semibold px-2 tabular-nums">
+                  {page} de {totalPages}
                 </span>
                 <Button
                   variant="outline"
                   onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
                   disabled={page === totalPages}
                   className="h-8 w-8 p-0"
+                  title="Página siguiente"
                 >
                   <span className="sr-only">Siguiente</span>
                   <ChevronRight className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page === totalPages}
+                  className="h-8 w-8 p-0"
+                  title="Última página"
+                >
+                  <span className="sr-only">Última página</span>
+                  <ChevronsRight className="size-4" />
                 </Button>
               </div>
             </div>
