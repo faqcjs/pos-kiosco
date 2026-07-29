@@ -146,7 +146,6 @@ function OpenShiftView({
   const [movReason, setMovReason] = useState('')
   const [closeOpen, setCloseOpen] = useState(false)
   const [counted, setCounted] = useState('')
-  const [closeCashierName, setCloseCashierName] = useState('')
   const [selectedSale, setSelectedSale] = useState(null)
 
   const shiftSales = useMemo(() => {
@@ -425,16 +424,15 @@ function OpenShiftView({
         footer={
           <Button
             className="h-12 w-full bg-success text-base font-bold text-success-foreground hover:bg-success/90"
-            disabled={counted === '' || !closeCashierName.trim() || closeShiftPending}
+            disabled={counted === '' || closeShiftPending}
             onClick={async () => {
               try {
-                await onClose(countedNum, closeCashierName.trim())
+                await onClose(countedNum, shift.openedBy)
                 const label =
                   diff === 0 ? 'Caja perfecta' : diff > 0 ? `Sobrante ${money(diff)}` : `Faltante ${money(Math.abs(diff))}`
                 toast(`Caja cerrada. ${label}`, diff === 0 ? 'success' : 'info')
                 setCloseOpen(false)
                 setCounted('')
-                setCloseCashierName('')
               } catch (err) {
                 console.error(err)
                 toast(err?.message || 'Error al cerrar la caja. Intentá de nuevo.', 'error')
@@ -449,16 +447,6 @@ function OpenShiftView({
           <div className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
             <span className="text-sm text-muted-foreground">Total teórico</span>
             <span className="font-heading text-lg font-bold tabular-nums">{money(theoretical)}</span>
-          </div>
-          <div>
-            <Label htmlFor="close-cashier-name">Nombre del cajero/a que cierra</Label>
-            <Input
-              id="close-cashier-name"
-              value={closeCashierName}
-              onChange={(e) => setCloseCashierName(e.target.value)}
-              placeholder="Ej: María"
-              required
-            />
           </div>
           <div>
             <Label htmlFor="counted">Monto físico real en caja</Label>

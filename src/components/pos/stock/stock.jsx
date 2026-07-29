@@ -183,10 +183,9 @@ export function Stock() {
     }
   }
   const [offLookupLoading, setOffLookupLoading] = useState(false)
-  const [alertsVisible, setAlertsVisible] = useState(() =>
-    window.innerWidth < 640 ? 3 : 15,
-  )
   const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false)
+  const [alertsModalOpen, setAlertsModalOpen] = useState(false)
+  const [alertsModalPage, setAlertsModalPage] = useState(1)
 
   const categoryContainerRef = useRef(null)
 
@@ -225,10 +224,6 @@ export function Stock() {
     () => (viewMode === 'inventory' ? stockAlerts : priceAlerts),
     [viewMode, stockAlerts, priceAlerts],
   )
-
-  useEffect(() => {
-    setAlertsVisible(window.innerWidth < 640 ? 3 : 15)
-  }, [viewMode])
 
   const filtered = useMemo(() => {
     return [...state.products]
@@ -431,7 +426,7 @@ export function Stock() {
             {viewMode === 'inventory' ? `Alertas de stock (${alerts.length})` : `Productos sin precio (${alerts.length})`}
           </h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            {alerts.slice(0, alertsVisible).map((p) => (
+            {alerts.slice(0, 6).map((p) => (
               <button
                 key={p.id}
                 onClick={() => openEdit(p)}
@@ -445,12 +440,15 @@ export function Stock() {
               </button>
             ))}
           </div>
-          {alertsVisible < alerts.length && (
+          {alerts.length > 6 && (
             <button
-              onClick={() => setAlertsVisible((v) => v + 15)}
-              className="mt-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => {
+                setAlertsModalPage(1)
+                setAlertsModalOpen(true)
+              }}
+              className="mt-3 text-xs font-semibold text-warning hover:text-warning/80 underline transition-colors"
             >
-              Ver {Math.min(15, alerts.length - alertsVisible)} más ({alerts.length - alertsVisible} restantes)
+              Ver más ({alerts.length - 6} restantes)
             </button>
           )}
         </Card>
@@ -504,14 +502,12 @@ export function Stock() {
                         >
                           <Minus className="size-3.5" />
                         </button>
-                        <span
-                          className={cn(
-                            'w-10 text-center text-sm font-bold tabular-nums',
-                            low && 'text-warning',
-                          )}
-                        >
-                          {p.stock}
-                        </span>
+                        <StockInput
+                          product={p}
+                          isAdmin={isAdmin}
+                          adjustStock={adjustStock}
+                          toast={toast}
+                        />
                         <button
                           disabled={p.controlLotes}
                           onClick={() => adjustStock(p.id, 1)}
@@ -659,6 +655,16 @@ export function Stock() {
         open={stockScannerOpen}
         onClose={() => setStockScannerOpen(false)}
         onDetect={handleStockScan}
+      />
+
+      <AlertsModal
+        open={alertsModalOpen}
+        onClose={() => setAlertsModalOpen(false)}
+        alerts={alerts}
+        viewMode={viewMode}
+        openEdit={openEdit}
+        alertsModalPage={alertsModalPage}
+        setAlertsModalPage={setAlertsModalPage}
       />
     </div>
   )
@@ -978,5 +984,141 @@ function BarcodeSearchModal({
         }}
       />
     </>
+  )
+}
+
+function AlertsModal({
+  open,
+  onClose,
+  alerts,
+  viewMode,
+  openEdit,
+  alertsModalPage,
+  setAlertsModalPage,
+}) {
+  const ALERTS_PER_PAGE = 10
+  const totalAlertsPages = Math.ceil(alerts.length / ALERTS_PER_PAGE)
+  const paginatedAlerts = useMemo(() => {
+    if (alerts.length <= 10) return alerts
+    const start = (alertsModalPage - 1) * ALERTS_PER_PAGE
+    return alerts.slice(start, start + ALERTS_PER_PAGE)
+  }, [alerts, alertsModalPage])
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={viewMode === 'inventory' ? 'Alertas de Stock Bajo' : 'Productos sin Precio'}
+    >
+      <div className="space-y-4">
+        <div className="grid gap-2">
+          {paginatedAlerts.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => {
+                openEdit(p)
+                onClose()
+              }}
+              className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm transition-colors hover:bg-muted text-left w-full"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-lg shrink-0">{CATEGORY_ICON[p.category]}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-foreground truncate">{p.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{p.category}</p>
+                </div>
+              </div>
+              <Badge tone={viewMode === 'inventory' ? (p.stock === 0 ? 'danger' : 'warning') : 'danger'} className="shrink-0 ml-2">
+                {viewMode === 'inventory' ? (p.stock === 0 ? 'Sin stock' : `${p.stock} u.`) : 'Sin precio'}
+              </Badge>
+            </button>
+          ))}
+        </div>
+
+        {alerts.length > 10 && (
+          <div className="flex items-center justify-between border-t border-border pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={alertsModalPage === 1}
+              onClick={() => setAlertsModalPage((p) => Math.max(1, p - 1))}
+              className="h-9 px-3 text-xs font-semibold"
+            >
+              Anterior
+            </Button>
+            <span className="text-xs text-muted-foreground font-semibold">
+              Página {alertsModalPage} de {totalAlertsPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={alertsModalPage === totalAlertsPages}
+              onClick={() => setAlertsModalPage((p) => Math.min(totalAlertsPages, p + 1))}
+              className="h-9 px-3 text-xs font-semibold"
+            >
+              Siguiente
+            </Button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+function StockInput({ product, isAdmin, adjustStock, toast }) {
+  const [val, setVal] = useState(product.stock)
+
+  useEffect(() => {
+    setVal(product.stock)
+  }, [product.stock])
+
+  const handleBlurOrSubmit = () => {
+    const numVal = parseInt(val, 10)
+    if (isNaN(numVal) || numVal < 0) {
+      setVal(product.stock)
+      return
+    }
+
+    const delta = numVal - product.stock
+    if (delta === 0) return
+
+    if (delta < 0 && !isAdmin) {
+      toast('No tenés permisos para disminuir el stock', 'error')
+      setVal(product.stock)
+      return
+    }
+
+    adjustStock(product.id, delta)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.target.blur()
+    } else if (e.key === 'Escape') {
+      setVal(product.stock)
+      e.target.blur()
+    }
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      disabled={product.controlLotes}
+      value={val}
+      onChange={(e) => {
+        const v = e.target.value
+        if (v === '' || /^[0-9]+$/.test(v)) {
+          setVal(v)
+        }
+      }}
+      onBlur={handleBlurOrSubmit}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        "w-12 h-8 text-center text-sm font-bold bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:bg-card transition-all disabled:opacity-40 disabled:cursor-not-allowed tabular-nums",
+        product.stock <= product.minStock && "text-warning"
+      )}
+    />
   )
 }
