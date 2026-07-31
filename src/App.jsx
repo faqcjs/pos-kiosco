@@ -11,6 +11,8 @@ import { Admin } from '@/components/pos/admin/admin'
 import { Card, Input, Label } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
 import { formatDateTime } from '@/lib/format'
+import { PwaInstallPrompt } from '@/components/ui/pwa-install-prompt'
+
 
 function LoginScreen() {
   const { login } = useStore()
@@ -314,7 +316,9 @@ export default function App() {
     <StoreProvider>
       <ToastProvider>
         <Shell />
+        <PwaInstallPrompt />
       </ToastProvider>
     </StoreProvider>
   )
 }
+

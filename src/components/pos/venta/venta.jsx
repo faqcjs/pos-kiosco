@@ -1,6 +1,6 @@
 'use client'
 
-import { Camera, Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle, PanelRightClose, PanelRightOpen, Flame } from 'lucide-react'
+import { Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle, PanelRightClose, PanelRightOpen, Flame, ScanBarcode } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input } from '@/components/ui/kit'
@@ -242,15 +242,20 @@ export function Venta() {
       } else {
         toast(`Venta registrada (${label}): ${money(total)}`)
       }
-      setCart([])
-      setPayOpen(false)
-      setMobileCartOpen(false)
+      return true
     } catch (error) {
       console.error(error)
       toast(error.message || 'Error al registrar la venta', 'error')
+      return false
     } finally {
       setIsSaving(false)
     }
+  }
+
+  function handleFinishSale() {
+    setCart([])
+    setPayOpen(false)
+    setMobileCartOpen(false)
   }
 
   return (
@@ -280,14 +285,6 @@ export function Venta() {
                   <span className="sr-only">Buscar producto o código...</span>
                 </span>
               </div>
-              <Button
-                variant="outline"
-                className="h-11 w-11 shrink-0 p-0"
-                onClick={() => setScannerOpen(true)}
-                aria-label="Escanear código"
-              >
-                <Camera className="size-5" />
-              </Button>
               {/* Mobile: toggle quick amount */}
               <Button
                 variant="outline"
@@ -553,7 +550,7 @@ export function Venta() {
               : "bottom-[calc(5rem+env(safe-area-inset-bottom))]"
           )}
         >
-          <Camera className="size-5 text-success-foreground" />
+          <ScanBarcode className="size-5 text-success-foreground" />
         </button>
       )}
 
@@ -591,9 +588,11 @@ export function Venta() {
       <ScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onDetect={handleScan} />
       <PaymentModal
         open={payOpen}
-        onClose={() => !isSaving && setPayOpen(false)}
+        onClose={() => !isSaving && handleFinishSale()}
         total={total}
+        items={cart}
         onConfirm={handleConfirmSale}
+        onFinish={handleFinishSale}
         isSaving={isSaving}
       />
     </div>

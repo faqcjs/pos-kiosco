@@ -3,7 +3,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "types": ["vite-plugin-pwa/client"]
   },
+
   "exclude": ["node_modules", "dist"]
 }

@@ -184,8 +184,7 @@ export function Stock() {
   }
   const [offLookupLoading, setOffLookupLoading] = useState(false)
   const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false)
-  const [alertsModalOpen, setAlertsModalOpen] = useState(false)
-  const [alertsModalPage, setAlertsModalPage] = useState(1)
+  const [filterAlertsOnly, setFilterAlertsOnly] = useState(false)
 
   const categoryContainerRef = useRef(null)
 
@@ -208,7 +207,7 @@ export function Stock() {
 
   useEffect(() => {
     setPage(1)
-  }, [query, category])
+  }, [query, category, filterAlertsOnly, viewMode])
 
   const stockAlerts = useMemo(
     () => state.products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock),
@@ -216,7 +215,10 @@ export function Stock() {
   )
 
   const priceAlerts = useMemo(
-    () => state.products.filter((p) => p.price === 0 || !p.price).sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      state.products
+        .filter((p) => !p.price || p.price === 0 || !p.cost || p.cost === 0)
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [state.products],
   )
 
@@ -225,15 +227,32 @@ export function Stock() {
     [viewMode, stockAlerts, priceAlerts],
   )
 
+  const alertStats = useMemo(() => {
+    if (viewMode === 'inventory') {
+      const outOfStock = stockAlerts.filter((p) => p.stock === 0).length
+      const lowStock = stockAlerts.filter((p) => p.stock > 0).length
+      return { outOfStock, lowStock }
+    } else {
+      const noPrice = priceAlerts.filter((p) => !p.price || p.price === 0).length
+      const noCost = priceAlerts.filter((p) => !p.cost || p.cost === 0).length
+      return { noPrice, noCost }
+    }
+  }, [viewMode, stockAlerts, priceAlerts])
+
   const filtered = useMemo(() => {
     return [...state.products]
       .filter((p) => {
         const matchesCat = category === 'Todos' || p.category === category
         const matchesQ = matchProduct(p, query)
-        return matchesCat && matchesQ
+        const matchesAlert =
+          !filterAlertsOnly ||
+          (viewMode === 'inventory'
+            ? p.stock <= p.minStock
+            : !p.price || p.price === 0 || !p.cost || p.cost === 0)
+        return matchesCat && matchesQ && matchesAlert
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [state.products, query, category])
+  }, [state.products, query, category, filterAlertsOnly, viewMode])
 
   const ITEMS_PER_PAGE = 15
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
@@ -420,38 +439,57 @@ export function Stock() {
       </div>
 
       {alerts.length > 0 && (
-        <Card className="border-warning/40 bg-warning/5 p-4">
-          <h3 className="flex items-center gap-2 font-heading text-base font-bold text-warning">
-            <AlertTriangle className="size-5" />
-            {viewMode === 'inventory' ? `Alertas de stock (${alerts.length})` : `Productos sin precio (${alerts.length})`}
-          </h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {alerts.slice(0, 6).map((p) => (
-              <button
-                key={p.id}
-                onClick={() => openEdit(p)}
-                className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm transition-colors hover:bg-muted"
-              >
-                <span>{CATEGORY_ICON[p.category]}</span>
-                <span className="font-medium">{p.name}</span>
-                <Badge tone={viewMode === 'inventory' ? (p.stock === 0 ? 'danger' : 'warning') : 'danger'}>
-                  {viewMode === 'inventory' ? (p.stock === 0 ? 'Sin stock' : `${p.stock} u.`) : 'Sin precio'}
-                </Badge>
-              </button>
-            ))}
+        <Card className="border-warning/40 bg-warning/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="flex items-center gap-2 font-heading text-base font-bold text-warning">
+              <AlertTriangle className="size-5 shrink-0" />
+              {viewMode === 'inventory'
+                ? `Alertas de Stock (${alerts.length} en total)`
+                : `Productos con datos pendientes (${alerts.length} en total)`}
+            </h3>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
+              {viewMode === 'inventory' ? (
+                <>
+                  <span>• <strong className="text-foreground">{alertStats.outOfStock}</strong> sin stock</span>
+                  <span>• <strong className="text-foreground">{alertStats.lowStock}</strong> con stock bajo</span>
+                </>
+              ) : (
+                <>
+                  <span>• <strong className="text-foreground">{alertStats.noPrice}</strong> sin precio de venta</span>
+                  <span>• <strong className="text-foreground">{alertStats.noCost}</strong> sin precio de costo</span>
+                </>
+              )}
+            </div>
           </div>
-          {alerts.length > 6 && (
-            <button
-              onClick={() => {
-                setAlertsModalPage(1)
-                setAlertsModalOpen(true)
-              }}
-              className="mt-3 text-xs font-semibold text-warning hover:text-warning/80 underline transition-colors"
-            >
-              Ver más ({alerts.length - 6} restantes)
-            </button>
-          )}
+
+          <Button
+            variant={filterAlertsOnly ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={() => setFilterAlertsOnly((v) => !v)}
+            className={cn(
+              'h-9 px-3.5 text-xs font-semibold shrink-0 transition-all',
+              filterAlertsOnly
+                ? 'bg-warning text-warning-foreground hover:bg-warning/90'
+                : 'border-warning/40 text-warning hover:bg-warning/10'
+            )}
+          >
+            {filterAlertsOnly ? 'Viendo solo alertas ✓' : `Filtrar en tabla (${alerts.length}) →`}
+          </Button>
         </Card>
+      )}
+
+      {filterAlertsOnly && (
+        <div className="flex items-center justify-between rounded-xl border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs font-medium text-warning shadow-sm">
+          <span>
+            Filtrando tabla por productos con <strong>{viewMode === 'inventory' ? 'alertas de stock' : 'precios o costos pendientes'}</strong> ({filtered.length} encontrados)
+          </span>
+          <button
+            onClick={() => setFilterAlertsOnly(false)}
+            className="font-bold underline hover:opacity-80 transition-opacity ml-2"
+          >
+            Ver catálogo completo ✕
+          </button>
+        </div>
       )}
 
       {/* Inventory table */}
@@ -655,16 +693,6 @@ export function Stock() {
         open={stockScannerOpen}
         onClose={() => setStockScannerOpen(false)}
         onDetect={handleStockScan}
-      />
-
-      <AlertsModal
-        open={alertsModalOpen}
-        onClose={() => setAlertsModalOpen(false)}
-        alerts={alerts}
-        viewMode={viewMode}
-        openEdit={openEdit}
-        alertsModalPage={alertsModalPage}
-        setAlertsModalPage={setAlertsModalPage}
       />
     </div>
   )
@@ -987,83 +1015,7 @@ function BarcodeSearchModal({
   )
 }
 
-function AlertsModal({
-  open,
-  onClose,
-  alerts,
-  viewMode,
-  openEdit,
-  alertsModalPage,
-  setAlertsModalPage,
-}) {
-  const ALERTS_PER_PAGE = 10
-  const totalAlertsPages = Math.ceil(alerts.length / ALERTS_PER_PAGE)
-  const paginatedAlerts = useMemo(() => {
-    if (alerts.length <= 10) return alerts
-    const start = (alertsModalPage - 1) * ALERTS_PER_PAGE
-    return alerts.slice(start, start + ALERTS_PER_PAGE)
-  }, [alerts, alertsModalPage])
 
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={viewMode === 'inventory' ? 'Alertas de Stock Bajo' : 'Productos sin Precio'}
-    >
-      <div className="space-y-4">
-        <div className="grid gap-2">
-          {paginatedAlerts.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                openEdit(p)
-                onClose()
-              }}
-              className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm transition-colors hover:bg-muted text-left w-full"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-lg shrink-0">{CATEGORY_ICON[p.category]}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-foreground truncate">{p.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{p.category}</p>
-                </div>
-              </div>
-              <Badge tone={viewMode === 'inventory' ? (p.stock === 0 ? 'danger' : 'warning') : 'danger'} className="shrink-0 ml-2">
-                {viewMode === 'inventory' ? (p.stock === 0 ? 'Sin stock' : `${p.stock} u.`) : 'Sin precio'}
-              </Badge>
-            </button>
-          ))}
-        </div>
-
-        {alerts.length > 10 && (
-          <div className="flex items-center justify-between border-t border-border pt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={alertsModalPage === 1}
-              onClick={() => setAlertsModalPage((p) => Math.max(1, p - 1))}
-              className="h-9 px-3 text-xs font-semibold"
-            >
-              Anterior
-            </Button>
-            <span className="text-xs text-muted-foreground font-semibold">
-              Página {alertsModalPage} de {totalAlertsPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={alertsModalPage === totalAlertsPages}
-              onClick={() => setAlertsModalPage((p) => Math.min(totalAlertsPages, p + 1))}
-              className="h-9 px-3 text-xs font-semibold"
-            >
-              Siguiente
-            </Button>
-          </div>
-        )}
-      </div>
-    </Modal>
-  )
-}
 
 function StockInput({ product, isAdmin, adjustStock, toast }) {
   const [val, setVal] = useState(product.stock)
