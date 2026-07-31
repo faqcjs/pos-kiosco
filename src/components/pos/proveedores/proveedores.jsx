@@ -595,6 +595,16 @@ function SupplierDetail({
     }
   }, [receiveOpen])
 
+  function handleNextStep() {
+    const amt = Number(totalInvoiceAmount)
+    if (!totalInvoiceAmount || isNaN(amt) || amt <= 0) {
+      toast('Ingresá el monto total de la boleta para continuar al paso 2', 'error')
+      setTimeout(() => document.getElementById('inv-total')?.focus(), 50)
+      return
+    }
+    setStep(2)
+  }
+
   useEffect(() => {
     // When a product is selected in catalog mode, suggest the last cost
     if (selectedProdId && addItemType === 'catalog') {
@@ -1199,15 +1209,14 @@ function SupplierDetail({
               </label>
 
               <div className="mt-6 flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/60">
-                <Button variant="outline" className="flex-1" onClick={() => setReceiveOpen(false)}>
+                <Button variant="outline" className="h-12 flex-1 text-sm font-semibold" onClick={() => setReceiveOpen(false)}>
                   Cancelar
                 </Button>
                 <Button 
-                  className="flex-1 font-bold"
-                  onClick={() => setStep(2)}
-                  disabled={!totalInvoiceAmount || Number(totalInvoiceAmount) <= 0}
+                  className="h-12 flex-1 font-bold text-base shadow-sm"
+                  onClick={handleNextStep}
                 >
-                  Siguiente
+                  Siguiente →
                 </Button>
               </div>
             </div>
@@ -1470,12 +1479,15 @@ function SupplierDetail({
                 )}
               </div>
 
-              <div className="mt-6 flex gap-2 pt-2 border-t border-border/60">
-                <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>
-                  Volver al Paso 1
+              <div className="mt-6 flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/60">
+                <Button variant="outline" onClick={() => setStep(1)} className="h-12 sm:flex-none text-sm font-semibold">
+                  ← Volver al Paso 1
                 </Button>
-                <Button className="flex-1 font-bold" onClick={submitReceive} disabled={items.length === 0}>
-                  Confirmar
+                <Button variant="ghost" onClick={() => setReceiveOpen(false)} className="h-12 sm:flex-none text-sm font-semibold text-muted-foreground hover:text-foreground">
+                  Cancelar
+                </Button>
+                <Button className="h-12 flex-1 font-bold text-base shadow-sm" onClick={submitReceive} disabled={items.length === 0}>
+                  Confirmar Recepción
                 </Button>
               </div>
             </div>
