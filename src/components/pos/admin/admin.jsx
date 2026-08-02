@@ -63,6 +63,9 @@ export function Admin() {
   const [salesDayPage, setSalesDayPage] = useState(1)
   const [selectedDayPage, setSelectedDayPage] = useState(1)
   const [selectedDay, setSelectedDay] = useState(null)
+  const [salesDateFrom, setSalesDateFrom] = useState('')
+  const [salesDateTo, setSalesDateTo] = useState('')
+  const [modalPaymentFilter, setModalPaymentFilter] = useState('todos') // 'todos' | 'efectivo' | 'qr'
   const [isLoading, setIsLoading] = useState(false)
   const [topProductsModalOpen, setTopProductsModalOpen] = useState(false)
   const [topProdCategory, setTopProdCategory] = useState('Todos')
@@ -323,7 +326,7 @@ export function Admin() {
   }, [state.sales])
 
   // historical sales grouped by day
-  const salesByDayList = useMemo(() => {
+  const rawSalesByDayList = useMemo(() => {
     const groups = {}
     for (const s of state.sales) {
       const dateStr = startOfDay(new Date(s.date)).toISOString()
@@ -341,6 +344,20 @@ export function Admin() {
     return Object.values(groups).sort((a, b) => b.date.getTime() - a.date.getTime())
   }, [state.sales])
 
+  const salesByDayList = useMemo(() => {
+    return rawSalesByDayList.filter((day) => {
+      if (salesDateFrom) {
+        const fromTime = new Date(salesDateFrom + 'T00:00:00').getTime()
+        if (day.date.getTime() < fromTime) return false
+      }
+      if (salesDateTo) {
+        const toTime = new Date(salesDateTo + 'T23:59:59.999').getTime()
+        if (day.date.getTime() > toTime) return false
+      }
+      return true
+    })
+  }, [rawSalesByDayList, salesDateFrom, salesDateTo])
+
   const SALES_DAY_PER_PAGE = 7
   const totalSalesDayPages = Math.ceil(salesByDayList.length / SALES_DAY_PER_PAGE) || 1
   const currentSalesDayPage = Math.min(salesDayPage, totalSalesDayPages)
@@ -350,15 +367,40 @@ export function Admin() {
     return salesByDayList.slice(start, start + SALES_DAY_PER_PAGE)
   }, [salesByDayList, currentSalesDayPage])
 
+  const modalSummary = useMemo(() => {
+    if (!selectedDay?.sales) return { cashCount: 0, cashTotal: 0, qrCount: 0, qrTotal: 0 }
+    let cashCount = 0
+    let cashTotal = 0
+    let qrCount = 0
+    let qrTotal = 0
+
+    for (const s of selectedDay.sales) {
+      if (s.method === 'efectivo') {
+        cashCount++
+        cashTotal += s.total
+      } else if (s.method === 'qr') {
+        qrCount++
+        qrTotal += s.total
+      }
+    }
+
+    return { cashCount, cashTotal, qrCount, qrTotal }
+  }, [selectedDay])
+
+  const modalFilteredSales = useMemo(() => {
+    if (!selectedDay?.sales) return []
+    if (modalPaymentFilter === 'todos') return selectedDay.sales
+    return selectedDay.sales.filter((s) => s.method === modalPaymentFilter)
+  }, [selectedDay, modalPaymentFilter])
+
   const MODAL_SALES_PER_PAGE = 5
-  const selectedDaySalesList = useMemo(() => selectedDay?.sales || [], [selectedDay])
-  const totalSelectedDayPages = Math.ceil(selectedDaySalesList.length / MODAL_SALES_PER_PAGE) || 1
+  const totalSelectedDayPages = Math.ceil(modalFilteredSales.length / MODAL_SALES_PER_PAGE) || 1
   const currentSelectedDayPage = Math.min(selectedDayPage, totalSelectedDayPages)
 
   const paginatedSelectedDaySales = useMemo(() => {
     const start = (currentSelectedDayPage - 1) * MODAL_SALES_PER_PAGE
-    return selectedDaySalesList.slice(start, start + MODAL_SALES_PER_PAGE)
-  }, [selectedDaySalesList, currentSelectedDayPage])
+    return modalFilteredSales.slice(start, start + MODAL_SALES_PER_PAGE)
+  }, [modalFilteredSales, currentSelectedDayPage])
 
   // Métricas de ventas agrupadas por turno de caja (últimos 8 turnos)
   const shiftSalesData = useMemo(() => {
@@ -906,7 +948,52 @@ export function Admin() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="p-4 sm:p-5 lg:col-span-2 overflow-hidden w-full min-w-0">
-          <h3 className="mb-3 font-heading font-semibold">Historial de Ventas por Día</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h3 className="font-heading font-semibold">Historial de Ventas por Día</h3>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="sales-date-from" className="text-xs text-muted-foreground whitespace-nowrap mb-0">Desde:</Label>
+                <Input
+                  id="sales-date-from"
+                  type="date"
+                  className="h-8 text-xs py-1 px-2.5 w-auto"
+                  value={salesDateFrom}
+                  onChange={(e) => {
+                    setSalesDateFrom(e.target.value)
+                    setSalesDayPage(1)
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="sales-date-to" className="text-xs text-muted-foreground whitespace-nowrap mb-0">Hasta:</Label>
+                <Input
+                  id="sales-date-to"
+                  type="date"
+                  className="h-8 text-xs py-1 px-2.5 w-auto"
+                  value={salesDateTo}
+                  onChange={(e) => {
+                    setSalesDateTo(e.target.value)
+                    setSalesDayPage(1)
+                  }}
+                />
+              </div>
+              {(salesDateFrom || salesDateTo) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSalesDateFrom('')
+                    setSalesDateTo('')
+                    setSalesDayPage(1)
+                  }}
+                  className="h-8 text-xs px-2.5"
+                >
+                  Limpiar
+                </Button>
+              )}
+            </div>
+          </div>
+
           {isLoading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
@@ -924,6 +1011,7 @@ export function Admin() {
                     onClick={() => {
                       setSelectedDay(day)
                       setSelectedDayPage(1)
+                      setModalPaymentFilter('todos')
                     }}
                     className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl border border-border bg-card hover:bg-muted/80 hover:shadow-sm cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
                   >
@@ -1106,7 +1194,10 @@ export function Admin() {
 
       <Modal
         open={!!selectedDay}
-        onClose={() => setSelectedDay(null)}
+        onClose={() => {
+          setSelectedDay(null)
+          setModalPaymentFilter('todos')
+        }}
         title={selectedDay ? `Detalle de Ventas - ${formatDayLabel(selectedDay.date)}` : ''}
       >
         {selectedDay && (
@@ -1115,46 +1206,126 @@ export function Admin() {
               <span className="text-sm font-medium text-muted-foreground">Total del día:</span>
               <span className="font-heading text-lg font-bold text-success">{money(selectedDay.total)}</span>
             </div>
-            
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-              {paginatedSelectedDaySales.map((sale) => {
-                const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[sale.method]
-                const tone = sale.method === 'efectivo' ? 'success' : sale.method === 'qr' ? 'default' : 'warning'
-                
-                return (
-                  <div key={sale.id} className="p-3 rounded-xl border border-border bg-muted/30 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold bg-muted px-2 py-0.5 rounded text-foreground font-mono">
-                          {formatTime(sale.date)}
-                        </span>
-                        <Badge tone={tone}>{label}</Badge>
-                      </div>
-                      <span className="font-heading text-sm font-bold tabular-nums">{money(sale.total)}</span>
-                    </div>
-                    
-                    <div className="pl-2 border-l-2 border-border space-y-1">
-                      {sale.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-xs">
-                          <span className="text-foreground font-medium">
-                            {item.qty}x {item.name}
-                          </span>
-                          <span className="text-muted-foreground tabular-nums">
-                            {money(item.price * item.qty)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
+
+            {/* Resumen total por medio de pago */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 dark:bg-emerald-500/15">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Ventas en Efectivo</span>
+                  <Badge tone="success" className="text-[10px] px-1.5 py-0">{modalSummary.cashCount} op.</Badge>
+                </div>
+                <p className="mt-1 font-heading text-base sm:text-lg font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                  {money(modalSummary.cashTotal)}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl border border-sky-500/20 bg-sky-500/10 dark:bg-sky-500/15">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-sky-700 dark:text-sky-300">Ventas por QR</span>
+                  <Badge tone="default" className="text-[10px] px-1.5 py-0">{modalSummary.qrCount} op.</Badge>
+                </div>
+                <p className="mt-1 font-heading text-base sm:text-lg font-bold text-sky-700 dark:text-sky-300 tabular-nums">
+                  {money(modalSummary.qrTotal)}
+                </p>
+              </div>
             </div>
+
+            {/* Filtros por método de pago */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
+              <span className="text-xs font-medium text-muted-foreground">Filtrar ventas:</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalPaymentFilter('todos')
+                    setSelectedDayPage(1)
+                  }}
+                  className={cn(
+                    'px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer',
+                    modalPaymentFilter === 'todos'
+                      ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                >
+                  Todos ({selectedDay.sales.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalPaymentFilter('efectivo')
+                    setSelectedDayPage(1)
+                  }}
+                  className={cn(
+                    'px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer',
+                    modalPaymentFilter === 'efectivo'
+                      ? 'bg-emerald-600 text-white font-semibold shadow-xs'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                >
+                  Efectivo ({modalSummary.cashCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalPaymentFilter('qr')
+                    setSelectedDayPage(1)
+                  }}
+                  className={cn(
+                    'px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer',
+                    modalPaymentFilter === 'qr'
+                      ? 'bg-sky-600 text-white font-semibold shadow-xs'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                >
+                  QR ({modalSummary.qrCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Listado de ventas */}
+            {modalFilteredSales.length === 0 ? (
+              <EmptyState title="Sin ventas para el filtro seleccionado" />
+            ) : (
+              <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                {paginatedSelectedDaySales.map((sale) => {
+                  const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[sale.method]
+                  const tone = sale.method === 'efectivo' ? 'success' : sale.method === 'qr' ? 'default' : 'warning'
+
+                  return (
+                    <div key={sale.id} className="p-3 rounded-xl border border-border bg-muted/30 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold bg-muted px-2 py-0.5 rounded text-foreground font-mono">
+                            {formatTime(sale.date)}
+                          </span>
+                          <Badge tone={tone}>{label}</Badge>
+                        </div>
+                        <span className="font-heading text-sm font-bold tabular-nums">{money(sale.total)}</span>
+                      </div>
+
+                      <div className="pl-2 border-l-2 border-border space-y-1">
+                        {sale.items.map((item, idx) => (
+                          <div key={idx} className="flex justify-between text-xs">
+                            <span className="text-foreground font-medium">
+                              {item.qty}x {item.name}
+                            </span>
+                            <span className="text-muted-foreground tabular-nums">
+                              {money(item.price * item.qty)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             <Pagination
               page={currentSelectedDayPage}
               totalPages={totalSelectedDayPages}
               onPageChange={setSelectedDayPage}
-              totalItems={selectedDaySalesList.length}
+              totalItems={modalFilteredSales.length}
               itemsPerPage={MODAL_SALES_PER_PAGE}
             />
           </div>
