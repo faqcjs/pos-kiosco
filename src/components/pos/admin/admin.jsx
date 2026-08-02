@@ -949,14 +949,14 @@ export function Admin() {
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="p-4 sm:p-5 lg:col-span-2 overflow-hidden w-full min-w-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <h3 className="font-heading font-semibold">Historial de Ventas por Día</h3>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <div className="flex items-center gap-1.5">
-                <Label htmlFor="sales-date-from" className="text-xs text-muted-foreground whitespace-nowrap mb-0">Desde:</Label>
+            <h3 className="font-heading font-semibold text-base sm:text-lg">Historial de Ventas por Día</h3>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 text-xs w-full sm:w-auto">
+              <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+                <Label htmlFor="sales-date-from" className="text-xs text-muted-foreground whitespace-nowrap mb-0 shrink-0 font-medium">Desde:</Label>
                 <Input
                   id="sales-date-from"
                   type="date"
-                  className="h-8 text-xs py-1 px-2.5 w-auto"
+                  className="h-9 sm:h-8 text-xs py-1 px-2.5 w-full sm:w-auto"
                   value={salesDateFrom}
                   onChange={(e) => {
                     setSalesDateFrom(e.target.value)
@@ -964,12 +964,12 @@ export function Admin() {
                   }}
                 />
               </div>
-              <div className="flex items-center gap-1.5">
-                <Label htmlFor="sales-date-to" className="text-xs text-muted-foreground whitespace-nowrap mb-0">Hasta:</Label>
+              <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+                <Label htmlFor="sales-date-to" className="text-xs text-muted-foreground whitespace-nowrap mb-0 shrink-0 font-medium">Hasta:</Label>
                 <Input
                   id="sales-date-to"
                   type="date"
-                  className="h-8 text-xs py-1 px-2.5 w-auto"
+                  className="h-9 sm:h-8 text-xs py-1 px-2.5 w-full sm:w-auto"
                   value={salesDateTo}
                   onChange={(e) => {
                     setSalesDateTo(e.target.value)
@@ -986,7 +986,7 @@ export function Admin() {
                     setSalesDateTo('')
                     setSalesDayPage(1)
                   }}
-                  className="h-8 text-xs px-2.5"
+                  className="h-9 sm:h-8 text-xs px-3 shrink-0"
                 >
                   Limpiar
                 </Button>
@@ -1013,16 +1013,16 @@ export function Admin() {
                       setSelectedDayPage(1)
                       setModalPaymentFilter('todos')
                     }}
-                    className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl border border-border bg-card hover:bg-muted/80 hover:shadow-sm cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                    className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:bg-muted/80 hover:shadow-sm cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
                   >
                     <div>
-                      <p className="text-xs sm:text-sm font-medium">{formatDayLabel(day.date)}</p>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      <p className="text-sm font-semibold">{formatDayLabel(day.date)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {day.sales.length} {day.sales.length === 1 ? 'operación' : 'operaciones'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-heading text-xs sm:text-sm font-bold tabular-nums">{money(day.total)}</span>
+                      <span className="font-heading text-sm sm:text-base font-bold tabular-nums">{money(day.total)}</span>
                       <ChevronRight className="size-4 text-muted-foreground" />
                     </div>
                   </div>
@@ -1202,38 +1202,38 @@ export function Admin() {
       >
         {selectedDay && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b border-border">
-              <span className="text-sm font-medium text-muted-foreground">Total del día:</span>
-              <span className="font-heading text-lg font-bold text-success">{money(selectedDay.total)}</span>
+            <div className="flex justify-between items-center pb-2.5 border-b border-border">
+              <span className="text-xs sm:text-sm font-medium text-muted-foreground">Total del día:</span>
+              <span className="font-heading text-lg sm:text-xl font-bold text-success tabular-nums">{money(selectedDay.total)}</span>
             </div>
 
             {/* Resumen total por medio de pago */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 dark:bg-emerald-500/15">
-                <div className="flex items-center justify-between">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+              <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 dark:bg-emerald-500/15">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Ventas en Efectivo</span>
-                  <Badge tone="success" className="text-[10px] px-1.5 py-0">{modalSummary.cashCount} op.</Badge>
+                  <Badge tone="success" className="text-[11px] px-2 py-0.5 shrink-0">{modalSummary.cashCount} op.</Badge>
                 </div>
-                <p className="mt-1 font-heading text-base sm:text-lg font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                <p className="mt-1.5 font-heading text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
                   {money(modalSummary.cashTotal)}
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl border border-sky-500/20 bg-sky-500/10 dark:bg-sky-500/15">
-                <div className="flex items-center justify-between">
+              <div className="p-3.5 rounded-xl border border-sky-500/20 bg-sky-500/10 dark:bg-sky-500/15">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-sky-700 dark:text-sky-300">Ventas por QR</span>
-                  <Badge tone="default" className="text-[10px] px-1.5 py-0">{modalSummary.qrCount} op.</Badge>
+                  <Badge tone="default" className="text-[11px] px-2 py-0.5 shrink-0">{modalSummary.qrCount} op.</Badge>
                 </div>
-                <p className="mt-1 font-heading text-base sm:text-lg font-bold text-sky-700 dark:text-sky-300 tabular-nums">
+                <p className="mt-1.5 font-heading text-lg sm:text-xl font-bold text-sky-700 dark:text-sky-300 tabular-nums">
                   {money(modalSummary.qrTotal)}
                 </p>
               </div>
             </div>
 
             {/* Filtros por método de pago */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border">
               <span className="text-xs font-medium text-muted-foreground">Filtrar ventas:</span>
-              <div className="flex items-center gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -1241,7 +1241,7 @@ export function Admin() {
                     setSelectedDayPage(1)
                   }}
                   className={cn(
-                    'px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer',
+                    'px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer text-center',
                     modalPaymentFilter === 'todos'
                       ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
                       : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -1256,7 +1256,7 @@ export function Admin() {
                     setSelectedDayPage(1)
                   }}
                   className={cn(
-                    'px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer',
+                    'px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer text-center',
                     modalPaymentFilter === 'efectivo'
                       ? 'bg-emerald-600 text-white font-semibold shadow-xs'
                       : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -1271,7 +1271,7 @@ export function Admin() {
                     setSelectedDayPage(1)
                   }}
                   className={cn(
-                    'px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer',
+                    'px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer text-center',
                     modalPaymentFilter === 'qr'
                       ? 'bg-sky-600 text-white font-semibold shadow-xs'
                       : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -1286,14 +1286,14 @@ export function Admin() {
             {modalFilteredSales.length === 0 ? (
               <EmptyState title="Sin ventas para el filtro seleccionado" />
             ) : (
-              <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
                 {paginatedSelectedDaySales.map((sale) => {
                   const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[sale.method]
                   const tone = sale.method === 'efectivo' ? 'success' : sale.method === 'qr' ? 'default' : 'warning'
 
                   return (
                     <div key={sale.id} className="p-3 rounded-xl border border-border bg-muted/30 space-y-2">
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center gap-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold bg-muted px-2 py-0.5 rounded text-foreground font-mono">
                             {formatTime(sale.date)}
@@ -1305,11 +1305,11 @@ export function Admin() {
 
                       <div className="pl-2 border-l-2 border-border space-y-1">
                         {sale.items.map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-xs">
-                            <span className="text-foreground font-medium">
+                          <div key={idx} className="flex justify-between text-xs gap-2">
+                            <span className="text-foreground font-medium truncate">
                               {item.qty}x {item.name}
                             </span>
-                            <span className="text-muted-foreground tabular-nums">
+                            <span className="text-muted-foreground tabular-nums shrink-0">
                               {money(item.price * item.qty)}
                             </span>
                           </div>
