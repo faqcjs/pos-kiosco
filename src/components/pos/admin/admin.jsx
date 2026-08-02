@@ -27,6 +27,8 @@ import {
   ChevronRight,
   Trash2,
   UserPlus,
+  ShieldAlert,
+  CheckCircle2,
 } from 'lucide-react'
 import { Badge, Card, EmptyState, StatCard, Modal, Input, Label, Select, Pagination } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
@@ -64,6 +66,8 @@ export function Admin() {
   const [isLoading, setIsLoading] = useState(false)
   const [topProductsModalOpen, setTopProductsModalOpen] = useState(false)
   const [topProdCategory, setTopProdCategory] = useState('Todos')
+  const [auditModalOpen, setAuditModalOpen] = useState(false)
+  const [auditFilterCajero, setAuditFilterCajero] = useState('Todos')
 
   useEffect(() => {
     setIsLoading(true)
@@ -265,6 +269,58 @@ export function Admin() {
     }
     return list.sort((a, b) => b.qty - a.qty).slice(0, 10)
   }, [allSoldProducts, topProdCategory])
+
+  const auditStats = useMemo(() => {
+    let itemsCatalogCount = 0
+    let itemsManualCount = 0
+    let catalogRevenue = 0
+    let manualRevenue = 0
+    const manualItemsList = []
+    const cajerosSet = new Set()
+
+    for (const s of state.sales || []) {
+      const cajeroName = s.soldBy || 'N/D'
+      cajerosSet.add(cajeroName)
+      for (const item of s.items || []) {
+        const itemTotal = (item.price || 0) * (item.qty || 1)
+        if (item.productId) {
+          itemsCatalogCount += item.qty
+          catalogRevenue += itemTotal
+        } else {
+          itemsManualCount += item.qty
+          manualRevenue += itemTotal
+          manualItemsList.push({
+            id: `${s.id}-${item.name || 'manual'}-${Math.random()}`,
+            saleId: s.id,
+            date: s.date,
+            soldBy: cajeroName,
+            name: item.name || 'Monto libre',
+            price: item.price || 0,
+            qty: item.qty || 1,
+            total: itemTotal,
+          })
+        }
+      }
+    }
+
+    const totalItems = itemsCatalogCount + itemsManualCount
+    const catalogPct = totalItems > 0 ? (itemsCatalogCount / totalItems) * 100 : 0
+    const manualPct = totalItems > 0 ? (itemsManualCount / totalItems) * 100 : 0
+
+    manualItemsList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    return {
+      itemsCatalogCount,
+      itemsManualCount,
+      totalItems,
+      catalogRevenue,
+      manualRevenue,
+      catalogPct,
+      manualPct,
+      manualItemsList,
+      cajeros: ['Todos', ...Array.from(cajerosSet)],
+    }
+  }, [state.sales])
 
   // historical sales grouped by day
   const salesByDayList = useMemo(() => {
@@ -744,6 +800,110 @@ export function Admin() {
         </div>
       </div>
 
+      {/* Widget de Auditoría de Control de Stock */}
+      <Card className="mt-4 p-4 sm:p-5 overflow-hidden w-full min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 font-bold shrink-0">
+              <ShieldAlert className="size-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-heading font-semibold text-base">Auditoría de Control de Stock</h3>
+                {auditStats.manualPct > 30 && (
+                  <Badge tone="warning" className="text-[10px]">
+                    Atención: {auditStats.manualPct.toFixed(0)}% Monto Libre
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Control de productos pasados por catálogo (descuentan stock) vs. montos ingresados a mano.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs font-semibold px-3 self-start sm:self-auto shrink-0"
+            onClick={() => setAuditModalOpen(true)}
+          >
+            Ver auditoría completa
+          </Button>
+        </div>
+
+        {/* Barra Visual de Proporción */}
+        <div className="space-y-2 mb-5">
+          <div className="flex justify-between text-xs font-semibold">
+            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <CheckCircle2 className="size-3.5" /> Catálogo: {auditStats.catalogPct.toFixed(1)}% ({auditStats.itemsCatalogCount} art.)
+            </span>
+            <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <AlertTriangle className="size-3.5" /> Monto Libre: {auditStats.manualPct.toFixed(1)}% ({auditStats.itemsManualCount} art.)
+            </span>
+          </div>
+          <div className="h-3.5 w-full bg-muted rounded-full overflow-hidden flex p-0.5 gap-0.5">
+            <div
+              className="h-full bg-emerald-500 rounded-l-full transition-all duration-500"
+              style={{ width: `${auditStats.catalogPct}%` }}
+              title={`Catálogo: ${auditStats.catalogPct.toFixed(1)}%`}
+            />
+            <div
+              className="h-full bg-amber-500 rounded-r-full transition-all duration-500"
+              style={{ width: `${auditStats.manualPct}%` }}
+              title={`Monto Libre: ${auditStats.manualPct.toFixed(1)}%`}
+            />
+          </div>
+        </div>
+
+        {/* Métricas Principales */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div className="rounded-xl border border-border/80 p-3 bg-muted/20">
+            <p className="text-xs text-muted-foreground font-medium">Recaudado por Catálogo (Descontó stock)</p>
+            <p className="font-heading text-lg sm:text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+              {money(auditStats.catalogRevenue)}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {auditStats.itemsCatalogCount} ítems seleccionados del catálogo
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-amber-500/20 p-3 bg-amber-500/5">
+            <p className="text-xs text-muted-foreground font-medium">Recaudado por Monto Libre (NO descontó stock)</p>
+            <p className="font-heading text-lg sm:text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
+              {money(auditStats.manualRevenue)}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {auditStats.itemsManualCount} ítems cargados a mano sin código
+            </p>
+          </div>
+        </div>
+
+        {/* Lista corta de últimos ítems de monto libre */}
+        {auditStats.manualItemsList.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              Últimos ítems cargados a mano (sin descuento de stock)
+            </h4>
+            <div className="divide-y divide-border/60 rounded-xl border border-border/60 overflow-hidden bg-card">
+              {auditStats.manualItemsList.slice(0, 4).map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-2.5 text-xs">
+                  <div className="min-w-0 flex-1 pr-3">
+                    <p className="font-semibold text-foreground truncate">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Cajero: <span className="font-medium text-foreground">{item.soldBy}</span> · {formatDate(item.date)} {formatTime(item.date)}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-bold tabular-nums">{money(item.total)}</p>
+                    <p className="text-[10px] text-muted-foreground">{item.qty} u. x {money(item.price)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="p-4 sm:p-5 lg:col-span-2 overflow-hidden w-full min-w-0">
           <h3 className="mb-3 font-heading font-semibold">Historial de Ventas por Día</h3>
@@ -882,6 +1042,63 @@ export function Admin() {
                   </div>
                 );
               })
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Auditoría Completa de Montos Libres */}
+      <Modal
+        open={auditModalOpen}
+        onClose={() => setAuditModalOpen(false)}
+        title="Auditoría Completa de Ventas por Monto Libre"
+        variant="large"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Listado detallado de todas las ventas realizadas ingresando montos manuales en lugar de seleccionar productos del catálogo.
+          </p>
+
+          {/* Filtro por cajero */}
+          {auditStats.cajeros.length > 2 && (
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium shrink-0">Filtrar por cajero:</Label>
+              <Select
+                value={auditFilterCajero}
+                onChange={(e) => setAuditFilterCajero(e.target.value)}
+                className="h-8 text-xs max-w-[200px]"
+              >
+                {auditStats.cajeros.map((c) => (
+                  <option key={c} value={c}>{c === 'Todos' ? 'Todos los cajeros' : c}</option>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          <div className="max-h-[60vh] overflow-y-auto pr-1">
+            {auditStats.manualItemsList.length === 0 ? (
+              <p className="text-center text-xs text-muted-foreground py-10">
+                🎉 ¡Excelente! No se registraron ventas por monto libre. Todo el stock se encuentra controlado por catálogo.
+              </p>
+            ) : (
+              <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+                {auditStats.manualItemsList
+                  .filter((i) => auditFilterCajero === 'Todos' || i.soldBy === auditFilterCajero)
+                  .map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-3 text-xs hover:bg-muted/30 transition-colors">
+                      <div className="min-w-0 flex-1 pr-3">
+                        <p className="font-semibold text-foreground">{item.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Cajero: <span className="font-medium text-foreground">{item.soldBy}</span> · {formatDate(item.date)} {formatTime(item.date)}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-bold tabular-nums text-amber-600 dark:text-amber-400">{money(item.total)}</p>
+                        <p className="text-[10px] text-muted-foreground">{item.qty} u. x {money(item.price)}</p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
             )}
           </div>
         </div>
