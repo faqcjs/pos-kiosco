@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge, Card, Input, Label, Modal, Select, StatCard } from '@/components/ui/kit'
+import { Badge, Card, Input, Label, Modal, Pagination, Select, StatCard } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { formatDateTime, formatTime, money } from '@/lib/format'
@@ -147,6 +147,8 @@ function OpenShiftView({
   const [closeOpen, setCloseOpen] = useState(false)
   const [counted, setCounted] = useState('')
   const [selectedSale, setSelectedSale] = useState(null)
+  const [historyPage, setHistoryPage] = useState(1)
+  const HISTORY_ITEMS_PER_PAGE = 8
 
   const shiftSales = useMemo(() => {
     if (!shift) return []
@@ -171,6 +173,14 @@ function OpenShiftView({
     }))
     return [...movs, ...sls].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [shift, shiftSales])
+
+  const totalHistoryPages = Math.ceil(timeline.length / HISTORY_ITEMS_PER_PAGE) || 1
+  const currentHistoryPage = Math.min(historyPage, totalHistoryPages)
+
+  const paginatedTimeline = useMemo(() => {
+    const start = (currentHistoryPage - 1) * HISTORY_ITEMS_PER_PAGE
+    return timeline.slice(start, start + HISTORY_ITEMS_PER_PAGE)
+  }, [timeline, currentHistoryPage])
 
   function submitMovement() {
     const n = Number(movAmount)
@@ -266,10 +276,10 @@ function OpenShiftView({
       <Card className="p-4">
         <h3 className="font-heading text-base font-bold">Historial del turno</h3>
         <div className="mt-3 space-y-2">
-          {timeline.length === 0 ? (
+          {paginatedTimeline.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Sin movimientos aún.</p>
           ) : (
-            timeline.map((item) => {
+            paginatedTimeline.map((item) => {
               if (item.isMovement) {
                 const positive = item.amount >= 0
                 return (
@@ -355,6 +365,13 @@ function OpenShiftView({
             })
           )}
         </div>
+        <Pagination
+          page={currentHistoryPage}
+          totalPages={totalHistoryPages}
+          onPageChange={setHistoryPage}
+          totalItems={timeline.length}
+          itemsPerPage={HISTORY_ITEMS_PER_PAGE}
+        />
       </Card>
 
       <Modal

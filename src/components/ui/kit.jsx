@@ -1,10 +1,11 @@
 'use client'
 
-import { X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react'
 import {
   forwardRef,
   useEffect,
 } from 'react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export function Card({ className, ...props }) {
@@ -229,3 +230,89 @@ export function StatCard({
     </Card>
   )
 }
+
+export function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+  className,
+  showDetails = true,
+  totalItems,
+  itemsPerPage,
+}) {
+  if (totalPages <= 1) return null
+
+  const startItem = totalItems && itemsPerPage ? (page - 1) * itemsPerPage + 1 : null
+  const endItem = totalItems && itemsPerPage ? Math.min(page * itemsPerPage, totalItems) : null
+
+  return (
+    <div
+      className={cn(
+        'flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 mt-3 text-xs text-muted-foreground',
+        className,
+      )}
+    >
+      {showDetails && startItem && endItem ? (
+        <span>
+          Mostrando <span className="font-medium text-foreground">{startItem}</span> a{' '}
+          <span className="font-medium text-foreground">{endItem}</span> de{' '}
+          <span className="font-medium text-foreground">{totalItems}</span>
+        </span>
+      ) : (
+        <span className="font-medium tabular-nums">
+          Página {page} de {totalPages}
+        </span>
+      )}
+      <div className="flex items-center gap-1 ml-auto">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(1)}
+          disabled={page === 1}
+          className="h-7 w-7 p-0"
+          title="Primera página"
+        >
+          <span className="sr-only">Primera página</span>
+          <ChevronsLeft className="size-3.5" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page === 1}
+          className="h-7 w-7 p-0"
+          title="Anterior"
+        >
+          <span className="sr-only">Anterior</span>
+          <ChevronLeft className="size-3.5" />
+        </Button>
+        <span className="text-xs font-semibold px-2 tabular-nums text-foreground">
+          {page} / {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page === totalPages}
+          className="h-7 w-7 p-0"
+          title="Siguiente"
+        >
+          <span className="sr-only">Siguiente</span>
+          <ChevronRight className="size-3.5" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(totalPages)}
+          disabled={page === totalPages}
+          className="h-7 w-7 p-0"
+          title="Última página"
+        >
+          <span className="sr-only">Última página</span>
+          <ChevronsRight className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+

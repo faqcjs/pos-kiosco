@@ -28,7 +28,7 @@ import {
   Trash2,
   UserPlus,
 } from 'lucide-react'
-import { Badge, Card, EmptyState, StatCard, Modal, Input, Label, Select } from '@/components/ui/kit'
+import { Badge, Card, EmptyState, StatCard, Modal, Input, Label, Select, Pagination } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/pos/page-header'
 import { useToast } from '@/components/ui/toast'
@@ -58,7 +58,8 @@ export function Admin() {
   }
   const [adminTab, setAdminTab] = useState('stats') // "stats" / "empleados"
   const [range, setRange] = useState('Semana') // "Hoy", "Semana", "Mes", "6 Meses"
-  const [visibleDays, setVisibleDays] = useState(10)
+  const [salesDayPage, setSalesDayPage] = useState(1)
+  const [selectedDayPage, setSelectedDayPage] = useState(1)
   const [selectedDay, setSelectedDay] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [topProductsModalOpen, setTopProductsModalOpen] = useState(false)
@@ -283,6 +284,25 @@ export function Admin() {
     }
     return Object.values(groups).sort((a, b) => b.date.getTime() - a.date.getTime())
   }, [state.sales])
+
+  const SALES_DAY_PER_PAGE = 7
+  const totalSalesDayPages = Math.ceil(salesByDayList.length / SALES_DAY_PER_PAGE) || 1
+  const currentSalesDayPage = Math.min(salesDayPage, totalSalesDayPages)
+
+  const paginatedSalesByDay = useMemo(() => {
+    const start = (currentSalesDayPage - 1) * SALES_DAY_PER_PAGE
+    return salesByDayList.slice(start, start + SALES_DAY_PER_PAGE)
+  }, [salesByDayList, currentSalesDayPage])
+
+  const MODAL_SALES_PER_PAGE = 5
+  const selectedDaySalesList = useMemo(() => selectedDay?.sales || [], [selectedDay])
+  const totalSelectedDayPages = Math.ceil(selectedDaySalesList.length / MODAL_SALES_PER_PAGE) || 1
+  const currentSelectedDayPage = Math.min(selectedDayPage, totalSelectedDayPages)
+
+  const paginatedSelectedDaySales = useMemo(() => {
+    const start = (currentSelectedDayPage - 1) * MODAL_SALES_PER_PAGE
+    return selectedDaySalesList.slice(start, start + MODAL_SALES_PER_PAGE)
+  }, [selectedDaySalesList, currentSelectedDayPage])
 
   // Métricas de ventas agrupadas por turno de caja (últimos 8 turnos)
   const shiftSalesData = useMemo(() => {
@@ -736,34 +756,38 @@ export function Admin() {
           ) : salesByDayList.length === 0 ? (
             <EmptyState title="Sin ventas registradas" />
           ) : (
-            <div className="space-y-2">
-              {salesByDayList.slice(0, visibleDays).map((day) => (
-                <div
-                  key={day.id}
-                  onClick={() => setSelectedDay(day)}
-                  className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl border border-border bg-card hover:bg-muted/80 hover:shadow-sm cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
-                >
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium">{formatDayLabel(day.date)}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">
-                      {day.sales.length} {day.sales.length === 1 ? 'operación' : 'operaciones'}
-                    </p>
+            <>
+              <div className="space-y-2">
+                {paginatedSalesByDay.map((day) => (
+                  <div
+                    key={day.id}
+                    onClick={() => {
+                      setSelectedDay(day)
+                      setSelectedDayPage(1)
+                    }}
+                    className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl border border-border bg-card hover:bg-muted/80 hover:shadow-sm cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium">{formatDayLabel(day.date)}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+                        {day.sales.length} {day.sales.length === 1 ? 'operación' : 'operaciones'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-heading text-xs sm:text-sm font-bold tabular-nums">{money(day.total)}</span>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-heading text-xs sm:text-sm font-bold tabular-nums">{money(day.total)}</span>
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  </div>
-                </div>
-              ))}
-              
-              {visibleDays < salesByDayList.length && (
-                <div className="pt-2 text-center">
-                  <Button variant="outline" size="sm" onClick={() => setVisibleDays((prev) => prev + 10)}>
-                    Cargar más días
-                  </Button>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+              <Pagination
+                page={currentSalesDayPage}
+                totalPages={totalSalesDayPages}
+                onPageChange={setSalesDayPage}
+                totalItems={salesByDayList.length}
+                itemsPerPage={SALES_DAY_PER_PAGE}
+              />
+            </>
           )}
         </Card>
 
@@ -876,7 +900,7 @@ export function Admin() {
             </div>
             
             <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-              {selectedDay.sales.map((sale) => {
+              {paginatedSelectedDaySales.map((sale) => {
                 const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[sale.method]
                 const tone = sale.method === 'efectivo' ? 'success' : sale.method === 'qr' ? 'default' : 'warning'
                 
@@ -908,6 +932,14 @@ export function Admin() {
                 )
               })}
             </div>
+
+            <Pagination
+              page={currentSelectedDayPage}
+              totalPages={totalSelectedDayPages}
+              onPageChange={setSelectedDayPage}
+              totalItems={selectedDaySalesList.length}
+              itemsPerPage={MODAL_SALES_PER_PAGE}
+            />
           </div>
         )}
       </Modal>
@@ -926,6 +958,13 @@ function UsersTab({ state, createUser, deleteUser }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedEmp, setSelectedEmp] = useState(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [empSalesPage, setEmpSalesPage] = useState(1)
+  const EMP_SALES_PER_PAGE = 5
+
+  const handleSelectEmp = (empName) => {
+    setSelectedEmp(empName)
+    setEmpSalesPage(1)
+  }
 
   // Obtener ventas asociadas al empleado seleccionado
   const selectedEmpSales = useMemo(() => {
@@ -938,6 +977,14 @@ function UsersTab({ state, createUser, deleteUser }) {
       .filter((s) => empShifts.has(s.shiftId))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [selectedEmp, state.sales, state.shiftHistory])
+
+  const totalEmpSalesPages = Math.ceil((selectedEmpSales?.length || 0) / EMP_SALES_PER_PAGE) || 1
+  const currentEmpSalesPage = Math.min(empSalesPage, totalEmpSalesPages)
+
+  const paginatedEmpSales = useMemo(() => {
+    const start = (currentEmpSalesPage - 1) * EMP_SALES_PER_PAGE
+    return (selectedEmpSales || []).slice(start, start + EMP_SALES_PER_PAGE)
+  }, [selectedEmpSales, currentEmpSalesPage])
 
   const selectedEmpTotal = useMemo(() => {
     return selectedEmpSales.reduce((sum, s) => sum + s.total, 0)
@@ -1072,7 +1119,7 @@ function UsersTab({ state, createUser, deleteUser }) {
                   <div 
                     key={emp.name} 
                     className="rounded-xl border border-border p-4 space-y-2 bg-muted/10 hover:bg-muted/20 active:scale-[0.99] transition-all cursor-pointer select-none"
-                    onClick={() => setSelectedEmp(emp.name)}
+                    onClick={() => handleSelectEmp(emp.name)}
                   >
                     <div className="flex items-center justify-between border-b border-border/40 pb-2">
                       <h4 className="font-semibold text-foreground text-base">{emp.name}</h4>
@@ -1120,7 +1167,7 @@ function UsersTab({ state, createUser, deleteUser }) {
                       <tr 
                         key={emp.name} 
                         className="hover:bg-muted/20 active:bg-muted/30 transition-colors cursor-pointer select-none"
-                        onClick={() => setSelectedEmp(emp.name)}
+                        onClick={() => handleSelectEmp(emp.name)}
                       >
                         <td className="py-3 px-4 font-semibold text-foreground">{emp.name}</td>
                         <td className="py-3 px-4 text-center text-muted-foreground">{emp.shiftsCount}</td>
@@ -1266,7 +1313,7 @@ function UsersTab({ state, createUser, deleteUser }) {
                   No hay ventas registradas para este empleado.
                 </p>
               ) : (
-                selectedEmpSales.map((sale) => {
+                paginatedEmpSales.map((sale) => {
                   const label = { efectivo: 'Efectivo', qr: 'QR', fiado: 'Fiado' }[sale.method]
                   const tone = sale.method === 'efectivo' ? 'success' : sale.method === 'qr' ? 'default' : 'warning'
                   
@@ -1301,6 +1348,14 @@ function UsersTab({ state, createUser, deleteUser }) {
                 })
               )}
             </div>
+
+            <Pagination
+              page={currentEmpSalesPage}
+              totalPages={totalEmpSalesPages}
+              onPageChange={setEmpSalesPage}
+              totalItems={selectedEmpSales.length}
+              itemsPerPage={EMP_SALES_PER_PAGE}
+            />
           </div>
         )}
       </Modal>
