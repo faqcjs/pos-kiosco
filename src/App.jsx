@@ -297,7 +297,7 @@ function Shell() {
   }
 
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300 h-dvh overflow-hidden">
       <AppShell active={active} onChange={handleRouteChange}>
         {active === 'venta' && !state.currentUser?.role?.includes('repositor') ? (
           <Screen active={active} />

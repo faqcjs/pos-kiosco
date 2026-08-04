@@ -224,7 +224,7 @@ function OpenShiftView({
           value={money(theoretical)}
           tone="accent"
           sub="Saldo estimado"
-          className="p-3"
+          className="p-3 border-2 border-emerald-500 dark:border-emerald-400 shadow-xs shadow-emerald-500/20"
         />
       </div>
 
