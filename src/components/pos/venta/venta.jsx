@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
-import { cn, matchProduct } from '@/lib/utils'
+import { cn, matchProduct, normalizeText } from '@/lib/utils'
 import { PaymentModal } from './payment-modal'
 import { ScannerModal } from './scanner-modal'
 
@@ -109,9 +109,7 @@ export function Venta() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = state.products.filter((p) => {
-      const matchesCat =
-        category === 'Todos' ||
-        p.category === category
+      const matchesCat = !q && category !== 'Todos' ? p.category === category : true
       const matchesQ = matchProduct(p, query)
       return matchesCat && matchesQ
     })
@@ -219,6 +217,44 @@ export function Venta() {
     }, 50)
   }
 
+  function handleSearchKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const trimmed = query.trim()
+      if (!trimmed) return
+
+      // 1. Coincidencia exacta por código de barras
+      const exactBarcode = state.products.find(
+        (p) => p.barcode && p.barcode.trim().toLowerCase() === trimmed.toLowerCase()
+      )
+      if (exactBarcode) {
+        addProductToCart(exactBarcode)
+        toast(`Agregado: ${exactBarcode.name}`)
+        setQuery('')
+        return
+      }
+
+      // 2. Un único resultado filtrado en pantalla
+      if (filtered.length === 1) {
+        addProductToCart(filtered[0])
+        toast(`Agregado: ${filtered[0].name}`)
+        setQuery('')
+        return
+      }
+
+      // 3. Coincidencia exacta por nombre de producto
+      const exactName = state.products.find(
+        (p) => normalizeText(p.name) === normalizeText(trimmed)
+      )
+      if (exactName) {
+        addProductToCart(exactName)
+        toast(`Agregado: ${exactName.name}`)
+        setQuery('')
+        return
+      }
+    }
+  }
+
   function handleScan(code) {
     const prod = state.products.find((p) => p.barcode === code)
     if (prod) {
@@ -277,8 +313,9 @@ export function Venta() {
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar..."
-                  className="pl-10 placeholder:text-muted-foreground sm:placeholder:content-[''] [&::placeholder]:sm:hidden"
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Buscar producto o escanear código..."
+                  className="pl-10 placeholder:text-muted-foreground"
                   aria-label="Buscar producto o código"
                 />
                 <span className="pointer-events-none absolute inset-y-0 left-10 hidden items-center text-muted-foreground sm:flex">

@@ -14,17 +14,34 @@ export function normalizeText(str) {
 }
 
 export function matchProduct(product, query) {
-  const q = normalizeText(query).trim()
-  if (!q) return true
+  const rawQ = (query || '').trim()
+  if (!rawQ) return true
 
-  // Check barcode first
-  if (product.barcode && product.barcode.includes(q)) {
+  const q = normalizeText(rawQ)
+  const compactQ = q.replace(/\s+/g, '')
+
+  // 1. Check barcode
+  if (product.barcode) {
+    const cleanBarcode = product.barcode.trim().toLowerCase()
+    if (cleanBarcode.includes(compactQ.toLowerCase())) {
+      return true
+    }
+  }
+
+  // 2. Check category name
+  if (product.category && normalizeText(product.category).includes(q)) {
     return true
   }
 
+  // 3. Check product name with spaces removed (e.g. "cocacola" matching "coca cola")
   const prodName = normalizeText(product.name)
-  const queryWords = q.split(/\s+/).filter(Boolean)
+  const compactProdName = prodName.replace(/\s+/g, '')
 
-  // Every query word must be present in the normalized product name
+  if (compactProdName.includes(compactQ)) {
+    return true
+  }
+
+  // 4. Check every word in query is in product name
+  const queryWords = q.split(/\s+/).filter(Boolean)
   return queryWords.every((word) => prodName.includes(word))
 }
