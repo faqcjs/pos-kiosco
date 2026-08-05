@@ -462,18 +462,21 @@ function OpenShiftView({
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between rounded-xl bg-muted px-4 py-3">
-            <span className="text-sm text-muted-foreground">Total teórico</span>
+            <div>
+              <span className="text-sm text-muted-foreground">Total teórico</span>
+              <p className="text-xs text-muted-foreground/70">Incluye ventas en efectivo y QR</p>
+            </div>
             <span className="font-heading text-lg font-bold tabular-nums">{money(theoretical)}</span>
           </div>
           <div>
-            <Label htmlFor="counted">Monto físico real en caja</Label>
+            <Label htmlFor="counted">Total contado (efectivo + QR/transferencia)</Label>
             <Input
               id="counted"
               type="number"
               inputMode="numeric"
               value={counted}
               onChange={(e) => setCounted(e.target.value)}
-              placeholder="Contá el efectivo"
+              placeholder="Ingresá efectivo + lo cobrado por QR"
             />
           </div>
           {counted !== '' && (
