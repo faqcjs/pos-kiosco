@@ -106,7 +106,7 @@ export function CargaRapida({ onClose }) {
       cost: Number(draft.cost) || 0,
       price: Number(draft.price) || 0,
       stock: Number(draft.stock) || 1,
-      minStock: 0,
+      minStock: 5,
       unidad: 1,
       controlLotes: false,
     })

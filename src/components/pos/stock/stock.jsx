@@ -21,7 +21,7 @@ const EMPTY = {
   cost: 0,
   price: 0,
   stock: 1,
-  minStock: 0,
+  minStock: 5,
   unidad: 1,
   controlLotes: false,
 }
@@ -889,9 +889,23 @@ function ProductFormModal({
                 inputMode="numeric"
                 value={draft.minStock ?? ''}
                 onChange={(e) => setDraft({ ...draft, minStock: e.target.value })}
-                placeholder="0"
+                placeholder="5"
                 disabled={Boolean(draft.id && !isAdmin)}
               />
+              <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                <span>Presets:</span>
+                {[3, 5, 10].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    disabled={Boolean(draft.id && !isAdmin)}
+                    onClick={() => setDraft({ ...draft, minStock: val })}
+                    className="rounded border border-border px-1.5 py-0.5 hover:bg-muted active:scale-95 transition-all font-mono"
+                  >
+                    {val}
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
               <Label htmlFor="unidad">U. por bulto</Label>
