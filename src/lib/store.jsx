@@ -263,9 +263,32 @@ export function useStore() {
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sales').select('*').order('date', { ascending: false })
-      if (error) throw error
-      return data || []
+      let allSales = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('sales')
+          .select('*')
+          .order('date', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) {
+          hasMore = false
+        } else {
+          allSales.push(...data)
+          if (data.length < pageSize) {
+            hasMore = false
+          } else {
+            page++
+          }
+        }
+      }
+
+      return allSales
     },
   })
 
@@ -290,9 +313,32 @@ export function useStore() {
   const { data: shifts = [], isLoading: loadingShifts } = useQuery({
     queryKey: ['shifts'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('shifts').select('*').order('openedAt', { ascending: false })
-      if (error) throw error
-      return data || []
+      let allShifts = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('shifts')
+          .select('*')
+          .order('openedAt', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) {
+          hasMore = false
+        } else {
+          allShifts.push(...data)
+          if (data.length < pageSize) {
+            hasMore = false
+          } else {
+            page++
+          }
+        }
+      }
+
+      return allShifts
     },
   })
 

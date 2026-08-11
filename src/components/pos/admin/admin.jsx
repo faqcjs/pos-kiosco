@@ -87,10 +87,20 @@ export function Admin() {
     }, 400)
   }
 
+  const getSaleMs = (s) => {
+    const raw = s.date || s.created_at || s.createdAt
+    if (!raw) return 0
+    if (raw instanceof Date) return isNaN(raw.getTime()) ? 0 : raw.getTime()
+    const str = String(raw).trim()
+    const normalized = str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str
+    const d = new Date(normalized)
+    return isNaN(d.getTime()) ? 0 : d.getTime()
+  }
+
   const stats = useMemo(() => {
     const now = new Date()
     const today = startOfDay(now).getTime()
-    const salesToday = state.sales.filter((s) => new Date(s.date).getTime() >= today)
+    const salesToday = state.sales.filter((s) => getSaleMs(s) >= today)
     const revenueToday = salesToday.reduce((sum, s) => sum + s.total, 0)
     const marginToday = salesToday.reduce((sum, s) => sum + (s.total - s.cost), 0)
     
@@ -129,12 +139,13 @@ export function Admin() {
     
     if (range === 'Hoy') {
       const todayStart = startOfDay(now).getTime()
-      const todaySales = state.sales.filter((s) => new Date(s.date).getTime() >= todayStart)
+      const todaySales = state.sales.filter((s) => getSaleMs(s) >= todayStart)
       const data = []
       for (let h = 0; h < 24; h += 2) {
         const label = `${String(h).padStart(2, '0')}:00`
         const blockSales = todaySales.filter((s) => {
-          const date = new Date(s.date)
+          const ms = getSaleMs(s)
+          const date = new Date(ms)
           const hour = date.getHours()
           return hour >= h && hour < h + 2
         })
@@ -153,7 +164,7 @@ export function Admin() {
         const d = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i))
         const next = d.getTime() + 86_400_000
         const daySales = state.sales.filter((s) => {
-          const t = new Date(s.date).getTime()
+          const t = getSaleMs(s)
           return t >= d.getTime() && t < next
         })
         data.push({
@@ -171,7 +182,7 @@ export function Admin() {
         const d = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i))
         const next = d.getTime() + 86_400_000
         const daySales = state.sales.filter((s) => {
-          const t = new Date(s.date).getTime()
+          const t = getSaleMs(s)
           return t >= d.getTime() && t < next
         })
         data.push({
@@ -190,7 +201,7 @@ export function Admin() {
         const start = new Date(d.getFullYear(), d.getMonth(), 1).getTime()
         const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime()
         const monthSales = state.sales.filter((s) => {
-          const t = new Date(s.date).getTime()
+          const t = getSaleMs(s)
           return t >= start && t < end
         })
         data.push({
@@ -329,7 +340,8 @@ export function Admin() {
   const rawSalesByDayList = useMemo(() => {
     const groups = {}
     for (const s of state.sales) {
-      const dateStr = startOfDay(new Date(s.date)).toISOString()
+      const ms = getSaleMs(s)
+      const dateStr = startOfDay(new Date(ms)).toISOString()
       if (!groups[dateStr]) {
         groups[dateStr] = {
           id: dateStr,
@@ -1363,7 +1375,7 @@ function UsersTab({ state, createUser, deleteUser }) {
     )
     return (state.sales || [])
       .filter((s) => empShifts.has(s.shiftId))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => getSaleMs(b) - getSaleMs(a))
   }, [selectedEmp, state.sales, state.shiftHistory])
 
   const totalEmpSalesPages = Math.ceil((selectedEmpSales?.length || 0) / EMP_SALES_PER_PAGE) || 1
