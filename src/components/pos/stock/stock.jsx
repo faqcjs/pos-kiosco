@@ -1,13 +1,12 @@
 'use client'
 
-import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
+import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select, Skeleton } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
-import { CargaRapida } from '@/components/pos/stock/carga-rapida'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
@@ -183,7 +182,6 @@ export function Stock() {
     }
   }
   const [offLookupLoading, setOffLookupLoading] = useState(false)
-  const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false)
   const [filterAlertsOnly, setFilterAlertsOnly] = useState(false)
 
   const categoryContainerRef = useRef(null)
@@ -357,22 +355,12 @@ export function Stock() {
         title="Stock"
         description="Catálogo e inventario de productos."
         action={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setCargaRapidaOpen(true)}>
-              <Zap className="size-4" />
-              Carga rápida
-            </Button>
-            <Button onClick={openNew}>
-              <Plus className="size-4" />
-              Nuevo
-            </Button>
-          </div>
+          <Button onClick={openNew}>
+            <Plus className="size-4" />
+            Nuevo
+          </Button>
         }
       />
-
-      {cargaRapidaOpen && (
-        <CargaRapida onClose={() => setCargaRapidaOpen(false)} />
-      )}
 
       <div className="flex border-b border-border">
         <button
