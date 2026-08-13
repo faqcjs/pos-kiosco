@@ -76,29 +76,48 @@ export function ModalDetalleCaja({ shift, open, onClose }) {
       variant="large"
     >
       <div className="space-y-6">
-        {/* State Banner */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-muted/30 p-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h4 className="text-sm font-bold text-foreground font-heading">
-                Caja #{shift.id ? String(shift.id).slice(-6).toUpperCase() : 'SN'}
-              </h4>
-              <Badge tone={isOpen ? 'primary' : 'muted'}>
-                {isOpen ? 'Abierta' : 'Cerrada'}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground flex items-center gap-2">
-              <User className="size-3.5" />
-              Abierta por <span className="font-semibold text-foreground">{openedByStr}</span> ({openDateStr})
-            </p>
+        {/* State Banner (Apertura y Cierre) */}
+        <div className="rounded-2xl border border-border/80 bg-muted/30 p-3.5 sm:p-4 space-y-3">
+          {/* Fila 1: ID de Caja y Estado */}
+          <div className="flex items-center justify-between pb-2 border-b border-border/50">
+            <h4 className="text-xs sm:text-sm font-bold text-foreground font-heading">
+              Sesión de Caja #{shift.id ? String(shift.id).slice(-6).toUpperCase() : 'SN'}
+            </h4>
+            <Badge tone={isOpen ? 'primary' : 'muted'} className="text-[10px] sm:text-xs">
+              {isOpen ? 'Abierta' : 'Cerrada'}
+            </Badge>
           </div>
 
-          {!isOpen && (
-            <div className="text-right space-y-0.5">
-              <p className="text-xs text-muted-foreground">Cierre por {closedByStr}</p>
-              <p className="text-xs font-semibold text-foreground">{closeDateStr}</p>
+          {/* Fila 2: Apertura vs Cierre en Grid Responsivo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            {/* Apertura */}
+            <div className="flex items-start gap-2 bg-card/60 p-2.5 rounded-xl border border-border/40">
+              <div className="size-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                <User className="size-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
+                  Apertura por
+                </span>
+                <p className="font-bold text-foreground truncate">{openedByStr}</p>
+                <p className="text-[11px] text-muted-foreground">{openDateStr}</p>
+              </div>
             </div>
-          )}
+
+            {/* Cierre */}
+            <div className="flex items-start gap-2 bg-card/60 p-2.5 rounded-xl border border-border/40">
+              <div className="size-7 rounded-lg bg-muted text-muted-foreground flex items-center justify-center shrink-0 mt-0.5">
+                <Clock className="size-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
+                  {isOpen ? 'Estado Cierre' : 'Cierre por'}
+                </span>
+                <p className="font-bold text-foreground truncate">{isOpen ? 'En curso' : closedByStr}</p>
+                <p className="text-[11px] text-muted-foreground">{isOpen ? 'Sesión no finalizada' : closeDateStr}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* KPI Financial Breakdown Cards */}
