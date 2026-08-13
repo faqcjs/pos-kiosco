@@ -19,7 +19,6 @@ import { cn } from '@/lib/utils'
 const DONUT_COLORS = ['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)']
 
 export function TabResumen({ sales, products, dailyData, paymentMethodsData, isSingleDay }) {
-  const [selectedPaymentIndex, setSelectedPaymentIndex] = useState(null)
   // 1. Pago más usado
   const topPaymentMethod = useMemo(() => {
     if (!sales || sales.length === 0) return { name: 'Sin ventas', percentage: 0 }
@@ -242,23 +241,11 @@ export function TabResumen({ sales, products, dailyData, paymentMethodsData, isS
 
           {/* Gráfico Donut de medios de pago (1/3 de ancho) */}
         <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h3 className="text-base font-bold text-foreground font-heading">¿Cómo te pagan?</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {selectedPaymentIndex !== null
-                  ? 'Viendo desglose del medio de pago.'
-                  : 'Tocá un medio de pago para ver su total.'}
-              </p>
-            </div>
-            {selectedPaymentIndex !== null && (
-              <button
-                onClick={() => setSelectedPaymentIndex(null)}
-                className="text-[10px] font-bold text-primary hover:underline shrink-0 bg-primary/10 px-2 py-1 rounded-md"
-              >
-                Ver todos ✕
-              </button>
-            )}
+          <div>
+            <h3 className="text-base font-bold text-foreground font-heading">¿Cómo te pagan?</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Reparto de ingresos según el medio de pago.
+            </p>
           </div>
 
           <div className="relative h-56 w-full my-3 flex items-center justify-center">
@@ -269,21 +256,17 @@ export function TabResumen({ sales, products, dailyData, paymentMethodsData, isS
                     data={paymentMethodsData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={56}
+                    innerRadius={58}
                     outerRadius={78}
                     paddingAngle={4}
                     cornerRadius={5}
                     dataKey="value"
-                    onClick={(_, index) => setSelectedPaymentIndex(selectedPaymentIndex === index ? null : index)}
-                    cursor="pointer"
                   >
                     {paymentMethodsData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={DONUT_COLORS[index % DONUT_COLORS.length]}
-                        stroke={selectedPaymentIndex === index ? 'var(--color-primary, #10b981)' : 'transparent'}
-                        strokeWidth={selectedPaymentIndex === index ? 3 : 0}
-                        opacity={selectedPaymentIndex === null || selectedPaymentIndex === index ? 1 : 0.45}
+                        stroke="transparent"
                       />
                     ))}
                   </Pie>
@@ -305,67 +288,35 @@ export function TabResumen({ sales, products, dailyData, paymentMethodsData, isS
               </div>
             )}
 
-            {/* Texto central del Donut (Total o Selección Dinámica) */}
-            {paymentMethodsData && paymentMethodsData.length > 0 && (() => {
-              const totalSum = paymentMethodsData.reduce((sum, item) => sum + (item.value || 0), 0)
-              const totalVtas = paymentMethodsData.reduce((sum, item) => sum + (item.count || 0), 0)
-              const selectedItem = selectedPaymentIndex !== null ? paymentMethodsData[selectedPaymentIndex] : null
-              const activeAmount = selectedItem ? selectedItem.value : totalSum
-              const activePct = totalSum > 0 && selectedItem ? Math.round(((selectedItem.value || 0) / totalSum) * 100) : 100
-              const activeCount = selectedItem ? selectedItem.count : totalVtas
-
-              return (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-2">
-                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider truncate max-w-[110px]">
-                    {selectedItem ? selectedItem.name : 'Total'}
-                  </span>
-                  <span className="text-base sm:text-lg font-black text-foreground font-heading tabular-nums leading-tight">
-                    {money(activeAmount)}
-                  </span>
-                  <span className="text-[10px] text-primary font-bold mt-0.5 bg-primary/10 px-1.5 py-0.5 rounded-full">
-                    {activePct}% {activeCount ? `(${activeCount} vtas)` : ''}
-                  </span>
-                </div>
-              )
-            })()}
+            {/* Texto central del Donut (Total del Período) */}
+            {paymentMethodsData && paymentMethodsData.length > 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-2">
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                  Total
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-foreground font-heading tabular-nums leading-tight">
+                  {money(paymentMethodsData.reduce((sum, item) => sum + (item.value || 0), 0))}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Leyenda interactiva abajo */}
-          <div className="space-y-1.5 pt-2 border-t border-border/60">
-            {paymentMethodsData?.map((pm, idx) => {
-              const totalSum = paymentMethodsData.reduce((sum, item) => sum + (item.value || 0), 0)
-              const pct = totalSum > 0 ? Math.round(((pm.value || 0) / totalSum) * 100) : 0
-              const isSelected = selectedPaymentIndex === idx
-
-              return (
-                <button
-                  key={pm.name}
-                  type="button"
-                  onClick={() => setSelectedPaymentIndex(isSelected ? null : idx)}
-                  className={cn(
-                    'flex w-full items-center justify-between p-2 rounded-xl text-xs transition-all text-left',
-                    isSelected
-                      ? 'bg-primary/10 border border-primary/30 font-bold'
-                      : 'hover:bg-muted/70 active:bg-muted'
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span
-                      className="size-3 rounded-full shrink-0 shadow-2xs"
-                      style={{ backgroundColor: DONUT_COLORS[idx % DONUT_COLORS.length] }}
-                    />
-                    <span className="text-foreground font-bold truncate">{pm.name}</span>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <p className="font-bold text-foreground tabular-nums">{money(pm.value)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      <span className="font-bold text-primary">{pct}%</span> {pm.count ? `• ${pm.count} vtas` : ''}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
+          {/* Leyenda a la derecha/debajo */}
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            {paymentMethodsData?.map((pm, idx) => (
+              <div key={pm.name} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="size-2.5 rounded-full"
+                    style={{ backgroundColor: DONUT_COLORS[idx % DONUT_COLORS.length] }}
+                  />
+                  <span className="text-foreground font-medium">{pm.name}</span>
+                </div>
+                <span className="text-muted-foreground font-semibold">
+                  {pm.count ? `${pm.count} vta.` : money(pm.value)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
