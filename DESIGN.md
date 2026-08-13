@@ -1,125 +1,199 @@
 ---
-version: 1.0.0
-name: eKiosco
-framework: React + Vite + Tailwind CSS v4 + @base-ui/react
-
-tokens:
-  colors:
-    light:
-      background: "oklch(0.98 0.005 145)" # ~#f5f8f6 (Soft light green-gray)
-      foreground: "oklch(0.2 0.02 155)"   # ~#2a3530 (Dark slate green)
-      card: "oklch(1 0 0)"                 # #ffffff
-      card-foreground: "oklch(0.2 0.02 155)"
-      primary: "oklch(0.58 0.14 155)"     # ~#2e9d69 (Vibrant commerce green)
-      primary-foreground: "oklch(0.99 0.01 145)" # ~#f9fbf9
-      secondary: "oklch(0.95 0.01 155)"   # ~#ebefec (Very light green-gray)
-      secondary-foreground: "oklch(0.3 0.03 155)" # ~#3d4e44
-      accent: "oklch(0.75 0.15 65)"       # ~#dd8844 (Warm orange for "fiar" / credit)
-      accent-foreground: "oklch(0.25 0.03 65)" # ~#502b11
-      destructive: "oklch(0.577 0.22 27.325)" # ~#cb3837 (System red)
-      success: "oklch(0.62 0.16 150)"     # ~#3cb075 (System success green)
-      warning: "oklch(0.78 0.15 75)"       # ~#e5964b (System warning amber)
-      border: "oklch(0.9 0.01 155)"       # ~#d9e2dd (Soft light borders)
-      input: "oklch(0.9 0.01 155)"
-      ring: "oklch(0.58 0.14 155)"
-    dark:
-      background: "oklch(0.18 0.015 155)" # ~#212925 (Dark slate charcoal)
-      foreground: "oklch(0.96 0.01 145)"  # ~#eff3f0
-      card: "oklch(0.23 0.018 155)"       # ~#2a342f (Dark gray-green cards)
-      card-foreground: "oklch(0.96 0.01 145)"
-      primary: "oklch(0.68 0.15 155)"     # ~#42b47d (Bright commerce green)
-      primary-foreground: "oklch(0.16 0.02 155)" # ~#1b2520
-      secondary: "oklch(0.3 0.02 155)"    # ~#37423c
-      secondary-foreground: "oklch(0.96 0.01 145)"
-      accent: "oklch(0.72 0.15 65)"       # ~#e3904d
-      accent-foreground: "oklch(0.2 0.03 65)"
-      destructive: "oklch(0.65 0.2 27)"   # ~#d94947
-      success: "oklch(0.68 0.16 150)"     # ~#4ab980
-      warning: "oklch(0.78 0.15 75)"
-      border: "oklch(1 0 0 / 12%)"
-      input: "oklch(1 0 0 / 15%)"
-      ring: "oklch(0.68 0.15 155)"
-
-  radius:
-    default: "0.75rem" # 12px
-    sm: "0.45rem"      # calc(var(--radius) * 0.6)
-    md: "0.6rem"       # calc(var(--radius) * 0.8)
-    lg: "0.75rem"      # var(--radius)
-    xl: "1.05rem"      # calc(var(--radius) * 1.4)
-    2xl: "1.35rem"     # calc(var(--radius) * 1.8)
-    3xl: "1.65rem"     # calc(var(--radius) * 2.2)
-    4xl: "1.95rem"     # calc(var(--radius) * 2.6)
-
-  typography:
-    sans: "ui-sans-serif, system-ui, sans-serif"
-    heading: "ui-sans-serif, system-ui, sans-serif"
-
-  spacing:
-    xs: "0.25rem" # 4px
-    sm: "0.5rem"  # 8px
-    md: "1rem"    # 16px
-    lg: "1.5rem"  # 24px
-    xl: "2rem"    # 32px
+name: Kinetic Retail OS
+colors:
+  surface: '#0b1326'
+  surface-dim: '#0b1326'
+  surface-bright: '#31394d'
+  surface-container-lowest: '#060e20'
+  surface-container-low: '#131b2e'
+  surface-container: '#171f33'
+  surface-container-high: '#222a3d'
+  surface-container-highest: '#2d3449'
+  on-surface: '#dae2fd'
+  on-surface-variant: '#bccbb9'
+  inverse-surface: '#dae2fd'
+  inverse-on-surface: '#283044'
+  outline: '#869585'
+  outline-variant: '#3d4a3d'
+  surface-tint: '#4ae176'
+  primary: '#4be277'
+  on-primary: '#003915'
+  primary-container: '#22c55e'
+  on-primary-container: '#004b1e'
+  inverse-primary: '#006e2f'
+  secondary: '#bcc7de'
+  on-secondary: '#263143'
+  secondary-container: '#3e495d'
+  on-secondary-container: '#aeb9d0'
+  tertiary: '#ffba61'
+  on-tertiary: '#472a00'
+  tertiary-container: '#ef9900'
+  on-tertiary-container: '#5c3800'
+  error: '#ffb4ab'
+  on-error: '#690005'
+  error-container: '#93000a'
+  on-error-container: '#ffdad6'
+  primary-fixed: '#6bff8f'
+  primary-fixed-dim: '#4ae176'
+  on-primary-fixed: '#002109'
+  on-primary-fixed-variant: '#005321'
+  secondary-fixed: '#d8e3fb'
+  secondary-fixed-dim: '#bcc7de'
+  on-secondary-fixed: '#111c2d'
+  on-secondary-fixed-variant: '#3c475a'
+  tertiary-fixed: '#ffddb8'
+  tertiary-fixed-dim: '#ffb95f'
+  on-tertiary-fixed: '#2a1700'
+  on-tertiary-fixed-variant: '#653e00'
+  background: '#0b1326'
+  on-background: '#dae2fd'
+  surface-variant: '#2d3449'
+typography:
+  display-lg:
+    fontFamily: Inter
+    fontSize: 48px
+    fontWeight: '700'
+    lineHeight: '1.1'
+    letterSpacing: -0.02em
+  headline-lg:
+    fontFamily: Inter
+    fontSize: 32px
+    fontWeight: '600'
+    lineHeight: '1.2'
+    letterSpacing: -0.01em
+  headline-lg-mobile:
+    fontFamily: Inter
+    fontSize: 24px
+    fontWeight: '600'
+    lineHeight: '1.2'
+  headline-md:
+    fontFamily: Inter
+    fontSize: 20px
+    fontWeight: '600'
+    lineHeight: '1.4'
+  body-lg:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: '400'
+    lineHeight: '1.5'
+  body-md:
+    fontFamily: Inter
+    fontSize: 16px
+    fontWeight: '400'
+    lineHeight: '1.5'
+  label-md:
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: '500'
+    lineHeight: '1.2'
+    letterSpacing: 0.01em
+  label-sm:
+    fontFamily: Inter
+    fontSize: 12px
+    fontWeight: '600'
+    lineHeight: '1'
+    letterSpacing: 0.05em
+  price-display:
+    fontFamily: Inter
+    fontSize: 24px
+    fontWeight: '700'
+    lineHeight: '1'
+    letterSpacing: -0.01em
+rounded:
+  sm: 0.25rem
+  DEFAULT: 0.5rem
+  md: 0.75rem
+  lg: 1rem
+  xl: 1.5rem
+  full: 9999px
+spacing:
+  base: 4px
+  xs: 4px
+  sm: 8px
+  md: 16px
+  lg: 24px
+  xl: 32px
+  gutter: 16px
+  margin-page: 24px
+  sidebar-width: 240px
 ---
 
-# eKiosco Design System
+## Brand & Style
 
-A modern, high-contrast, commerce-focused Point of Sale (POS) system designed with a warm green-slate aesthetic, featuring support for a complete light and dark theme.
+The design system is engineered for high-velocity retail environments. It prioritizes operational efficiency, legibility under varied lighting conditions, and a clear hierarchy of action. The brand personality is **Professional, Systematic, and Energetic**, reflecting the fast-paced nature of kiosk management.
 
-## Core Design Principles
+The visual style is **Corporate / Modern** with a focus on **Tonal Layering**. It utilizes high-contrast accents to guide the user's eye toward primary functions (like adding items to a cart or finalizing a sale) while maintaining a clean, organized backdrop for inventory management. The aesthetic is utility-driven, avoiding decorative elements in favor of functional clarity.
 
-- **Fluid POS Layout:** Grid-based and card-based dashboard layout optimized for quick operations, readability under store light conditions, and accessibility.
-- **Micro-interactions:** Interactive components (buttons, links, row items) must have subtle scale transitions (`active:scale-[0.98]` or similar) and hover states.
-- **Glassmorphism & Contrast:** Subtle borders (`border-border`), light backgrounds (`bg-card/50` with `backdrop-blur-sm`), and clear separations.
+Targeting kiosk owners and staff, the UI evokes a sense of **Reliability and Control**. The dark theme optimizes focus and reduces eye strain during long shifts in varied lighting, using a vibrant green to signal "success" and "active status" across the dashboard.
 
-## Core Components
+## Colors
 
-### 1. Cards (`Card`)
-- **Base styles:** `rounded-2xl border border-border bg-card text-card-foreground`
-- **Variations:** Can be used with backdrop blurs: `bg-card/50 backdrop-blur-sm`.
+This design system utilizes a high-contrast palette anchored by a vibrant **Success Green (#22C55E)**. This primary color is used exclusively for constructive actions, active states, and positive status indicators.
 
-### 2. Buttons (`Button`)
-- **Base structure:** Native button wrapped with custom Tailwind transitions and animations.
-- **Variants:**
-  - `default`: Primary action, using `bg-primary text-primary-foreground`.
-  - `outline`: Secondary borders using `border-border bg-background hover:bg-muted`.
-  - `secondary`: Subtle dark/light variant `bg-secondary text-secondary-foreground`.
-  - `ghost`: Borderless, reactive on hover `hover:bg-muted`.
-  - `destructive`: Warning actions, styled with a light transparent background `bg-destructive/10 text-destructive hover:bg-destructive/20`.
-- **Sizes:**
-  - `xs` (height: 24px), `sm` (height: 28px), `default`/`md` (height: 32px), `lg` (height: 36px).
-  - Standard app touch/click targets (e.g. login submit) use height `h-11` (`44px`) for optimal tap area.
+- **Primary:** High-visibility green (#22C55E) for CTA buttons, "Venta" (Sales) active states, and price highlights.
+- **Secondary:** Deep slate (#1E293B) used for structural elements and secondary navigation to provide a grounded, professional feel.
+- **Tertiary:** Amber (#F59E0B) is reserved for warning states, low stock alerts, or "Fiar" (Credit) indicators.
+- **Neutrals:** Based on a deep slate (#0F172A), generating a scale of grays that provide depth for layered interfaces.
 
-### 3. Inputs & Selects (`Input`, `Select`, `Textarea`)
-- **Height:** Standard POS inputs use `h-11` (44px) with `px-3.5` and font size `text-[16px]` (to prevent auto-zooming on iOS).
-- **Styles:** `rounded-xl border border-input bg-background outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40`.
+In **Dark Mode**, the interface uses a deep, sophisticated background with layered surface values to maintain the "Kiosk OS" feel while ensuring high focus and reduced glare in retail environments.
 
-### 4. Modals & Sheets (`Modal`)
-- **Overlay:** Backed by `bg-foreground/40 backdrop-blur-[2px]`.
-- **Variants:**
-  - `sheet`: Sliding bottom sheet on mobile `mt-auto max-h-[92vh] rounded-t-3xl sm:mx-auto sm:my-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-3xl` with a subtle top drag handle.
-  - `large`: Centered card modal `max-w-3xl rounded-3xl`.
-  - `default`: Centered card modal `max-w-lg rounded-3xl`.
+## Typography
 
-### 5. Badges (`Badge`)
-- **Tones:**
-  - `default`: `bg-primary/10 text-primary`
-  - `success`: `bg-success/15 text-success`
-  - `warning`: `bg-warning/20 text-warning-foreground dark:text-warning`
-  - `danger`: `bg-destructive/12 text-destructive`
-  - `muted`: `bg-muted text-muted-foreground`
-  - `accent`: `bg-accent/20 text-accent-foreground dark:text-accent`
+The system uses **Inter** for all roles to maintain a unified, "app-like" feel. The typeface was chosen for its exceptional legibility at small sizes (crucial for receipt previews and inventory lists) and its neutral, professional character.
 
-### 6. Stat Cards (`StatCard`)
-- Used for indicators, margins, total counts. Displays an uppercase label, large bold numbers, and optional subtexts.
+- **Scale:** A tight scale is used to maximize information density. 
+- **Hierarchy:** Price information is treated with increased weight (`700`) and the Primary color to ensure it is the first thing a user sees on a product card.
+- **Labels:** Small labels use uppercase styling with increased letter spacing to distinguish metadata (like "ADMINISTRADOR" or "UNIDADES") from editable content.
+- **Adaptability:** On mobile devices, large headlines scale down significantly to ensure the interface remains functional on handheld scanners or tablets.
 
-## Custom Animations & Transitions
-- **Scanline Effect (`.animate-scanline`):** Keyframe-based scanning line for camera/barcode operations.
-- **Float Up & Fade (`.animate-float-up-fade`):** Used for instant visual feedback on cart updates (adds a floating indicator that fades out).
-- **Subtle Pulse (`.animate-pulse-subtle`):** Used for active, running processes (e.g., opened cash shift).
+## Layout & Spacing
 
-## UX Anti-patterns & Rules
-1. **Never use hard-coded colors:** Always use CSS/Tailwind variables (`primary`, `border`, `muted`, etc.).
-2. **Never drop below 44px (h-11) for primary mobile interactive areas:** POS environments are fast-paced and require reliable tap sizes.
-3. **No raw scrollbars:** In scrolling listings, use `@utility no-scrollbar` if needed to save visual space.
-4. **Respect iPhone Safe Areas:** Integrate `pb-safe`, `pt-safe`, and `mb-safe` when laying out bottom navigation bars or full-screen panels.
+The design system employs a **Fluid Grid** model with fixed-width sidebars. The layout is divided into three functional zones: 
+1. **Navigation Rail:** A fixed 240px sidebar for global app switching.
+2. **Main Workspace:** A fluid area that uses a 12-column grid to display product tiles and management tools.
+3. **Transaction Sidebar:** A fixed 320px - 400px panel on the right for the "Carrito" (Cart), keeping the checkout process always visible.
+
+**Spacing Rhythm:**
+- A **4px base unit** governs all spacing.
+- **Product Grids:** Use a 16px (md) gutter to balance density with tap-target safety.
+- **Touch Targets:** Minimum height for buttons and interactive items is 48px to accommodate fast-paced touch interaction at a physical kiosk.
+- **Mobile:** The 3-column layout collapses into a single vertical flow, with the "Carrito" often becoming a bottom-sheet or a persistent summary bar.
+
+## Elevation & Depth
+
+In this dark-mode configuration, depth is conveyed through **Tonal Layers** supplemented by subtle, dark ambient shadows. This maintains a clean, digital-first look that performs well on various kiosk screens.
+
+- **Level 0 (Base):** The darkest color in the palette. Used for the main app background.
+- **Level 1 (Surface):** Slightly elevated. Used for cards, sidebars, and navigation rails.
+- **Level 2 (Elevated):** Features a soft ambient shadow (e.g., 0px 4px 12px rgba(0,0,0,0.5)). Used for hover states, active input fields, and "pop-out" elements.
+- **Outlines:** Low-contrast outlines (1px solid `outline-variant`) are used to define card boundaries and provide structure without visual clutter in the dark environment.
+- **Status Glow:** A soft, primary-colored outer glow may be applied to the most critical action button (e.g., "Cobrar") to draw focus.
+
+## Shapes
+
+The shape language is **Rounded**, using a consistent corner radius to soften the technical nature of the software and make the UI feel approachable and modern.
+
+- **Standard Elements:** Product cards, input fields, and buttons use a `0.5rem` (8px) radius.
+- **Large Containers:** The main workspace and the Cart container use `rounded-xl` (1.5rem) when they are nested to create a "container-within-container" look.
+- **Chips/Status:** Use `rounded-full` (pill-shape) for category filters and status indicators (like "CAJA ABIERTA") to clearly distinguish them from actionable buttons.
+
+## Components
+
+**Buttons**
+- **Primary:** Solid green (#22C55E) background with white or high-contrast dark text. Reserved for finality (e.g., "Cobrar").
+- **Secondary:** Dark slate background (#1E293B) with white text. Used for navigation and non-critical actions.
+- **Icon Buttons:** Circular or slightly rounded squares with centered icons for quick actions like "Search" or "Close".
+
+**Cards**
+- **Product Tiles:** Feature a top-aligned icon/image, a centered price in `price-display` green, and a bottom-aligned label for the name. Quantity badges are placed in the top-right corner.
+
+**Inputs**
+- **Search & Add:** High-contrast containers with 1px borders. Focused states use a 2px green border.
+- **Prominent Numeric Inputs:** Large, centered text for price entry or quantity adjustments.
+
+**Status Indicators**
+- **Caja Abierta:** Uses a pill shape with a leading green dot.
+- **Stock Alerts:** Uses high-contrast badges in tertiary amber for items running low.
+
+**Lists**
+- **Cart Items:** Horizontal rows with condensed typography. Use a simple divider line between items. Leading space is reserved for item count, and trailing space for the subtotal.

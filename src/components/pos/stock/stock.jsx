@@ -1,13 +1,12 @@
 'use client'
 
-import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Minus, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react'
+import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select, Skeleton } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
-import { CargaRapida } from '@/components/pos/stock/carga-rapida'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
@@ -183,7 +182,6 @@ export function Stock() {
     }
   }
   const [offLookupLoading, setOffLookupLoading] = useState(false)
-  const [cargaRapidaOpen, setCargaRapidaOpen] = useState(false)
   const [filterAlertsOnly, setFilterAlertsOnly] = useState(false)
 
   const categoryContainerRef = useRef(null)
@@ -345,7 +343,7 @@ export function Stock() {
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-1.5 lg:p-6">
       {offLookupLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-4 shadow-xl">
             <Loader2 className="size-5 animate-spin text-primary" />
             <span className="text-sm font-medium">Buscando en OpenFoodFacts…</span>
@@ -357,22 +355,12 @@ export function Stock() {
         title="Stock"
         description="Catálogo e inventario de productos."
         action={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setCargaRapidaOpen(true)}>
-              <Zap className="size-4" />
-              Carga rápida
-            </Button>
-            <Button onClick={openNew}>
-              <Plus className="size-4" />
-              Nuevo
-            </Button>
-          </div>
+          <Button onClick={openNew}>
+            <Plus className="size-4" />
+            Nuevo
+          </Button>
         }
       />
-
-      {cargaRapidaOpen && (
-        <CargaRapida onClose={() => setCargaRapidaOpen(false)} />
-      )}
 
       <div className="flex border-b border-border">
         <button
@@ -421,13 +409,32 @@ export function Stock() {
 
       {/* category filters */}
       <div ref={categoryContainerRef} className="no-scrollbar -mx-1.5 lg:-mx-6 flex flex-row flex-nowrap gap-2 overflow-x-auto px-1.5 lg:px-6 pb-1 touch-pan-x select-none">
+        {alerts.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setFilterAlertsOnly((v) => !v)}
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors',
+              filterAlertsOnly
+                ? 'border-amber-500 bg-amber-500 text-slate-950 shadow-sm'
+                : 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20',
+            )}
+          >
+            <AlertTriangle className="size-4 shrink-0" />
+            Alertas ({alerts.length})
+          </button>
+        )}
+
         {LOCAL_CATEGORIES.map((c) => (
           <button
             key={c}
-            onClick={() => setCategory(c)}
+            onClick={() => {
+              setCategory(c)
+              if (filterAlertsOnly) setFilterAlertsOnly(false)
+            }}
             className={cn(
               'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors',
-              category === c
+              category === c && !filterAlertsOnly
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-border bg-card text-muted-foreground hover:bg-muted',
             )}
@@ -438,50 +445,10 @@ export function Stock() {
         ))}
       </div>
 
-      {alerts.length > 0 && (
-        <Card className="border-warning/40 bg-warning/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <h3 className="flex items-center gap-2 font-heading text-base font-bold text-warning">
-              <AlertTriangle className="size-5 shrink-0" />
-              {viewMode === 'inventory'
-                ? `Alertas de Stock (${alerts.length} en total)`
-                : `Productos con datos pendientes (${alerts.length} en total)`}
-            </h3>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
-              {viewMode === 'inventory' ? (
-                <>
-                  <span>• <strong className="text-foreground">{alertStats.outOfStock}</strong> sin stock</span>
-                  <span>• <strong className="text-foreground">{alertStats.lowStock}</strong> con stock bajo</span>
-                </>
-              ) : (
-                <>
-                  <span>• <strong className="text-foreground">{alertStats.noPrice}</strong> sin precio de venta</span>
-                  <span>• <strong className="text-foreground">{alertStats.noCost}</strong> sin precio de costo</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          <Button
-            variant={filterAlertsOnly ? 'secondary' : 'outline'}
-            size="sm"
-            onClick={() => setFilterAlertsOnly((v) => !v)}
-            className={cn(
-              'h-9 px-3.5 text-xs font-semibold shrink-0 transition-all',
-              filterAlertsOnly
-                ? 'bg-warning text-warning-foreground hover:bg-warning/90'
-                : 'border-warning/40 text-warning hover:bg-warning/10'
-            )}
-          >
-            {filterAlertsOnly ? 'Viendo solo alertas ✓' : `Filtrar en tabla (${alerts.length}) →`}
-          </Button>
-        </Card>
-      )}
-
       {filterAlertsOnly && (
-        <div className="flex items-center justify-between rounded-xl border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs font-medium text-warning shadow-sm">
+        <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-medium text-amber-700 dark:text-amber-300 shadow-xs">
           <span>
-            Filtrando tabla por productos con <strong>{viewMode === 'inventory' ? 'alertas de stock' : 'precios o costos pendientes'}</strong> ({filtered.length} encontrados)
+            Filtrando por <strong>{viewMode === 'inventory' ? 'alertas de stock' : 'precios o costos pendientes'}</strong> ({filtered.length} productos)
           </span>
           <button
             onClick={() => setFilterAlertsOnly(false)}

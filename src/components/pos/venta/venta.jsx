@@ -1,6 +1,6 @@
 'use client'
 
-import { Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle, PanelRightClose, PanelRightOpen, Flame, ScanBarcode } from 'lucide-react'
+import { Minus, Plus, Search, ShoppingCart, Trash2, X, AlertTriangle, PanelRightClose, PanelRightOpen, Flame, ScanBarcode, SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input } from '@/components/ui/kit'
@@ -11,6 +11,7 @@ import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
 import { cn, matchProduct, normalizeText } from '@/lib/utils'
 import { PaymentModal } from './payment-modal'
 import { ScannerModal } from './scanner-modal'
+import { ExtrasModal } from './extras-modal'
 
 const LOCAL_CATEGORIES = ['Todos', ...CATEGORIES]
 const LOCAL_CATEGORY_ICON = CATEGORY_ICON
@@ -66,6 +67,12 @@ export function Venta() {
   })
   const [floatingEffects, setFloatingEffects] = useState([])
   const [isSaving, setIsSaving] = useState(false)
+
+  // Estado para Extras (Descuentos y Recargos)
+  const [extraType, setExtraType] = useState('descuento') // 'descuento' | 'recargo'
+  const [extraCalc, setExtraCalc] = useState('porcentaje') // 'porcentaje' | 'monto'
+  const [extraValue, setExtraValue] = useState(0)
+  const [extrasModalOpen, setExtrasModalOpen] = useState(false)
 
   const toggleCartCollapsed = () => {
     setCartCollapsed((c) => {
@@ -123,8 +130,24 @@ export function Venta() {
     return matches
   }, [state.products, salesCount, query, category])
 
-  const total = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart])
+  // Cálculos de Subtotal, Extras y Total final
+  const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart])
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart])
+
+  const extraAmount = useMemo(() => {
+    if (!extraValue || extraValue <= 0) return 0
+    if (extraCalc === 'porcentaje') {
+      return (subtotal * extraValue) / 100
+    }
+    return Number(extraValue)
+  }, [subtotal, extraCalc, extraValue])
+
+  const total = useMemo(() => {
+    if (extraType === 'descuento') {
+      return Math.max(0, subtotal - extraAmount)
+    }
+    return subtotal + extraAmount
+  }, [subtotal, extraAmount, extraType])
 
   const isShiftOpen = state.currentShift?.status === 'open'
 
@@ -176,7 +199,7 @@ export function Venta() {
         }
         return c.map((i) => (i.productId === p.id ? { ...i, qty: i.qty + 1 } : i))
       }
-      return [...c, { id: p.id, productId: p.id, name: p.name, price: p.price, qty: 1 }]
+      return [...c, { id: p.id, productId: p.id, name: p.name, price: p.price, category: p.category || 'Varios', qty: 1 }]
     })
   }
 
@@ -211,7 +234,6 @@ export function Venta() {
     ])
     setQuickAmount('')
     setQuickName('')
-    // Volver a enfocar el campo de concepto para la próxima carga rápida
     setTimeout(() => {
       document.getElementById('quick-name-input')?.focus()
     }, 50)
@@ -290,6 +312,7 @@ export function Venta() {
 
   function handleFinishSale() {
     setCart([])
+    setExtraValue(0)
     setPayOpen(false)
     setMobileCartOpen(false)
   }
@@ -297,10 +320,9 @@ export function Venta() {
   return (
     <>
     <style>{`
-      .venta-root { height: calc(100svh - 9.5rem); }
-      @media (min-width: 1024px) { .venta-root { height: calc(100svh - 4rem); } }
+      .venta-root { height: 100%; min-height: 0; }
     `}</style>
-    <div className="venta-root flex flex-col lg:flex-row overflow-hidden" style={{ minHeight: 0 }}>
+    <div className="venta-root flex flex-col lg:flex-row overflow-hidden h-full" style={{ minHeight: 0 }}>
       {/* Left: products */}
       <div className="flex min-w-0 flex-1 flex-col p-1.5 lg:p-6 min-h-0 overflow-hidden">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 flex-1 min-h-0">
@@ -319,7 +341,7 @@ export function Venta() {
                   aria-label="Buscar producto o código"
                 />
                 <span className="pointer-events-none absolute inset-y-0 left-10 hidden items-center text-muted-foreground sm:flex">
-                  <span className="sr-only">Buscar producto o código...</span>
+                  <span className="sr-only">Buscar producto o consultar precio...</span>
                 </span>
               </div>
               {/* Mobile: toggle quick amount */}
@@ -400,7 +422,7 @@ export function Venta() {
 
           {/* Scrollable grid area */}
           <div className="flex-1 overflow-y-auto min-h-0 pr-0.5">
-            <div className="grid auto-rows-min grid-cols-2 gap-3 pb-2 sm:grid-cols-3 xl:grid-cols-4">
+            <div className="grid auto-rows-min grid-cols-2 gap-3 pb-32 sm:pb-24 lg:pb-4 sm:grid-cols-3 xl:grid-cols-4">
               {filtered.map((p) => {
                 const low = p.stock <= p.minStock
                 const out = p.stock <= 0
@@ -470,16 +492,16 @@ export function Venta() {
         </div>
       </div>
 
-      {/* Right: cart (desktop) — single aside with smooth width transition */}
+      {/* Right: cart (desktop) */}
       <aside
         className={cn(
-          'hidden shrink-0 flex-col border-l border-border bg-card lg:flex',
+          'hidden shrink-0 flex-col border-l border-border bg-card lg:flex h-full max-h-full min-h-0',
           'transition-[width] duration-300 ease-in-out overflow-hidden',
           cartCollapsed ? 'w-[72px]' : 'w-80 xl:w-96',
         )}
       >
         {cartCollapsed ? (
-          /* Compact state: icon + badge + total */
+          /* Compact state */
           <div className="flex h-full flex-col items-center py-5 gap-4">
             <button
               onClick={toggleCartCollapsed}
@@ -492,7 +514,6 @@ export function Venta() {
                   {cartCount}
                 </span>
               )}
-              {/* Tooltip */}
               <span className="pointer-events-none absolute right-full mr-3 whitespace-nowrap rounded-lg bg-popover px-2.5 py-1.5 text-xs font-semibold text-popover-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 z-50">
                 Ver carrito ({cartCount} prod.)
               </span>
@@ -507,14 +528,12 @@ export function Venta() {
                     {money(total)}
                   </p>
                 </div>
-                {/* Tooltip */}
                 <span className="pointer-events-none absolute right-full mr-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-popover px-2.5 py-1.5 text-xs font-semibold text-popover-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 z-50">
                   Total: {money(total)}
                 </span>
               </div>
             )}
             
-            {/* Lista compacta de iconos de categorías de los productos en el carrito */}
             {cart.length > 0 && (
               <div className="w-full flex-1 overflow-y-auto no-scrollbar flex flex-col items-center gap-2.5 my-2">
                 <div className="h-px w-8 bg-border" />
@@ -528,7 +547,6 @@ export function Venta() {
                       onClick={toggleCartCollapsed}
                     >
                       <span>{icon}</span>
-                      {/* Tooltip con nombre y cantidad */}
                       <span className="pointer-events-none absolute right-full mr-3 whitespace-nowrap rounded-lg bg-popover px-2.5 py-1.5 text-xs font-semibold text-popover-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 z-50">
                         {item.name} ({item.qty} u.)
                       </span>
@@ -544,7 +562,6 @@ export function Venta() {
               className="group relative flex size-10 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted hover:scale-105 active:scale-95 transition-all duration-300 ease-in-out"
             >
               <PanelRightOpen className="size-4" />
-              {/* Tooltip */}
               <span className="pointer-events-none absolute right-full mr-3 whitespace-nowrap rounded-lg bg-popover px-2.5 py-1.5 text-xs font-semibold text-popover-foreground shadow-lg opacity-0 transition-opacity group-hover:opacity-100 z-50">
                 Expandir panel
               </span>
@@ -553,9 +570,16 @@ export function Venta() {
         ) : (
           <CartPanel
             cart={cart}
+            subtotal={subtotal}
             total={total}
+            cartCount={cartCount}
+            extraType={extraType}
+            extraCalc={extraCalc}
+            extraValue={extraValue}
+            extraAmount={extraAmount}
             onChangeQty={changeQty}
             onRemove={removeItem}
+            onOpenExtras={() => setExtrasModalOpen(true)}
             onPay={() => setPayOpen(true)}
             onCollapse={toggleCartCollapsed}
             getExpirationWarning={getExpirationWarning}
@@ -570,8 +594,8 @@ export function Venta() {
           className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-30 flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 font-semibold text-primary-foreground shadow-lg lg:hidden"
         >
           <ShoppingCart className="size-5" />
-          <span>{cartCount}</span>
-          <span className="tabular-nums">{money(total)}</span>
+          <span>{cartCount} {cartCount === 1 ? 'ítem' : 'ítems'}</span>
+          <span className="tabular-nums font-bold">{money(total)}</span>
         </button>
       )}
 
@@ -596,10 +620,10 @@ export function Venta() {
         <div className="fixed inset-0 z-40 flex flex-col lg:hidden">
           <button
             aria-label="Cerrar carrito"
-            className="flex-1 bg-foreground/40 backdrop-blur-[2px]"
+            className="flex-1 bg-black/60"
             onClick={() => setMobileCartOpen(false)}
           />
-          <div className="flex max-h-[85vh] flex-col rounded-t-3xl bg-card">
+          <div className="flex max-h-[90vh] flex-col rounded-t-3xl bg-card border-t border-border overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="font-heading text-lg font-bold">Carrito</h2>
               <button
@@ -612,9 +636,16 @@ export function Venta() {
             </div>
             <CartPanel
               cart={cart}
+              subtotal={subtotal}
               total={total}
+              cartCount={cartCount}
+              extraType={extraType}
+              extraCalc={extraCalc}
+              extraValue={extraValue}
+              extraAmount={extraAmount}
               onChangeQty={changeQty}
               onRemove={removeItem}
+              onOpenExtras={() => setExtrasModalOpen(true)}
               onPay={() => setPayOpen(true)}
               getExpirationWarning={getExpirationWarning}
             />
@@ -623,6 +654,19 @@ export function Venta() {
       )}
 
       <ScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onDetect={handleScan} />
+      <ExtrasModal
+        open={extrasModalOpen}
+        onClose={() => setExtrasModalOpen(false)}
+        subtotal={subtotal}
+        extraType={extraType}
+        extraCalc={extraCalc}
+        extraValue={extraValue}
+        onApply={({ type, calc, value }) => {
+          setExtraType(type)
+          setExtraCalc(calc)
+          setExtraValue(value)
+        }}
+      />
       <PaymentModal
         open={payOpen}
         onClose={() => !isSaving && handleFinishSale()}
@@ -639,9 +683,16 @@ export function Venta() {
 
 function CartPanel({
   cart,
+  subtotal,
   total,
+  cartCount,
+  extraType,
+  extraCalc,
+  extraValue,
+  extraAmount,
   onChangeQty,
   onRemove,
+  onOpenExtras,
   onPay,
   onCollapse,
   getExpirationWarning,
@@ -727,16 +778,44 @@ function CartPanel({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Total</span>
-          <span className="font-heading text-2xl font-bold tabular-nums">{money(total)}</span>
+      {/* Footer con Resumen (Items, Subtotal, Extras y Total) */}
+      <div className="shrink-0 border-t border-border p-3.5 lg:p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2.5">
+        <div className="space-y-1 text-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span>{cartCount} {cartCount === 1 ? 'ítem' : 'ítems'}</span>
+            <span>Subtotal: <strong className="text-foreground font-semibold">{money(subtotal)}</strong></span>
+          </div>
+
+          {extraValue > 0 && (
+            <div className="flex items-center justify-between font-medium">
+              <span className={extraType === 'descuento' ? 'text-destructive' : 'text-primary'}>
+                Ajuste ({extraType === 'descuento' ? 'Descuento' : 'Recargo'}) ({extraCalc === 'porcentaje' ? `${extraValue}%` : '$'})
+              </span>
+              <span className={extraType === 'descuento' ? 'text-destructive font-bold' : 'text-primary font-bold'}>
+                {extraType === 'descuento' ? '-' : '+'}{money(extraAmount)}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-1 border-t border-border/60">
+            <span className="text-sm font-bold text-foreground">Total</span>
+            <span className="font-heading text-xl lg:text-2xl font-extrabold text-foreground tabular-nums">{money(total)}</span>
+          </div>
         </div>
+
+        <Button
+          variant="outline"
+          onClick={onOpenExtras}
+          className="w-full h-8 text-xs font-semibold flex items-center justify-center gap-1.5 border-dashed cursor-pointer"
+        >
+          <SlidersHorizontal className="size-3.5" />
+          {extraValue > 0 ? `Extras (${extraType === 'descuento' ? '-' : '+'}${money(extraAmount)})` : 'Gestionar extras'}
+        </Button>
+
         <Button
           onClick={onPay}
           disabled={cart.length === 0}
-          className="h-14 w-full bg-success text-lg font-bold text-success-foreground hover:bg-success/90"
+          className="h-12 w-full bg-success text-base lg:text-lg font-bold text-success-foreground hover:bg-success/90 cursor-pointer shadow-sm"
         >
           Cobrar {money(total)}
         </Button>

@@ -541,9 +541,11 @@ BEGIN
         RAISE EXCEPTION 'La fecha de la transacción está fuera del rango permitido (no se permiten fechas futuras).';
     END IF;
 
-    SELECT name INTO supplier_name FROM public.suppliers WHERE id = p_supplier_id;
-    IF supplier_name IS NULL THEN
-        RAISE EXCEPTION 'Proveedor no encontrado.';
+    IF p_supplier_id IS NOT NULL AND p_supplier_id <> '' THEN
+        SELECT name INTO supplier_name FROM public.suppliers WHERE id = p_supplier_id;
+        IF supplier_name IS NULL THEN
+            RAISE EXCEPTION 'Proveedor no encontrado.';
+        END IF;
     END IF;
 
     -- Update products stock/cost and handle batches
@@ -637,9 +639,11 @@ BEGIN
         );
     END IF;
 
-    UPDATE public.suppliers
-    SET entries = COALESCE(entries, '[]'::jsonb) || v_entries
-    WHERE id = p_supplier_id;
+    IF p_supplier_id IS NOT NULL AND p_supplier_id <> '' THEN
+        UPDATE public.suppliers
+        SET entries = COALESCE(entries, '[]'::jsonb) || v_entries
+        WHERE id = p_supplier_id;
+    END IF;
 
     IF p_paid_cash THEN
         SELECT * INTO active_shift FROM public.shifts WHERE id = p_shift_id;

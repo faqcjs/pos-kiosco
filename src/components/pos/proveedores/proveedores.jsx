@@ -11,6 +11,10 @@ import { useToast } from '@/components/ui/toast'
 import { cn, matchProduct } from '@/lib/utils'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
 
+import { PurchasesList } from '@/components/pos/compras/purchases-list'
+import { NewPurchaseModal } from '@/components/pos/compras/new-purchase-modal'
+import { ShoppingCart } from 'lucide-react'
+
 const SUPPLIER_CATEGORIES = [
   'Varios',
   'Golosinas',
@@ -44,8 +48,11 @@ function getWhatsAppLink(phone) {
 }
 
 export function Proveedores() {
-  const { state, addSupplier, updateSupplier, deleteSupplier, receiveGoods, registerSupplierPayment } = useStore()
+  const { state, addSupplier, updateSupplier, deleteSupplier, deleteSupplierEntry, receiveGoods, registerSupplierPayment } = useStore()
   const toast = useToast()
+  const [mainTab, setMainTab] = useState('compras') // 'compras' | 'proveedores'
+  const [newPurchaseOpen, setNewPurchaseOpen] = useState(false)
+  const [editingPurchase, setEditingPurchase] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   
@@ -78,9 +85,34 @@ export function Proveedores() {
     return suppliers.filter((s) => s.delivery_days?.includes(todayDayName)).length
   }, [suppliers, todayDayName])
 
+  // Total purchases metrics
+  const totalPurchasesAmount = useMemo(() => {
+    let sum = 0
+    for (const sup of suppliers) {
+      if (sup.entries) {
+        for (const e of sup.entries) {
+          if (e.type === 'factura') sum += Number(e.amount) || 0
+        }
+      }
+    }
+    return sum
+  }, [suppliers])
+
+  const totalPurchasesCount = useMemo(() => {
+    let count = 0
+    for (const sup of suppliers) {
+      if (sup.entries) {
+        for (const e of sup.entries) {
+          if (e.type === 'factura') count++
+        }
+      }
+    }
+    return count
+  }, [suppliers])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    let list = suppliers
+    let list = suppliers.filter((s) => s.id !== 'compra_directa' && s.name !== 'Compra Directa')
 
     // Text search filter
     if (q) {
@@ -192,33 +224,109 @@ export function Proveedores() {
       ) : (
         <div className="mx-auto max-w-5xl p-1.5 lg:p-6 space-y-6">
           <PageHeader
-            title="Proveedores"
-            description="Cuenta corriente con tus proveedores y agenda de visitas."
+            title={mainTab === 'compras' ? 'Compras' : 'Agenda de Proveedores'}
+            description={
+              mainTab === 'compras'
+                ? 'Ingreso de mercadería, reposición de stock e historial de compras.'
+                : 'Cuentas corrientes, saldo deudor y agenda de visitas.'
+            }
             action={
-              <Button onClick={handleOpenNew} className="active:scale-[0.98]">
-                <Plus className="size-4" /> Nuevo proveedor
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setNewPurchaseOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold active:scale-[0.98]"
+                >
+                  <PackagePlus className="size-4 mr-1.5" /> Nueva Compra
+                </Button>
+                {mainTab === 'proveedores' && (
+                  <Button onClick={handleOpenNew} variant="outline" className="active:scale-[0.98]">
+                    <Plus className="size-4 mr-1" /> Nuevo proveedor
+                  </Button>
+                )}
+              </div>
             }
           />
 
-          {/* KPI Summary Cards */}
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
-            <Card className="p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
-              <span className="absolute top-2 right-2 text-2xl">💰</span>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Deuda Total</p>
-              <p className="mt-2 font-heading text-lg sm:text-2xl font-black tabular-nums text-destructive">
-                {money(totalDebt)}
-              </p>
-            </Card>
-
-            <Card className="p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
-              <span className="absolute top-2 right-2 text-2xl">🚚</span>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Visitas hoy</p>
-              <p className="mt-2 font-heading text-lg sm:text-2xl font-black text-foreground">
-                {visitingTodayCount}
-              </p>
-            </Card>
+          {/* Navigation Tabs (Compras vs Agenda de Proveedores) */}
+          <div className="flex rounded-xl bg-muted/70 p-1 border border-border/30 w-full sm:w-fit overflow-x-auto">
+            <button
+              onClick={() => setMainTab('compras')}
+              className={cn(
+                'flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all active:scale-[0.97] whitespace-nowrap min-h-[40px]',
+                mainTab === 'compras'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <ShoppingCart className="size-4" /> Compras
+            </button>
+            <button
+              onClick={() => setMainTab('proveedores')}
+              className={cn(
+                'flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all active:scale-[0.97] whitespace-nowrap min-h-[40px]',
+                mainTab === 'proveedores'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Truck className="size-4" /> Agenda de Proveedores ({suppliers.filter((s) => s.id !== 'compra_directa' && s.name !== 'Compra Directa').length})
+            </button>
           </div>
+
+          {mainTab === 'compras' ? (
+            <div className="space-y-6">
+              {/* KPI Summary Cards for Compras */}
+              <div className="grid gap-3 grid-cols-2">
+                <Card className="p-3 sm:p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
+                  <span className="absolute top-2 right-2 text-base sm:text-2xl opacity-60 sm:opacity-80">📦</span>
+                  <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider pr-4">
+                    Compras Registradas
+                  </p>
+                  <p className="mt-1 sm:mt-2 font-heading text-base sm:text-2xl font-black text-foreground">
+                    {totalPurchasesCount}
+                  </p>
+                </Card>
+
+                <Card className="p-3 sm:p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
+                  <span className="absolute top-2 right-2 text-base sm:text-2xl opacity-60 sm:opacity-80">💳</span>
+                  <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider pr-4">
+                    Total Invertido
+                  </p>
+                  <p className="mt-1 sm:mt-2 font-heading text-base sm:text-2xl font-black tabular-nums text-foreground">
+                    {money(totalPurchasesAmount)}
+                  </p>
+                </Card>
+              </div>
+
+              {/* Purchases List */}
+              <PurchasesList
+                suppliers={suppliers}
+                onOpenNewPurchase={() => {
+                  setEditingPurchase(null)
+                  setNewPurchaseOpen(true)
+                }}
+                onEditPurchase={(purchase) => {
+                  setEditingPurchase(purchase)
+                  setNewPurchaseOpen(true)
+                }}
+                onDeletePurchase={(supId, entryId) => {
+                  deleteSupplierEntry(supId, entryId)
+                  toast('Compra eliminada', 'info')
+                }}
+              />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* KPI Summary Cards */}
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+                <Card className="p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
+                  <span className="absolute top-2 right-2 text-2xl">🚚</span>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Visitas hoy</p>
+                  <p className="mt-2 font-heading text-lg sm:text-2xl font-black text-foreground">
+                    {visitingTodayCount}
+                  </p>
+                </Card>
+              </div>
 
           {/* Search, Filters, Category Tabs */}
           <div className="space-y-4">
@@ -246,17 +354,6 @@ export function Proveedores() {
                   )}
                 >
                   Todos
-                </button>
-                <button
-                  onClick={() => setViewFilter('deuda')}
-                  className={cn(
-                    "rounded-lg px-4 py-1.5 text-xs font-semibold transition-all active:scale-[0.97]",
-                    viewFilter === 'deuda' 
-                      ? "bg-destructive text-white shadow-sm font-bold" 
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Con Deuda
                 </button>
                 <button
                   onClick={() => setViewFilter('visita_hoy')}
@@ -375,16 +472,7 @@ export function Proveedores() {
                       </div>
 
                       <div className="text-right">
-                        {balance > 0 ? (
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-xs text-muted-foreground">Debés:</span>
-                            <span className="font-heading text-base font-bold tabular-nums text-destructive">
-                              {money(balance)}
-                            </span>
-                          </div>
-                        ) : (
-                          <Badge tone="success" className="text-[10px]">Al día</Badge>
-                        )}
+                        <Badge variant="outline" className="text-[10px]">Registrado</Badge>
                       </div>
                     </div>
                   </div>
@@ -394,6 +482,8 @@ export function Proveedores() {
           </div>
         </div>
       )}
+    </div>
+  )}
 
       {/* Creation/Edit Form Modal */}
       <Modal
@@ -495,11 +585,29 @@ export function Proveedores() {
           </Button>
         </div>
       </Modal>
+
+      <NewPurchaseModal
+        open={newPurchaseOpen}
+        onClose={() => {
+          setNewPurchaseOpen(false)
+          setEditingPurchase(null)
+        }}
+        onReceive={receiveGoods}
+        onDeleteEntry={deleteSupplierEntry}
+        editingPurchase={editingPurchase}
+        suppliers={suppliers}
+        products={state.products}
+        canReceive={
+          state.currentUser?.role === 'administrador' ||
+          state.currentUser?.role === 'repositor' ||
+          state.currentUser?.role === 'cajero'
+        }
+      />
     </>
   )
 }
 
-function parseInvoiceDetail(detail) {
+export function parseInvoiceDetail(detail) {
   let text = detail || ''
   let invoiceNumber = ''
   let invoiceDate = null

@@ -26,8 +26,8 @@ const NAV = [
   { id: 'venta', label: 'Venta', short: 'Venta', icon: ShoppingCart },
   { id: 'caja', label: 'Caja', short: 'Caja', icon: Wallet },
   { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
+  { id: 'proveedores', label: 'Compras', short: 'Compras', icon: ShoppingCart },
   { id: 'fiar', label: 'Fiar', short: 'Fiar', icon: NotebookPen },
-  { id: 'proveedores', label: 'Proveedores', short: 'Prov.', icon: Truck },
   { id: 'admin', label: 'Admin', short: 'Admin', icon: BarChart3 },
 ]
 
@@ -250,7 +250,7 @@ export function AppShell({
   const activeLabel = filteredNav.find((n) => n.id === active)?.label ?? 'eKiosco'
 
   return (
-    <div className="flex min-h-dvh bg-background">
+    <div className="flex h-dvh max-h-dvh w-full overflow-hidden bg-background">
       {/* Desktop sidebar */}
       <aside
         className={cn(
@@ -447,9 +447,9 @@ export function AppShell({
       </aside>
 
       {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col h-full min-h-0 overflow-hidden">
         {/* Mobile header */}
-        <header className="sticky top-0 z-30 flex flex-col gap-2 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 flex flex-col gap-2 border-b border-border bg-background px-4 py-2.5 lg:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -518,11 +518,11 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</main>
+        <main className="min-w-0 flex-1 h-full min-h-0 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</main>
 
         {/* Mobile bottom nav */}
         <nav className={cn(
-          "fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden",
+          "fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background pb-[env(safe-area-inset-bottom)] lg:hidden",
           filteredNav.length === 2 ? "grid-cols-2" : (filteredNav.length === 5 ? "grid-cols-5" : "grid-cols-6")
         )}>
           {filteredNav.map((item) => {
