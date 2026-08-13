@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Search, Trash2, Camera, PackagePlus, Calendar } from 'lucide-react'
+import { Plus, Search, Trash2, Camera, PackagePlus, Calendar, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select } from '@/components/ui/kit'
 import { money, uid } from '@/lib/format'
@@ -212,9 +212,9 @@ export function NewPurchaseModal({
         size="lg"
       >
         <div className="space-y-4">
-          {/* Top row: Proveedor opcional y Fecha */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
+          {/* Top row: Proveedor, Fecha y Escáner */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div className="sm:col-span-6">
               <Label className="text-xs font-semibold">Proveedor (Opcional)</Label>
               <Select
                 value={supplierId}
@@ -232,7 +232,7 @@ export function NewPurchaseModal({
               </Select>
             </div>
 
-            <div>
+            <div className="sm:col-span-4">
               <Label className="text-xs font-semibold">Fecha</Label>
               <div className="relative mt-1">
                 <Calendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -244,57 +244,77 @@ export function NewPurchaseModal({
                 />
               </div>
             </div>
+
+            <div className="sm:col-span-2 flex flex-col justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setScannerOpen(true)}
+                className="h-11 w-full gap-2 text-xs font-semibold border-border hover:bg-muted"
+                title="Escanear producto con cámara"
+              >
+                <Camera className="size-4.5 text-primary shrink-0" />
+                <span>Escanear</span>
+              </Button>
+            </div>
           </div>
 
-          {/* Search or Scan Barcode */}
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={prodQuery}
-                onChange={(e) => setProdQuery(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Buscar por nombre o código de barras (Enter para agregar)..."
-                className="pl-9 h-11 text-xs sm:text-sm bg-card shadow-2xs"
-              />
+          {/* Search Input (Full Width) */}
+          <div className="relative w-full">
+            <Search className="absolute left-3.5 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={prodQuery}
+              onChange={(e) => setProdQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Buscar por nombre o código de barras (Enter para agregar)..."
+              className="pl-10 pr-9 h-11 text-xs sm:text-sm bg-card shadow-2xs w-full"
+            />
+            {prodQuery && (
+              <button
+                type="button"
+                onClick={() => setProdQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+              >
+                <X className="size-4" />
+              </button>
+            )}
 
-              {/* Suggestions */}
-              {productSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-30 mt-1.5 rounded-xl border border-border bg-card p-1.5 shadow-2xl max-h-72 overflow-y-auto divide-y divide-border/30">
-                  {productSuggestions.map((p, idx) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => handleSelectSuggestion(p)}
-                      className={cn(
-                        "flex w-full items-center justify-between p-2.5 text-left text-xs rounded-lg transition-colors min-h-[44px]",
-                        idx === 0 ? "bg-primary/5 hover:bg-primary/10 font-bold" : "hover:bg-muted active:bg-muted/80"
-                      )}
-                    >
-                      <div className="min-w-0 pr-2">
-                        <p className="font-semibold text-foreground truncate">{p.name}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Stock actual: <span className="font-bold">{p.stock}</span> | Costo catálogo: <span className="font-bold">{money(p.cost)}</span>
-                        </p>
+            {/* Suggestions Dropdown */}
+            {productSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-30 mt-1.5 rounded-xl border border-border bg-card p-1.5 shadow-2xl max-h-72 overflow-y-auto divide-y divide-border/40">
+                {productSuggestions.map((p, idx) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleSelectSuggestion(p)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 p-3 text-left rounded-lg transition-all min-h-[50px]",
+                      idx === 0
+                        ? "bg-primary/10 border border-primary/20"
+                        : "hover:bg-muted active:bg-muted/80"
+                    )}
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p className="font-bold text-xs sm:text-sm text-foreground leading-snug break-words">{p.name}</p>
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground font-medium">
+                        <span>Stock: <strong className="text-foreground font-bold">{p.stock}</strong></span>
+                        <span>•</span>
+                        <span>Costo catálogo: <strong className="text-foreground font-bold">{money(p.cost)}</strong></span>
+                        {p.category && (
+                          <>
+                            <span>•</span>
+                            <span className="opacity-80">{p.category}</span>
+                          </>
+                        )}
                       </div>
-                      <Badge variant={idx === 0 ? "default" : "outline"} className="text-[10px] shrink-0 font-bold">
-                        {idx === 0 ? "↵ Seleccionar" : "+ Agregar"}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setScannerOpen(true)}
-              className="h-11 px-3 shrink-0"
-              title="Escanear producto"
-            >
-              <Camera className="size-5" />
-            </Button>
+                    </div>
+                    <Badge variant={idx === 0 ? "default" : "secondary"} className="text-[10px] sm:text-xs shrink-0 font-bold px-2.5 py-1">
+                      {idx === 0 ? "↵ Seleccionar" : "+ Agregar"}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Items Table */}
