@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Search, Trash2, Camera, PackagePlus, Calendar, X } from 'lucide-react'
+import { Plus, Search, Trash2, Camera, PackagePlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select } from '@/components/ui/kit'
 import { money, uid } from '@/lib/format'
@@ -23,7 +23,6 @@ export function NewPurchaseModal({
   const toast = useToast()
 
   const [supplierId, setSupplierId] = useState(initialSupplierId || '')
-  const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().split('T')[0])
   const [items, setItems] = useState([])
   const [prodQuery, setProdQuery] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -37,15 +36,9 @@ export function NewPurchaseModal({
             ? ''
             : editingPurchase.supplierId || '',
         )
-        setPurchaseDate(
-          editingPurchase.date
-            ? new Date(editingPurchase.date).toISOString().split('T')[0]
-            : new Date().toISOString().split('T')[0],
-        )
         setItems(editingPurchase.items || [])
       } else {
         setSupplierId(initialSupplierId || '')
-        setPurchaseDate(new Date().toISOString().split('T')[0])
         setItems([])
       }
       setProdQuery('')
@@ -170,9 +163,13 @@ export function NewPurchaseModal({
       .map((it) => `${it.name} (x${it.totalUnits} un. a ${money(it.unitCost)})`)
       .join(', ')
 
+    const currentDateISO = editingPurchase?.date
+      ? editingPurchase.date
+      : new Date().toISOString()
+
     const detailObj = {
       text: detailString,
-      invoiceDate: purchaseDate || null,
+      invoiceDate: currentDateISO,
     }
     const finalDetailString = JSON.stringify(detailObj)
 
@@ -212,9 +209,9 @@ export function NewPurchaseModal({
         size="lg"
       >
         <div className="space-y-4">
-          {/* Top row: Proveedor, Fecha y Escáner */}
+          {/* Top row: Proveedor y Escáner */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
-            <div className="sm:col-span-7">
+            <div className="sm:col-span-9">
               <Label className="text-xs font-semibold">Proveedor (Opcional)</Label>
               <Select
                 value={supplierId}
@@ -233,28 +230,15 @@ export function NewPurchaseModal({
             </div>
 
             <div className="sm:col-span-3">
-              <Label className="text-xs font-semibold">Fecha</Label>
-              <div className="relative mt-1">
-                <Calendar className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                <Input
-                  type="date"
-                  value={purchaseDate}
-                  onChange={(e) => setPurchaseDate(e.target.value)}
-                  className="pl-8 pr-1 h-10 text-xs font-medium bg-card"
-                />
-              </div>
-            </div>
-
-            <div className="sm:col-span-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setScannerOpen(true)}
-                className="h-10 w-full gap-1.5 text-xs font-semibold border-border hover:bg-muted px-2"
+                className="h-10 w-full gap-2 text-xs font-semibold border-border hover:bg-muted"
                 title="Escanear producto con cámara"
               >
                 <Camera className="size-4 text-primary shrink-0" />
-                <span>Escanear</span>
+                <span>Escanear producto</span>
               </Button>
             </div>
           </div>
