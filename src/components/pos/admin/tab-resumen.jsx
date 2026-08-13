@@ -80,16 +80,47 @@ export function TabResumen({ sales, products, dailyData, paymentMethodsData, isS
     return { name: topName, totalRevenue: maxRevenue, qty: topQty }
   }, [sales])
 
-  // 3. Próximo vencimiento
-  const upcomingExpiration = useMemo(() => {
-    if (!products || products.length === 0) return null
-    const withExp = products.filter((p) => p.expirationDate)
-    if (withExp.length === 0) return null
-    const sorted = [...withExp].sort(
-      (a, b) => new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime(),
-    )
-    return sorted[0]
-  }, [products])
+  // 3. Día de mayor venta de la semana
+  const topSalesDay = useMemo(() => {
+    if (!sales || sales.length === 0)
+      return { dayName: 'Sin ventas', totalRevenue: 0, percentage: 0, count: 0 }
+
+    const dayNames = ['Domingos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábados']
+    const dayRevenue = [0, 0, 0, 0, 0, 0, 0]
+    const dayCounts = [0, 0, 0, 0, 0, 0, 0]
+    let grandTotal = 0
+
+    sales.forEach((s) => {
+      const rawDate = s.date || s.created_at || s.createdAt
+      if (!rawDate) return
+      const d = new Date(rawDate)
+      if (isNaN(d.getTime())) return
+      const dayIdx = d.getDay()
+      const rev = Number(s.total) || 0
+      dayRevenue[dayIdx] += rev
+      dayCounts[dayIdx] += 1
+      grandTotal += rev
+    })
+
+    let topIdx = 0
+    let maxRev = -1
+
+    for (let i = 0; i < 7; i++) {
+      if (dayRevenue[i] > maxRev) {
+        maxRev = dayRevenue[i]
+        topIdx = i
+      }
+    }
+
+    const pct = grandTotal > 0 ? Math.round((maxRev / grandTotal) * 100) : 0
+
+    return {
+      dayName: dayNames[topIdx],
+      totalRevenue: maxRev,
+      percentage: pct,
+      count: dayCounts[topIdx],
+    }
+  }, [sales])
 
   return (
     <div className="space-y-6">
@@ -129,26 +160,22 @@ export function TabResumen({ sales, products, dailyData, paymentMethodsData, isS
           </div>
         </div>
 
-        {/* Card 3: Próximo vencimiento */}
+        {/* Card 3: Día de mayor venta */}
         <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-4 shadow-2xs">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
             <Calendar className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
             <span className="text-xs font-medium text-muted-foreground block">
-              Próximo vencimiento
+              Día de mayor venta
             </span>
             <h4 className="text-base font-bold text-foreground truncate font-heading">
-              {upcomingExpiration ? upcomingExpiration.name : 'Sin alertas'}
+              {topSalesDay.dayName}
             </h4>
             <span className="text-xs text-muted-foreground">
-              {upcomingExpiration
-                ? new Date(upcomingExpiration.expirationDate).toLocaleDateString('es-AR', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })
-                : 'No hay lotes por vencer'}
+              {topSalesDay.totalRevenue > 0
+                ? `${money(topSalesDay.totalRevenue)} (${topSalesDay.percentage}% del total)`
+                : 'Sin ventas en el período'}
             </span>
           </div>
         </div>
