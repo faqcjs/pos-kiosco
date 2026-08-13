@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 import { CreditCard, Package, Calendar } from 'lucide-react'
 import { money } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 const DONUT_COLORS = ['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)']
 
