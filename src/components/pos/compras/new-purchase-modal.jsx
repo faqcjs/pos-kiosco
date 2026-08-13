@@ -213,13 +213,13 @@ export function NewPurchaseModal({
       >
         <div className="space-y-4">
           {/* Top row: Proveedor, Fecha y Escáner */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-            <div className="sm:col-span-6">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+            <div className="sm:col-span-7">
               <Label className="text-xs font-semibold">Proveedor (Opcional)</Label>
               <Select
                 value={supplierId}
                 onChange={(e) => setSupplierId(e.target.value)}
-                className="mt-1 h-11 text-xs sm:text-sm"
+                className="mt-1 h-10 text-xs sm:text-sm"
               >
                 <option value="">🛒 Sin proveedor (Compra directa)</option>
                 {suppliers
@@ -232,28 +232,28 @@ export function NewPurchaseModal({
               </Select>
             </div>
 
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-3">
               <Label className="text-xs font-semibold">Fecha</Label>
               <div className="relative mt-1">
-                <Calendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Calendar className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <Input
                   type="date"
                   value={purchaseDate}
                   onChange={(e) => setPurchaseDate(e.target.value)}
-                  className="pl-9 h-11 text-xs sm:text-sm font-medium bg-card"
+                  className="pl-8 pr-1 h-10 text-xs font-medium bg-card"
                 />
               </div>
             </div>
 
-            <div className="sm:col-span-2 flex flex-col justify-end">
+            <div className="sm:col-span-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setScannerOpen(true)}
-                className="h-11 w-full gap-2 text-xs font-semibold border-border hover:bg-muted"
+                className="h-10 w-full gap-1.5 text-xs font-semibold border-border hover:bg-muted px-2"
                 title="Escanear producto con cámara"
               >
-                <Camera className="size-4.5 text-primary shrink-0" />
+                <Camera className="size-4 text-primary shrink-0" />
                 <span>Escanear</span>
               </Button>
             </div>
