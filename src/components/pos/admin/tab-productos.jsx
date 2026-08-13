@@ -185,61 +185,6 @@ export function TabProductos({ sales, products }) {
 
   return (
     <div className="space-y-6">
-      {/* Widget de Auditoría de Control de Stock */}
-      <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400">
-              <Lock className="size-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-foreground font-heading">
-                Auditoría de Control de Stock
-              </h3>
-              {auditStats.manualPct > 30 && (
-                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                  <AlertTriangle className="size-3" />
-                  Atención: {auditStats.manualPct.toFixed(0)}% Monto Libre
-                </span>
-              )}
-            </div>
-          </div>
-
-          <button
-            onClick={() => setAuditModalOpen(true)}
-            className="self-start sm:self-auto rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors shadow-2xs"
-          >
-            Ver auditoría completa
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="size-3.5 text-emerald-500" />
-              Catálogo: {auditStats.catalogPct.toFixed(1)}% ({auditStats.itemsCatalogCount} art.)
-            </span>
-            <span className="flex items-center gap-1">
-              <AlertTriangle className="size-3.5 text-amber-500" />
-              Monto Libre: {auditStats.manualPct.toFixed(1)}% ({auditStats.itemsManualCount} art.)
-            </span>
-          </div>
-
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-amber-200/50 dark:bg-amber-900/40 flex">
-            <div
-              className="bg-emerald-500 transition-all duration-500"
-              style={{ width: `${auditStats.catalogPct}%` }}
-              title={`Catálogo: ${auditStats.catalogPct.toFixed(1)}%`}
-            />
-            <div
-              className="bg-amber-500 transition-all duration-500"
-              style={{ width: `${auditStats.manualPct}%` }}
-              title={`Monto Libre: ${auditStats.manualPct.toFixed(1)}%`}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Grid 2 Columnas (Mobile 1 columna) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Columna Izquierda: Ranking Productos */}
@@ -255,34 +200,37 @@ export function TabProductos({ sales, products }) {
               </div>
             </div>
 
-            {/* Toggle de Filtros */}
-            <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/60 p-1 text-xs">
+            {/* Toggle de Filtros (Sin contenedor de fondo) */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <button
+                type="button"
                 onClick={() => setProductFilter('ingreso')}
                 className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
                   productFilter === 'ingreso'
                     ? 'bg-primary text-primary-foreground shadow-2xs'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 Mayor ingreso
               </button>
               <button
+                type="button"
                 onClick={() => setProductFilter('vendido')}
                 className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
                   productFilter === 'vendido'
                     ? 'bg-primary text-primary-foreground shadow-2xs'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 Más vendido
               </button>
               <button
+                type="button"
                 onClick={() => setProductFilter('ganancia')}
                 className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
                   productFilter === 'ganancia'
                     ? 'bg-primary text-primary-foreground shadow-2xs'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 Más ganancia
@@ -360,24 +308,26 @@ export function TabProductos({ sales, products }) {
               </div>
             </div>
 
-            {/* Toggle Filtros Categorías */}
-            <div className="flex items-center gap-1 rounded-xl bg-muted/60 p-1 text-xs">
+            {/* Toggle Filtros Categorías (Sin contenedor de fondo) */}
+            <div className="flex items-center gap-1.5 text-xs">
               <button
+                type="button"
                 onClick={() => setCategoryFilter('ingreso')}
                 className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
                   categoryFilter === 'ingreso'
                     ? 'bg-primary text-primary-foreground shadow-2xs'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 Mayor ingreso
               </button>
               <button
+                type="button"
                 onClick={() => setCategoryFilter('vendido')}
                 className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
                   categoryFilter === 'vendido'
                     ? 'bg-primary text-primary-foreground shadow-2xs'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 Más vendido
@@ -437,6 +387,61 @@ export function TabProductos({ sales, products }) {
         </div>
       </div>
 
+      {/* Widget de Auditoría de Control de Stock (Pasado al final) */}
+      <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400">
+              <Lock className="size-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground font-heading">
+                Auditoría de Control de Stock
+              </h3>
+              {auditStats.manualPct > 30 && (
+                <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <AlertTriangle className="size-3" />
+                  Atención: {auditStats.manualPct.toFixed(0)}% Monto Libre
+                </span>
+              )}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setAuditModalOpen(true)}
+            className="self-start sm:self-auto rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors shadow-2xs"
+          >
+            Ver auditoría completa
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="size-3.5 text-emerald-500" />
+              Catálogo: {auditStats.catalogPct.toFixed(1)}% ({auditStats.itemsCatalogCount} art.)
+            </span>
+            <span className="flex items-center gap-1">
+              <AlertTriangle className="size-3.5 text-amber-500" />
+              Monto Libre: {auditStats.manualPct.toFixed(1)}% ({auditStats.itemsManualCount} art.)
+            </span>
+          </div>
+
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-amber-200/50 dark:bg-amber-900/40 flex">
+            <div
+              className="bg-emerald-500 transition-all duration-500"
+              style={{ width: `${auditStats.catalogPct}%` }}
+              title={`Catálogo: ${auditStats.catalogPct.toFixed(1)}%`}
+            />
+            <div
+              className="bg-amber-500 transition-all duration-500"
+              style={{ width: `${auditStats.manualPct}%` }}
+              title={`Monto Libre: ${auditStats.manualPct.toFixed(1)}%`}
+            />
+          </div>
+        </div>
+      </div>
       {/* Modal de Auditoría Completa de Stock */}
       <Modal
         open={auditModalOpen}
