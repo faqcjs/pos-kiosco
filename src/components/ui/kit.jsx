@@ -116,10 +116,14 @@ export function Modal({
   open,
   onClose,
   title,
+  subtitle,
   children,
-  variant = 'sheet',
+  variant,
+  size,
   footer,
 }) {
+  const effectiveVariant = variant || size || 'sheet'
+
   useEffect(() => {
     if (!open) return
     const onKey = (e) => {
@@ -153,23 +157,26 @@ export function Modal({
       />
       <div
         className={cn(
-          'relative z-10 flex w-full flex-col bg-card text-card-foreground shadow-2xl duration-300 animate-in zoom-in-95 slide-in-from-bottom-8 ease-out',
-          variant === 'sheet'
+          'relative z-10 flex w-full flex-col bg-card border border-border text-card-foreground shadow-2xl duration-300 animate-in zoom-in-95 slide-in-from-bottom-8 ease-out',
+          effectiveVariant === 'sheet'
             ? 'mt-auto max-h-[92vh] rounded-t-3xl sm:mx-auto sm:my-auto sm:max-h-[88vh] sm:max-w-lg sm:rounded-3xl'
-            : variant === 'large'
+            : effectiveVariant === 'large' || effectiveVariant === 'lg'
               ? 'm-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-3xl rounded-3xl'
               : 'm-auto max-h-[90vh] w-[calc(100%-2rem)] max-w-lg rounded-3xl',
         )}
       >
         {/* Drag handle for sheet variant on mobile */}
-        {variant === 'sheet' && (
+        {effectiveVariant === 'sheet' && (
           <div className="flex justify-center pt-3 sm:hidden">
             <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
           </div>
         )}
         {title && (
           <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-4">
-            <h2 className="font-heading text-lg font-bold text-balance">{title}</h2>
+            <div>
+              <h2 className="font-heading text-lg font-bold text-balance">{title}</h2>
+              {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+            </div>
             <button
               onClick={onClose}
               aria-label="Cerrar"
