@@ -104,7 +104,12 @@ export function ReportsModule({
     const endMs = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : Infinity
 
     return sales.filter((s) => {
-      const t = new Date(s.date).getTime()
+      const rawDate = s.date || s.created_at || s.createdAt
+      if (!rawDate) return false
+      const normalizedDate = typeof rawDate === 'string' && rawDate.includes(' ') && !rawDate.includes('T')
+        ? rawDate.replace(' ', 'T')
+        : rawDate
+      const t = new Date(normalizedDate).getTime()
       const matchesDate = !isNaN(t) && t >= startMs && t <= endMs
       if (!matchesDate) return false
       if (paymentMethod && paymentMethod !== 'todos') {

@@ -49,25 +49,34 @@ export function TabResumen({ sales, products, dailyData, paymentMethodsData, isS
     }
   }, [sales])
 
-  // 2. Producto más popular
+  // 2. Producto más popular (definido por total dinero recaudado)
   const topProduct = useMemo(() => {
-    if (!sales || sales.length === 0) return { name: 'Sin ventas', qty: 0 }
+    if (!sales || sales.length === 0) return { name: 'Sin ventas', totalRevenue: 0, qty: 0 }
     const map = new Map()
     sales.forEach((s) => {
       s.items?.forEach((item) => {
         const key = item.name
-        map.set(key, (map.get(key) || 0) + item.qty)
+        const itemQty = Number(item.qty) || 1
+        const itemPrice = Number(item.price) || 0
+        const itemTotal = itemPrice * itemQty
+        const existing = map.get(key) || { revenue: 0, qty: 0 }
+        map.set(key, {
+          revenue: existing.revenue + itemTotal,
+          qty: existing.qty + itemQty,
+        })
       })
     })
     let topName = 'Sin datos'
-    let maxQty = 0
-    map.forEach((qty, name) => {
-      if (qty > maxQty) {
-        maxQty = qty
+    let maxRevenue = 0
+    let topQty = 0
+    map.forEach((data, name) => {
+      if (data.revenue > maxRevenue) {
+        maxRevenue = data.revenue
         topName = name
+        topQty = data.qty
       }
     })
-    return { name: topName, qty: maxQty }
+    return { name: topName, totalRevenue: maxRevenue, qty: topQty }
   }, [sales])
 
   // 3. Próximo vencimiento
@@ -114,7 +123,7 @@ export function TabResumen({ sales, products, dailyData, paymentMethodsData, isS
               {topProduct.name}
             </h4>
             <span className="text-xs text-muted-foreground">
-              {topProduct.qty} unidades vendidas
+              {money(topProduct.totalRevenue)} ({topProduct.qty} u.)
             </span>
           </div>
         </div>

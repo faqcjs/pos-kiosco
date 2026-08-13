@@ -1,10 +1,13 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Calendar, MoreHorizontal, Wallet } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Calendar, Eye } from 'lucide-react'
 import { money } from '@/lib/format'
+import { ModalDetalleCaja } from './modal-detalle-caja'
 
 export function TabHistorialCaja({ shifts }) {
+  const [selectedShift, setSelectedShift] = useState(null)
+
   const sortedShifts = useMemo(() => {
     if (!shifts) return []
     return [...shifts].sort(
@@ -87,8 +90,12 @@ export function TabHistorialCaja({ shifts }) {
                       </span>
                     </td>
                     <td className="p-3 text-center">
-                      <button className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-                        <MoreHorizontal className="size-4" />
+                      <button
+                        onClick={() => setSelectedShift(shift)}
+                        title="Ver detalle de caja"
+                        className="inline-flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        <Eye className="size-4" />
                       </button>
                     </td>
                   </tr>
@@ -104,6 +111,14 @@ export function TabHistorialCaja({ shifts }) {
           </tbody>
         </table>
       </div>
+
+      {/* Modal de detalle */}
+      <ModalDetalleCaja
+        shift={selectedShift}
+        open={!!selectedShift}
+        onClose={() => setSelectedShift(null)}
+      />
     </div>
   )
 }
+

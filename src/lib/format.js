@@ -17,10 +17,19 @@ export function moneyShort(value) {
   return `$${value.toFixed(0)}`
 }
 
+function parseSafeDate(iso) {
+  if (!iso) return null
+  if (iso instanceof Date) return isNaN(iso.getTime()) ? null : iso
+  const str = String(iso).trim()
+  if (!str) return null
+  const normalized = str.includes(' ') && !str.includes('T') ? str.replace(' ', 'T') : str
+  const d = new Date(normalized)
+  return isNaN(d.getTime()) ? null : d
+}
+
 export function formatDate(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  const d = parseSafeDate(iso)
+  if (!d) return ''
   return d.toLocaleDateString('es-AR', {
     day: '2-digit',
     month: '2-digit',
@@ -29,9 +38,8 @@ export function formatDate(iso) {
 }
 
 export function formatTime(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  const d = parseSafeDate(iso)
+  if (!d) return ''
   return d.toLocaleTimeString('es-AR', {
     hour: '2-digit',
     minute: '2-digit',
@@ -39,7 +47,6 @@ export function formatTime(iso) {
 }
 
 export function formatDateTime(iso) {
-  if (!iso) return ''
   const d = formatDate(iso)
   const t = formatTime(iso)
   if (!d && !t) return ''

@@ -58,6 +58,29 @@
 
 :root {
   color-scheme: light;
+}
+
+/* Fix native date input styling for mobile & desktop */
+input[type="date"] {
+  line-height: 1.5;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: 6px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.9);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+:root {
   --background: oklch(0.965 0.008 155);
   --foreground: oklch(0.2 0.02 155);
   --card: oklch(1 0 0 / 78%);

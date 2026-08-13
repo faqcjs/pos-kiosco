@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Search, MoreHorizontal, ChevronLeft, ChevronRight, BarChart2 } from 'lucide-react'
 import { Badge } from '@/components/ui/kit'
-import { money, formatDate, formatTime } from '@/lib/format'
+import { money, formatDate, formatTime, formatDateTime } from '@/lib/format'
 
 export function TabVentas({ sales }) {
   const [search, setSearch] = useState('')
@@ -113,9 +113,8 @@ export function TabVentas({ sales }) {
                 const itemsSummary =
                   sale.items?.map((i) => `${i.name} x${i.qty}`).join(', ') || 'Sin items'
                 const displayId = String(sale.id).slice(0, 8).toUpperCase()
-                const formattedDate = sale.date
-                  ? `${new Date(sale.date).toLocaleDateString('es-AR')} ${new Date(sale.date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
-                  : '-'
+                const rawDate = sale.date || sale.created_at || sale.createdAt
+                const formattedDate = formatDateTime(rawDate) || '-'
 
                 return (
                   <tr key={sale.id} className={isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'}>

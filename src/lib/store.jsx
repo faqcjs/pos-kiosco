@@ -263,9 +263,32 @@ export function useStore() {
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sales').select('*').order('date', { ascending: false })
-      if (error) throw error
-      return data || []
+      let allSales = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('sales')
+          .select('*')
+          .order('date', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) {
+          hasMore = false
+        } else {
+          allSales.push(...data)
+          if (data.length < pageSize) {
+            hasMore = false
+          } else {
+            page++
+          }
+        }
+      }
+
+      return allSales
     },
   })
 
@@ -283,16 +306,63 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase.from('suppliers').select('*').order('name')
       if (error) throw error
-      return data || []
+      const list = data || []
+
+      const storedDirect = typeof window !== 'undefined' ? localStorage.getItem('kiosko_direct_purchases') : null
+      if (storedDirect) {
+        try {
+          const directEntries = JSON.parse(storedDirect)
+          const existingDirectIdx = list.findIndex((s) => s.id === 'compra_directa' || s.name === 'Compra Directa')
+          if (existingDirectIdx !== -1) {
+            list[existingDirectIdx] = {
+              ...list[existingDirectIdx],
+              entries: directEntries,
+            }
+          } else {
+            list.push({
+              id: 'compra_directa',
+              name: 'Compra Directa',
+              category: 'General',
+              entries: directEntries,
+            })
+          }
+        } catch (e) {
+          console.error(e)
+        }
+      }
+      return list
     },
   })
 
   const { data: shifts = [], isLoading: loadingShifts } = useQuery({
     queryKey: ['shifts'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('shifts').select('*').order('openedAt', { ascending: false })
-      if (error) throw error
-      return data || []
+      let allShifts = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('shifts')
+          .select('*')
+          .order('openedAt', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) {
+          hasMore = false
+        } else {
+          allShifts.push(...data)
+          if (data.length < pageSize) {
+            hasMore = false
+          } else {
+            page++
+          }
+        }
+      }
+
+      return allShifts
     },
   })
 
@@ -765,20 +835,71 @@ export function useStore() {
   const receiveGoodsMutation = useMutation({
     mutationFn: async ({ supplierId, amount, detail, paidCash, shiftId, items = [] }) => {
       const date = new Date().toISOString()
-      const { error } = await supabase.rpc('receive_goods_rpc', {
-        p_supplier_id: supplierId,
-        p_amount: amount,
-        p_detail: detail,
-        p_paid_cash: paidCash,
-        p_date: date,
-        p_shift_id: shiftId,
-        p_items: items,
-      })
-      if (error) throw error
-      return { supplierId, amount, detail, paidCash, date, shiftId, items }
+      const dbSupplierId = supplierId === 'compra_directa' || !supplierId ? null : supplierId
+
+      if (!dbSupplierId) {
+        // Direct purchase without a supplier: update products directly in Supabase to bypass RPC supplier validation
+        for (const item of items) {
+          if (item.productId) {
+            const calculatedUnitCost = Number(((item.cost || 0) / (item.totalUnits || 1)).toFixed(2))
+            const currentProducts = qc.getQueryData(['products']) || []
+            const prod = currentProducts.find((p) => p.id === item.productId)
+            if (prod) {
+              const newStock = (Number(prod.stock) || 0) + (Number(item.totalUnits) || 0)
+              await supabase
+                .from('products')
+                .update({ cost: calculatedUnitCost, stock: newStock })
+                .eq('id', item.productId)
+            }
+          }
+        }
+      } else {
+        const { error } = await supabase.rpc('receive_goods_rpc', {
+          p_supplier_id: dbSupplierId,
+          p_amount: amount,
+          p_detail: detail,
+          p_paid_cash: paidCash,
+          p_date: date,
+          p_shift_id: shiftId,
+          p_items: items,
+        })
+        if (error) throw error
+      }
+      return { supplierId: supplierId || 'compra_directa', amount, detail, paidCash, date, shiftId, items }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['suppliers'] })
+    onSuccess: (result) => {
+      if (!result.supplierId || result.supplierId === 'compra_directa') {
+        const newEntry = {
+          id: uid(),
+          date: result.date,
+          type: 'factura',
+          amount: result.amount,
+          detail: result.detail,
+          paidCash: result.paidCash,
+          items: result.items,
+        }
+        qc.setQueryData(['suppliers'], (old = []) => {
+          const exists = old.some((s) => s.id === 'compra_directa' || s.name === 'Compra Directa')
+          let updated
+          if (exists) {
+            updated = old.map((s) => {
+              if (s.id === 'compra_directa' || s.name === 'Compra Directa') {
+                return { ...s, entries: [...(s.entries || []), newEntry] }
+              }
+              return s
+            })
+          } else {
+            updated = [...old, { id: 'compra_directa', name: 'Compra Directa', category: 'General', entries: [newEntry] }]
+          }
+          const directSup = updated.find((s) => s.id === 'compra_directa' || s.name === 'Compra Directa')
+          if (directSup && typeof window !== 'undefined') {
+            localStorage.setItem('kiosko_direct_purchases', JSON.stringify(directSup.entries || []))
+          }
+          return updated
+        })
+      } else {
+        qc.invalidateQueries({ queryKey: ['suppliers'] })
+      }
       qc.invalidateQueries({ queryKey: ['shifts'] })
       qc.invalidateQueries({ queryKey: ['products'] })
       qc.invalidateQueries({ queryKey: ['product_batches'] })
@@ -1190,6 +1311,34 @@ export function useStore() {
     const deletedEntry = oldEntries.find((e) => e.id === entryId)
     if (!deletedEntry) return
 
+    // Revert product stock for items in deleted purchase entry
+    if (deletedEntry.type === 'factura' && deletedEntry.items && Array.isArray(deletedEntry.items)) {
+      const currentProducts = qc.getQueryData(['products']) || []
+      const updatedProducts = currentProducts.map((p) => {
+        const item = deletedEntry.items.find((it) => it.productId === p.id)
+        if (item) {
+          const nextStock = Math.max(0, (Number(p.stock) || 0) - (Number(item.totalUnits) || 0))
+          return { ...p, stock: nextStock }
+        }
+        return p
+      })
+
+      qc.setQueryData(['products'], updatedProducts)
+      setProductsCache(updatedProducts)
+
+      if (isOnline) {
+        for (const item of deletedEntry.items) {
+          if (item.productId) {
+            const prod = currentProducts.find((p) => p.id === item.productId)
+            if (prod) {
+              const newStock = Math.max(0, (Number(prod.stock) || 0) - (Number(item.totalUnits) || 0))
+              await supabase.from('products').update({ stock: newStock }).eq('id', item.productId)
+            }
+          }
+        }
+      }
+    }
+
     const updatedEntries = oldEntries.filter((e) => e.id !== entryId)
     const updatedSupplier = { ...supplier, entries: updatedEntries }
 
@@ -1227,6 +1376,17 @@ export function useStore() {
           })
         }
       }
+    }
+
+    // If direct purchase, sync with localStorage and update query cache
+    if (supplierId === 'compra_directa' || supplier.name === 'Compra Directa') {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kiosko_direct_purchases', JSON.stringify(updatedEntries))
+      }
+      qc.setQueryData(['suppliers'], (old = []) =>
+        old.map((s) => (s.id === supplier.id ? updatedSupplier : s)),
+      )
+      return
     }
 
     // Update supplier in cache and DB
@@ -1311,18 +1471,29 @@ export function useStore() {
       })
 
       // Update suppliers local cache
+      const targetSupplierId = supplierId || 'compra_directa'
       qc.setQueryData(['suppliers'], (old = []) => {
-        return old.map((s) => {
-          if (s.id === supplierId) {
-            let entries = [...(s.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash, items }]
-            if (paidCash) {
-              entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
-            }
-            return { ...s, entries }
+        const exists = old.some((s) => s.id === targetSupplierId || (targetSupplierId === 'compra_directa' && (s.id === 'compra_directa' || s.name === 'Compra Directa')))
+
+          const updated = exists
+            ? old.map((s) => {
+                if (s.id === targetSupplierId || (targetSupplierId === 'compra_directa' && (s.id === 'compra_directa' || s.name === 'Compra Directa'))) {
+                  let entries = [...(s.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash, items }]
+                  if (paidCash) {
+                    entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
+                  }
+                  return { ...s, entries }
+                }
+                return s
+              })
+            : [...old, { id: 'compra_directa', name: 'Compra Directa', category: 'General', entries: [{ id: uid(), date, type: 'factura', amount, detail, paidCash, items }] }]
+
+          const directSup = updated.find((s) => s.id === 'compra_directa' || s.name === 'Compra Directa')
+          if (directSup && typeof window !== 'undefined') {
+            localStorage.setItem('kiosko_direct_purchases', JSON.stringify(directSup.entries || []))
           }
-          return s
+          return updated
         })
-      })
 
       // Update shift movement local cache
       if (paidCash && currentShift) {

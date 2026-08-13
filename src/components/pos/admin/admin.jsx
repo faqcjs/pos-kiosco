@@ -71,13 +71,13 @@ export function Admin() {
       />
 
       {/* Barra de control: Pestañas a la izquierda, Filtros a la derecha */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex rounded-lg border border-border p-0.5 bg-muted/50 w-full sm:w-[240px] shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="flex h-10 items-center rounded-xl border border-border p-1 bg-muted/50 w-full sm:w-[240px] shrink-0 box-border shadow-2xs">
           <button
             onClick={() => setAdminTab('stats')}
-            className={`flex-1 text-center rounded-md py-1.5 text-xs font-semibold transition-all duration-200 ease-out cursor-pointer ${
+            className={`flex-1 h-full flex items-center justify-center rounded-lg text-xs font-semibold transition-all duration-200 ease-out cursor-pointer ${
               adminTab === 'stats'
-                ? 'bg-card text-foreground shadow-sm'
+                ? 'bg-card text-foreground shadow-xs font-bold'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -85,9 +85,9 @@ export function Admin() {
           </button>
           <button
             onClick={() => setAdminTab('empleados')}
-            className={`flex-1 text-center rounded-md py-1.5 text-xs font-semibold transition-all duration-200 ease-out cursor-pointer ${
+            className={`flex-1 h-full flex items-center justify-center rounded-lg text-xs font-semibold transition-all duration-200 ease-out cursor-pointer ${
               adminTab === 'empleados'
-                ? 'bg-card text-foreground shadow-sm'
+                ? 'bg-card text-foreground shadow-xs font-bold'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -507,7 +507,7 @@ function UsersTab({ state, createUser, deleteUser }) {
                   return (
                     <div key={sale.id} className="rounded-xl border border-border p-3 space-y-2 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{formatDate(sale.date)} - {formatTime(sale.date)}</span>
+                        <span className="text-muted-foreground">{formatDate(sale.date || sale.created_at || sale.createdAt)} - {formatTime(sale.date || sale.created_at || sale.createdAt)}</span>
                         <Badge tone={tone} className="text-[10px] px-1.5 py-0.5 uppercase tracking-wide">
                           {label}
                         </Badge>

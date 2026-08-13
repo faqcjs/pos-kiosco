@@ -26,8 +26,8 @@ const NAV = [
   { id: 'venta', label: 'Venta', short: 'Venta', icon: ShoppingCart },
   { id: 'caja', label: 'Caja', short: 'Caja', icon: Wallet },
   { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
+  { id: 'proveedores', label: 'Compras', short: 'Compras', icon: ShoppingCart },
   { id: 'fiar', label: 'Fiar', short: 'Fiar', icon: NotebookPen },
-  { id: 'proveedores', label: 'Proveedores', short: 'Prov.', icon: Truck },
   { id: 'admin', label: 'Admin', short: 'Admin', icon: BarChart3 },
 ]
 
