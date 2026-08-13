@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select } from '@/components/ui/kit'
 import { money, uid } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
-import { matchProduct } from '@/lib/utils'
+import { matchProduct, searchProducts } from '@/lib/utils'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
 
 export function NewPurchaseModal({
@@ -53,10 +53,19 @@ export function NewPurchaseModal({
   }, [open, initialSupplierId, editingPurchase])
 
   const productSuggestions = useMemo(() => {
-    const q = prodQuery.trim().toLowerCase()
-    if (!q) return []
-    return products.filter((p) => matchProduct(p, prodQuery)).slice(0, 6)
+    return searchProducts(products, prodQuery).slice(0, 10)
   }, [products, prodQuery])
+
+  function handleSearchKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (productSuggestions.length > 0) {
+        handleSelectSuggestion(productSuggestions[0])
+      }
+    } else if (e.key === 'Escape') {
+      setProdQuery('')
+    }
+  }
 
   const totalAmount = useMemo(() => {
     return items.reduce((sum, it) => sum + (Number(it.cost) || 0), 0)
@@ -244,28 +253,32 @@ export function NewPurchaseModal({
               <Input
                 value={prodQuery}
                 onChange={(e) => setProdQuery(e.target.value)}
-                placeholder="Buscar por nombre o código de barras..."
-                className="pl-9 h-11 text-xs sm:text-sm"
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Buscar por nombre o código de barras (Enter para agregar)..."
+                className="pl-9 h-11 text-xs sm:text-sm bg-card shadow-2xs"
               />
 
               {/* Suggestions */}
               {productSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-xl border border-border bg-card p-1 shadow-lg max-h-60 overflow-y-auto">
-                  {productSuggestions.map((p) => (
+                <div className="absolute left-0 right-0 top-full z-30 mt-1.5 rounded-xl border border-border bg-card p-1.5 shadow-2xl max-h-72 overflow-y-auto divide-y divide-border/30">
+                  {productSuggestions.map((p, idx) => (
                     <button
                       key={p.id}
                       type="button"
                       onClick={() => handleSelectSuggestion(p)}
-                      className="flex w-full items-center justify-between p-2 text-left text-xs rounded-lg hover:bg-muted active:bg-muted/80 transition-colors min-h-[44px]"
+                      className={cn(
+                        "flex w-full items-center justify-between p-2.5 text-left text-xs rounded-lg transition-colors min-h-[44px]",
+                        idx === 0 ? "bg-primary/5 hover:bg-primary/10 font-bold" : "hover:bg-muted active:bg-muted/80"
+                      )}
                     >
                       <div className="min-w-0 pr-2">
                         <p className="font-semibold text-foreground truncate">{p.name}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Stock: {p.stock} | Costo: {money(p.cost)}
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Stock actual: <span className="font-bold">{p.stock}</span> | Costo catálogo: <span className="font-bold">{money(p.cost)}</span>
                         </p>
                       </div>
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        + Agregar
+                      <Badge variant={idx === 0 ? "default" : "outline"} className="text-[10px] shrink-0 font-bold">
+                        {idx === 0 ? "↵ Seleccionar" : "+ Agregar"}
                       </Badge>
                     </button>
                   ))}

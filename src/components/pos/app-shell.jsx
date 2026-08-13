@@ -449,7 +449,7 @@ export function AppShell({
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col h-full min-h-0 overflow-hidden">
         {/* Mobile header */}
-        <header className="sticky top-0 z-30 flex flex-col gap-2 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 flex flex-col gap-2 border-b border-border bg-background px-4 py-2.5 lg:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -522,7 +522,7 @@ export function AppShell({
 
         {/* Mobile bottom nav */}
         <nav className={cn(
-          "fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden",
+          "fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-background pb-[env(safe-area-inset-bottom)] lg:hidden",
           filteredNav.length === 2 ? "grid-cols-2" : (filteredNav.length === 5 ? "grid-cols-5" : "grid-cols-6")
         )}>
           {filteredNav.map((item) => {

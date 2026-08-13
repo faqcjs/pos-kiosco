@@ -137,9 +137,9 @@ export function CargaRapida({ onClose }) {
   const profitPercentage = Number(draft.cost) > 0 ? Math.round((profitAmount / Number(draft.cost)) * 100) : 0
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 py-3 sm:px-6 backdrop-blur-md">
+      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}

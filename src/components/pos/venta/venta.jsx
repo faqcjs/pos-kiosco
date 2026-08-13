@@ -583,7 +583,7 @@ export function Venta() {
         <div className="fixed inset-0 z-40 flex flex-col lg:hidden">
           <button
             aria-label="Cerrar carrito"
-            className="flex-1 bg-foreground/40 backdrop-blur-[2px]"
+            className="flex-1 bg-black/60"
             onClick={() => setMobileCartOpen(false)}
           />
           <div className="flex max-h-[90vh] flex-col rounded-t-3xl bg-card border-t border-border overflow-hidden shadow-2xl">

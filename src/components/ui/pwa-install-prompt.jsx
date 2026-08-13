@@ -46,7 +46,7 @@ export function PwaInstallPrompt() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md animate-in fade-in slide-in-from-bottom-5 duration-300">
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-slate-900/95 p-3.5 text-white shadow-2xl backdrop-blur-md dark:bg-slate-950/95">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-slate-900 p-3.5 text-white shadow-2xl dark:bg-slate-950">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 font-bold shadow-sm">
             📱

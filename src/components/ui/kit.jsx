@@ -12,7 +12,7 @@ export function Card({ className, ...props }) {
   return (
     <div
       className={cn(
-        'rounded-2xl border border-border/80 bg-card backdrop-blur-md text-card-foreground shadow-2xs transition-all',
+        'rounded-2xl border border-border bg-card text-card-foreground shadow-xs transition-all',
         className
       )}
       {...props}
@@ -149,7 +149,7 @@ export function Modal({
       <button
         aria-label="Cerrar"
         onClick={onClose}
-        className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px] animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/60 animate-in fade-in duration-200"
       />
       <div
         className={cn(

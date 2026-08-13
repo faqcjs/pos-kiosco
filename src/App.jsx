@@ -47,7 +47,7 @@ function LoginScreen() {
           </p>
         </div>
 
-        <Card className="p-8 shadow-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+        <Card className="p-8 shadow-xl border border-border bg-card">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="username">Usuario</Label>
@@ -122,7 +122,7 @@ function BlockScreen({ currentShift, logout }) {
           </h2>
         </div>
 
-        <Card className="p-8 shadow-xl border border-border/50 bg-card/50 backdrop-blur-sm space-y-6">
+        <Card className="p-8 shadow-xl border border-border bg-card space-y-6">
           <p className="text-sm text-muted-foreground text-center leading-relaxed">
             Caja en uso por otro cajero. El turno actual fue abierto por <strong className="text-foreground">{openedBy}</strong> el <strong className="text-foreground">{openedAt}</strong>.
           </p>

@@ -345,7 +345,7 @@ export function Stock() {
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-1.5 lg:p-6">
       {offLookupLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-4 shadow-xl">
             <Loader2 className="size-5 animate-spin text-primary" />
             <span className="text-sm font-medium">Buscando en OpenFoodFacts…</span>
