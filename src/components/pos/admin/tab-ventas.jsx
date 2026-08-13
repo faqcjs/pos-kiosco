@@ -1,15 +1,16 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, MoreHorizontal, ChevronLeft, ChevronRight, BarChart2 } from 'lucide-react'
-import { Badge } from '@/components/ui/kit'
-import { money, formatDate, formatTime, formatDateTime } from '@/lib/format'
+import { Search, ChevronLeft, ChevronRight, BarChart2, Eye, Receipt, User, Calendar, CreditCard, ShoppingBag } from 'lucide-react'
+import { Badge, Modal } from '@/components/ui/kit'
+import { money, formatDateTime } from '@/lib/format'
 
 export function TabVentas({ sales }) {
   const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [selectedSales, setSelectedSales] = useState([])
+  const [selectedSaleDetail, setSelectedSaleDetail] = useState(null)
 
   const filteredSales = useMemo(() => {
     if (!sales) return []
@@ -17,9 +18,10 @@ export function TabVentas({ sales }) {
       if (!search.trim()) return true
       const query = search.toLowerCase()
       const idMatch = s.id?.toLowerCase().includes(query)
-      const userMatch = s.userName?.toLowerCase().includes(query) || s.user?.toLowerCase().includes(query)
+      const cashierName = s.cashierName || s.userName || s.soldBy || s.openedBy || s.user || ''
+      const userMatch = cashierName.toLowerCase().includes(query)
       const customerMatch = s.customerName?.toLowerCase().includes(query)
-      const itemMatch = s.items?.some((i) => i.name.toLowerCase().includes(query))
+      const itemMatch = s.items?.some((i) => i.name?.toLowerCase().includes(query))
       return idMatch || userMatch || customerMatch || itemMatch
     })
   }, [sales, search])
@@ -60,25 +62,18 @@ export function TabVentas({ sales }) {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-2xs">
-            <MoreHorizontal className="size-4 text-muted-foreground" />
-            <span>Acciones</span>
-          </button>
-
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar por ID, cliente, producto..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="h-9 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary"
-            />
-          </div>
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar por ID, cajero, cliente, producto..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="h-9 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary"
+          />
         </div>
       </div>
 
@@ -97,13 +92,13 @@ export function TabVentas({ sales }) {
               </th>
               <th className="p-3">ID</th>
               <th className="p-3">Fecha</th>
-              <th className="p-3">Usuario</th>
+              <th className="p-3">Cajero / Usuario</th>
               <th className="p-3">Cliente</th>
               <th className="p-3">Productos</th>
               <th className="p-3">Método de Pago</th>
               <th className="p-3 text-right">Total</th>
               <th className="p-3 text-center">Estado</th>
-              <th className="p-3 text-center">Acciones</th>
+              <th className="p-3 text-center">Detalle</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50 font-medium">
@@ -115,6 +110,7 @@ export function TabVentas({ sales }) {
                 const displayId = String(sale.id).slice(0, 8).toUpperCase()
                 const rawDate = sale.date || sale.created_at || sale.createdAt
                 const formattedDate = formatDateTime(rawDate) || '-'
+                const cashier = sale.cashierName || sale.userName || sale.soldBy || sale.openedBy || sale.user || 'Admin / Caja'
 
                 return (
                   <tr key={sale.id} className={isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'}>
@@ -130,7 +126,12 @@ export function TabVentas({ sales }) {
                       <span className="rounded-md bg-muted px-1.5 py-0.5">{displayId}</span>
                     </td>
                     <td className="p-3 whitespace-nowrap text-muted-foreground">{formattedDate}</td>
-                    <td className="p-3 text-foreground font-semibold">{sale.userName || sale.user || 'Sistema'}</td>
+                    <td className="p-3 text-foreground font-semibold">
+                      <span className="inline-flex items-center gap-1.5">
+                        <User className="size-3.5 text-primary shrink-0" />
+                        <span>{cashier}</span>
+                      </span>
+                    </td>
                     <td className="p-3 text-muted-foreground">{sale.customerName || 'Cliente general'}</td>
                     <td className="p-3 max-w-xs truncate text-muted-foreground" title={itemsSummary}>
                       {itemsSummary}
@@ -149,8 +150,14 @@ export function TabVentas({ sales }) {
                       </span>
                     </td>
                     <td className="p-3 text-center">
-                      <button className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-                        <MoreHorizontal className="size-4" />
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSaleDetail(sale)}
+                        className="inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold bg-muted hover:bg-primary/10 hover:text-primary active:scale-95 transition-all"
+                        title="Ver detalle del ticket"
+                      >
+                        <Eye className="size-3.5" />
+                        <span>Ver</span>
                       </button>
                     </td>
                   </tr>
@@ -211,6 +218,83 @@ export function TabVentas({ sales }) {
           </button>
         </div>
       </div>
+
+      {/* Modal de Detalle de Venta */}
+      {selectedSaleDetail && (
+        <Modal
+          open={!!selectedSaleDetail}
+          onClose={() => setSelectedSaleDetail(null)}
+          title={`Ticket #${String(selectedSaleDetail.id).slice(0, 8).toUpperCase()}`}
+          subtitle={formatDateTime(selectedSaleDetail.date || selectedSaleDetail.created_at || selectedSaleDetail.createdAt)}
+        >
+          <div className="space-y-4 text-xs">
+            {/* Grid de Información Principal */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/50">
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Cajero</p>
+                <p className="font-bold text-foreground mt-0.5">
+                  {selectedSaleDetail.cashierName || selectedSaleDetail.userName || selectedSaleDetail.soldBy || selectedSaleDetail.openedBy || selectedSaleDetail.user || 'Admin / Caja'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Cliente</p>
+                <p className="font-medium text-foreground mt-0.5">
+                  {selectedSaleDetail.customerName || 'Cliente general'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Medio de Pago</p>
+                <p className="font-bold text-primary mt-0.5 capitalize">
+                  {selectedSaleDetail.method || 'Efectivo'}
+                </p>
+              </div>
+            </div>
+
+            {/* Detalle de Productos */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between font-bold text-foreground">
+                <span className="flex items-center gap-1.5">
+                  <ShoppingBag className="size-4 text-primary" /> Productos Vendidos
+                </span>
+                <span>{selectedSaleDetail.items?.length || 0} ítems</span>
+              </div>
+
+              <div className="rounded-xl border border-border overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/60 text-[10px] uppercase tracking-wider text-muted-foreground font-bold border-b border-border">
+                    <tr>
+                      <th className="p-2.5">Producto</th>
+                      <th className="p-2.5 text-center">Cant.</th>
+                      <th className="p-2.5 text-right">Precio U.</th>
+                      <th className="p-2.5 text-right">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40 font-medium">
+                    {selectedSaleDetail.items?.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-muted/20">
+                        <td className="p-2.5 font-semibold text-foreground">{item.name}</td>
+                        <td className="p-2.5 text-center text-muted-foreground">x{item.qty}</td>
+                        <td className="p-2.5 text-right text-muted-foreground tabular-nums">{money(item.price)}</td>
+                        <td className="p-2.5 text-right font-bold text-foreground tabular-nums">{money(item.price * item.qty)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Total Final */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-primary/10 border border-primary/20">
+              <span className="font-heading font-extrabold text-foreground text-sm">Total Cobrado</span>
+              <span className="font-heading font-black text-primary text-xl tabular-nums">
+                {money(selectedSaleDetail.total)}
+              </span>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
