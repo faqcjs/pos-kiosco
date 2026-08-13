@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select } from '@/components/ui/kit'
 import { money, uid } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
-import { matchProduct, searchProducts } from '@/lib/utils'
+import { cn, matchProduct, searchProducts } from '@/lib/utils'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
 
 export function NewPurchaseModal({
