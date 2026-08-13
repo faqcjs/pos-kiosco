@@ -298,7 +298,7 @@ export function ReportsModule({
           />
         )}
 
-        {reportTab === 'ventas' && <TabVentas sales={filteredSales} />}
+        {reportTab === 'ventas' && <TabVentas sales={filteredSales} shifts={filteredShifts || shifts} />}
 
         {reportTab === 'productos' && (
           <TabProductos sales={filteredSales} products={products} />

@@ -5,12 +5,40 @@ import { Search, ChevronLeft, ChevronRight, BarChart2, Eye, Receipt, User, Calen
 import { Badge, Modal } from '@/components/ui/kit'
 import { money, formatDateTime } from '@/lib/format'
 
-export function TabVentas({ sales }) {
+export function TabVentas({ sales, shifts = [] }) {
   const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [selectedSales, setSelectedSales] = useState([])
   const [selectedSaleDetail, setSelectedSaleDetail] = useState(null)
+
+  // Map shift ID -> cashier name typed at opening/closing
+  const shiftsMap = useMemo(() => {
+    const map = {}
+    if (shifts) {
+      shifts.forEach((shift) => {
+        const name = shift.openedBy || shift.opened_by || shift.userName || shift.user
+        if (shift.id && name) {
+          map[shift.id] = name
+        }
+      })
+    }
+    return map
+  }, [shifts])
+
+  const getCashierName = (s) => {
+    if (s.shiftId && shiftsMap[s.shiftId]) return shiftsMap[s.shiftId]
+    if (s.shift_id && shiftsMap[s.shift_id]) return shiftsMap[s.shift_id]
+    return (
+      s.openedBy ||
+      s.opened_by ||
+      s.cashierName ||
+      s.userName ||
+      s.soldBy ||
+      s.user ||
+      'Desconocido'
+    )
+  }
 
   const filteredSales = useMemo(() => {
     if (!sales) return []
@@ -18,13 +46,13 @@ export function TabVentas({ sales }) {
       if (!search.trim()) return true
       const query = search.toLowerCase()
       const idMatch = s.id?.toLowerCase().includes(query)
-      const cashierName = s.cashierName || s.userName || s.soldBy || s.openedBy || s.user || ''
+      const cashierName = getCashierName(s)
       const userMatch = cashierName.toLowerCase().includes(query)
       const customerMatch = s.customerName?.toLowerCase().includes(query)
       const itemMatch = s.items?.some((i) => i.name?.toLowerCase().includes(query))
       return idMatch || userMatch || customerMatch || itemMatch
     })
-  }, [sales, search])
+  }, [sales, search, shiftsMap])
 
   const totalPages = Math.max(1, Math.ceil(filteredSales.length / pageSize))
   const paginatedSales = useMemo(() => {
@@ -92,7 +120,7 @@ export function TabVentas({ sales }) {
               </th>
               <th className="p-3">ID</th>
               <th className="p-3">Fecha</th>
-              <th className="p-3">Cajero / Usuario</th>
+              <th className="p-3">Cajero</th>
               <th className="p-3">Cliente</th>
               <th className="p-3">Productos</th>
               <th className="p-3">Método de Pago</th>
@@ -110,7 +138,7 @@ export function TabVentas({ sales }) {
                 const displayId = String(sale.id).slice(0, 8).toUpperCase()
                 const rawDate = sale.date || sale.created_at || sale.createdAt
                 const formattedDate = formatDateTime(rawDate) || '-'
-                const cashier = sale.cashierName || sale.userName || sale.soldBy || sale.openedBy || sale.user || 'Admin / Caja'
+                const cashier = getCashierName(sale)
 
                 return (
                   <tr key={sale.id} className={isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'}>
@@ -233,7 +261,7 @@ export function TabVentas({ sales }) {
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase">Cajero</p>
                 <p className="font-bold text-foreground mt-0.5">
-                  {selectedSaleDetail.cashierName || selectedSaleDetail.userName || selectedSaleDetail.soldBy || selectedSaleDetail.openedBy || selectedSaleDetail.user || 'Admin / Caja'}
+                  {getCashierName(selectedSaleDetail)}
                 </p>
               </div>
 
