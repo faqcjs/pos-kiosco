@@ -277,22 +277,22 @@ export function Proveedores() {
             <div className="space-y-6">
               {/* KPI Summary Cards for Compras */}
               <div className="grid gap-3 grid-cols-2">
-                <Card className="p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
-                  <span className="absolute top-2 right-2 text-2xl">📦</span>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <Card className="p-3 sm:p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
+                  <span className="absolute top-2 right-2 text-base sm:text-2xl opacity-60 sm:opacity-80">📦</span>
+                  <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider pr-4">
                     Compras Registradas
                   </p>
-                  <p className="mt-2 font-heading text-lg sm:text-2xl font-black text-foreground">
+                  <p className="mt-1 sm:mt-2 font-heading text-base sm:text-2xl font-black text-foreground">
                     {totalPurchasesCount}
                   </p>
                 </Card>
 
-                <Card className="p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
-                  <span className="absolute top-2 right-2 text-2xl">💳</span>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <Card className="p-3 sm:p-4 relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
+                  <span className="absolute top-2 right-2 text-base sm:text-2xl opacity-60 sm:opacity-80">💳</span>
+                  <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider pr-4">
                     Total Invertido
                   </p>
-                  <p className="mt-2 font-heading text-lg sm:text-2xl font-black tabular-nums text-foreground">
+                  <p className="mt-1 sm:mt-2 font-heading text-base sm:text-2xl font-black tabular-nums text-foreground">
                     {money(totalPurchasesAmount)}
                   </p>
                 </Card>
