@@ -248,29 +248,36 @@ export function Proveedores() {
           />
 
           {/* Navigation Tabs (Compras vs Agenda de Proveedores) */}
-          <div className="flex rounded-xl bg-muted/70 p-1 border border-border/30 w-full sm:w-fit overflow-x-auto">
-            <button
-              onClick={() => setMainTab('compras')}
-              className={cn(
-                'flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all active:scale-[0.97] whitespace-nowrap min-h-[40px]',
-                mainTab === 'compras'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <ShoppingCart className="size-4" /> Compras
-            </button>
-            <button
-              onClick={() => setMainTab('proveedores')}
-              className={cn(
-                'flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all active:scale-[0.97] whitespace-nowrap min-h-[40px]',
-                mainTab === 'proveedores'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <Truck className="size-4" /> Agenda de Proveedores ({suppliers.filter((s) => s.id !== 'compra_directa' && s.name !== 'Compra Directa').length})
-            </button>
+          <div className="space-y-1.5">
+            <div className="flex rounded-xl bg-muted/70 p-1 border border-border/30 w-full sm:w-fit overflow-x-auto">
+              <button
+                onClick={() => setMainTab('compras')}
+                className={cn(
+                  'flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all active:scale-[0.97] whitespace-nowrap min-h-[40px]',
+                  mainTab === 'compras'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <ShoppingCart className="size-4" /> Compras
+              </button>
+              <button
+                onClick={() => setMainTab('proveedores')}
+                className={cn(
+                  'flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all active:scale-[0.97] whitespace-nowrap min-h-[40px]',
+                  mainTab === 'proveedores'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Truck className="size-4" /> Agenda de Proveedores ({suppliers.filter((s) => s.id !== 'compra_directa' && s.name !== 'Compra Directa').length})
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground font-medium pl-0.5">
+              {mainTab === 'compras'
+                ? '📦 Acá realizás la carga de productos e ingreso de mercadería al stock.'
+                : '🚚 Agenda de contactos y distribuidores para realizar pedidos.'}
+            </p>
           </div>
 
           {mainTab === 'compras' ? (
