@@ -321,6 +321,18 @@ export function Stock() {
       toast('Ingresá el nombre del producto', 'error')
       return
     }
+
+    if (!draft.id && draft.barcode?.trim()) {
+      const code = draft.barcode.trim()
+      const existing = state.products.find(
+        (p) => p.barcode && p.barcode.trim().toLowerCase() === code.toLowerCase()
+      )
+      if (existing) {
+        toast(`Ya existe un producto con el código "${code}": ${existing.name}`, 'error')
+        return
+      }
+    }
+
     const u = draft.unidad === '' ? 1 : (Number(draft.unidad) || 1)
     const finalProduct = {
       ...draft,
