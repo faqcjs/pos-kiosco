@@ -148,14 +148,40 @@ function RealtimeSync() {
   useEffect(() => {
     const channel = supabase
       .channel('pos-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        qc.invalidateQueries()
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        const table = payload.table
+        switch (table) {
+          case 'products':
+            qc.invalidateQueries({ queryKey: ['products'] })
+            break
+          case 'product_batches':
+            qc.invalidateQueries({ queryKey: ['product_batches'] })
+            qc.invalidateQueries({ queryKey: ['products'] })
+            break
+          case 'sales':
+            qc.invalidateQueries({ queryKey: ['sales'] })
+            break
+          case 'shifts':
+            qc.invalidateQueries({ queryKey: ['shifts'] })
+            break
+          case 'customers':
+            qc.invalidateQueries({ queryKey: ['customers'] })
+            break
+          case 'suppliers':
+            qc.invalidateQueries({ queryKey: ['suppliers'] })
+            break
+          case 'users':
+            qc.invalidateQueries({ queryKey: ['users'] })
+            break
+          default:
+            break
+        }
       })
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [qc])
   return null
 }
 
@@ -167,6 +193,53 @@ export function StoreProvider({ children }) {
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   )
+}
+
+// --- Hook for date-range filtered sales queries (e.g. Admin reports) ---
+export function useSalesQuery({ dateFrom, dateTo, enabled = true } = {}) {
+  return useQuery({
+    queryKey: ['sales', dateFrom || 'all-from', dateTo || 'all-to'],
+    queryFn: async () => {
+      const allSales = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        let query = supabase
+          .from('sales')
+          .select('*')
+          .order('date', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (dateFrom) {
+          const startIso = new Date(`${dateFrom}T00:00:00`).toISOString()
+          query = query.gte('date', startIso)
+        }
+        if (dateTo) {
+          const endIso = new Date(`${dateTo}T23:59:59.999`).toISOString()
+          query = query.lte('date', endIso)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+
+        if (!data || data.length === 0) {
+          hasMore = false
+        } else {
+          allSales.push(...data)
+          if (data.length < pageSize) {
+            hasMore = false
+          } else {
+            page++
+          }
+        }
+      }
+
+      return allSales
+    },
+    enabled,
+  })
 }
 
 // --- useStore Unified Hook ---
@@ -260,10 +333,22 @@ export function useStore() {
     },
   })
 
+  const isAdmin = currentUser?.role === 'administrador'
+
+  const salesQueryStartDate = useMemo(() => {
+    const now = new Date()
+    if (isAdmin) {
+      // First day of current month at 00:00:00 local time
+      return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString()
+    }
+    // Start of today at 00:00:00 local time
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString()
+  }, [isAdmin])
+
   const { data: sales = [], isLoading: loadingSales } = useQuery({
-    queryKey: ['sales'],
+    queryKey: ['sales', isAdmin ? 'admin-month' : 'cajero-today'],
     queryFn: async () => {
-      let allSales = []
+      const allSales = []
       let page = 0
       const pageSize = 1000
       let hasMore = true
@@ -272,6 +357,7 @@ export function useStore() {
         const { data, error } = await supabase
           .from('sales')
           .select('*')
+          .gte('date', salesQueryStartDate)
           .order('date', { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1)
 
@@ -337,32 +423,14 @@ export function useStore() {
   const { data: shifts = [], isLoading: loadingShifts } = useQuery({
     queryKey: ['shifts'],
     queryFn: async () => {
-      let allShifts = []
-      let page = 0
-      const pageSize = 1000
-      let hasMore = true
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('*')
+        .order('openedAt', { ascending: false })
+        .limit(100)
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('shifts')
-          .select('*')
-          .order('openedAt', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1)
-
-        if (error) throw error
-        if (!data || data.length === 0) {
-          hasMore = false
-        } else {
-          allShifts.push(...data)
-          if (data.length < pageSize) {
-            hasMore = false
-          } else {
-            page++
-          }
-        }
-      }
-
-      return allShifts
+      if (error) throw error
+      return data || []
     },
   })
 
@@ -451,7 +519,11 @@ export function useStore() {
         })
       }
     }
-    qc.invalidateQueries()
+    qc.invalidateQueries({ queryKey: ['sales'] })
+    qc.invalidateQueries({ queryKey: ['products'] })
+    qc.invalidateQueries({ queryKey: ['product_batches'] })
+    qc.invalidateQueries({ queryKey: ['shifts'] })
+    qc.invalidateQueries({ queryKey: ['customers'] })
     syncingSalesRef.current = false
 
     // Check if everything is synced to notify UI
@@ -603,7 +675,11 @@ export function useStore() {
         })
       }
     }
-    qc.invalidateQueries()
+    qc.invalidateQueries({ queryKey: ['customers'] })
+    qc.invalidateQueries({ queryKey: ['suppliers'] })
+    qc.invalidateQueries({ queryKey: ['shifts'] })
+    qc.invalidateQueries({ queryKey: ['products'] })
+    qc.invalidateQueries({ queryKey: ['product_batches'] })
     syncingActionsRef.current = false
 
     // Check if everything is synced to notify UI
@@ -1750,7 +1826,7 @@ export function useStore() {
 
   const discardFailedSale = useCallback((saleId) => {
     dequeueFailedSale(saleId)
-    qc.invalidateQueries()
+    qc.invalidateQueries({ queryKey: ['sales'] })
   }, [dequeueFailedSale, qc])
 
   const retryFailedAction = useCallback((action) => {
@@ -1766,7 +1842,10 @@ export function useStore() {
 
   const discardFailedAction = useCallback((actionId) => {
     dequeueFailedAction(actionId)
-    qc.invalidateQueries()
+    qc.invalidateQueries({ queryKey: ['customers'] })
+    qc.invalidateQueries({ queryKey: ['suppliers'] })
+    qc.invalidateQueries({ queryKey: ['products'] })
+    qc.invalidateQueries({ queryKey: ['shifts'] })
   }, [dequeueFailedAction, qc])
 
   const syncOfflineData = useCallback(async () => {
