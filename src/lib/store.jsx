@@ -327,9 +327,32 @@ export function useStore() {
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('products').select('*').order('name')
-      if (error) throw error
-      return data || []
+      const allProducts = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('name')
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) {
+          hasMore = false
+        } else {
+          allProducts.push(...data)
+          if (data.length < pageSize) {
+            hasMore = false
+          } else {
+            page++
+          }
+        }
+      }
+
+      return allProducts
     },
   })
 
@@ -447,9 +470,32 @@ export function useStore() {
   const { data: productBatches = [], isLoading: loadingProductBatches } = useQuery({
     queryKey: ['product_batches'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('product_batches').select('*').order('expirationDate')
-      if (error) throw error
-      return data || []
+      const allBatches = []
+      let page = 0
+      const pageSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('product_batches')
+          .select('*')
+          .order('expirationDate')
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) {
+          hasMore = false
+        } else {
+          allBatches.push(...data)
+          if (data.length < pageSize) {
+            hasMore = false
+          } else {
+            page++
+          }
+        }
+      }
+
+      return allBatches
     },
   })
 
