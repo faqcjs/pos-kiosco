@@ -574,6 +574,11 @@ export function useStore() {
             if (error) throw error
             break
           }
+          case 'ADD_PRODUCT': {
+            const { error } = await supabase.from('products').insert([action.payload])
+            if (error) throw error
+            break
+          }
           case 'UPDATE_PRODUCT': {
             const { error } = await supabase.from('products').update(action.payload).eq('id', action.payload.id)
             if (error) throw error
@@ -1102,16 +1107,25 @@ export function useStore() {
   })
 
   // Callback wrapper definitions to preserve component APIs
-  const addProduct = useCallback((p) => {
-    addProductMutation.mutate({ ...p, id: uid() })
-  }, [addProductMutation])
+  const addProduct = useCallback(async (p, options) => {
+    const newProduct = { ...p, id: p.id || uid() }
+    if (!isOnline) {
+      const sanitized = sanitizeProduct(newProduct)
+      enqueueOfflineAction({ id: uid(), type: 'ADD_PRODUCT', payload: sanitized })
+      qc.setQueryData(['products'], (old = []) => [...old, sanitized])
+      return sanitized
+    } else {
+      return await addProductMutation.mutateAsync(newProduct, options)
+    }
+  }, [addProductMutation, isOnline, enqueueOfflineAction, qc])
 
-  const updateProduct = useCallback((p) => {
+  const updateProduct = useCallback((p, options) => {
     if (!isOnline) {
       enqueueOfflineAction({ id: uid(), type: 'UPDATE_PRODUCT', payload: p })
       qc.setQueryData(['products'], (old = []) => old.map((x) => x.id === p.id ? { ...x, ...p } : x))
+      return Promise.resolve(p)
     } else {
-      updateProductMutation.mutate(p)
+      return updateProductMutation.mutateAsync(p, options)
     }
   }, [updateProductMutation, isOnline, enqueueOfflineAction, qc])
 

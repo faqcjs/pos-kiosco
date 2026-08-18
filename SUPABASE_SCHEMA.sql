@@ -788,15 +788,15 @@ DROP POLICY IF EXISTS "Allow insert products for admin and repositor" ON public.
 DROP POLICY IF EXISTS "Allow update products for admin and repositor" ON public.products;
 DROP POLICY IF EXISTS "Allow delete products for admin and repositor" ON public.products;
 
--- Only administrators and repositors (stock managers) can create, update, or delete products
-CREATE POLICY "Allow insert products for admin and repositor" 
+-- Allow admin, repositor, and cajero to create and update products
+CREATE POLICY "Allow insert products for admin, repositor and cajero" 
     ON public.products FOR INSERT TO authenticated 
-    WITH CHECK (public.has_role('administrador', 'repositor'));
+    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
 
-CREATE POLICY "Allow update products for admin and repositor" 
+CREATE POLICY "Allow update products for admin, repositor and cajero" 
     ON public.products FOR UPDATE TO authenticated 
-    USING (public.has_role('administrador', 'repositor'))
-    WITH CHECK (public.has_role('administrador', 'repositor'));
+    USING (public.has_role('administrador', 'repositor', 'cajero'))
+    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
 
 CREATE POLICY "Allow delete products for admin and repositor" 
     ON public.products FOR DELETE TO authenticated 
@@ -806,14 +806,14 @@ CREATE POLICY "Allow delete products for admin and repositor"
 CREATE POLICY "Allow select product_batches for authenticated users" 
     ON public.product_batches FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Allow insert product_batches for admin and repositor" 
+CREATE POLICY "Allow insert product_batches for admin, repositor and cajero" 
     ON public.product_batches FOR INSERT TO authenticated 
-    WITH CHECK (public.has_role('administrador', 'repositor'));
+    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
 
-CREATE POLICY "Allow update product_batches for admin and repositor" 
+CREATE POLICY "Allow update product_batches for admin, repositor and cajero" 
     ON public.product_batches FOR UPDATE TO authenticated 
-    USING (public.has_role('administrador', 'repositor'))
-    WITH CHECK (public.has_role('administrador', 'repositor'));
+    USING (public.has_role('administrador', 'repositor', 'cajero'))
+    WITH CHECK (public.has_role('administrador', 'repositor', 'cajero'));
 
 CREATE POLICY "Allow delete product_batches for admin and repositor" 
     ON public.product_batches FOR DELETE TO authenticated 

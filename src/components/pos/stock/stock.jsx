@@ -309,12 +309,14 @@ export function Stock() {
     }
   }
 
+  const [saving, setSaving] = useState(false)
+
   function openEdit(p) {
     setDraft(p)
     setFormOpen(true)
   }
 
-  function save() {
+  async function save() {
     if (!draft.name.trim()) {
       toast('Ingresá el nombre del producto', 'error')
       return
@@ -328,14 +330,24 @@ export function Stock() {
       minStock: draft.minStock === '' ? 0 : Number(draft.minStock),
       unidad: u,
     }
-    if (draft.id) {
-      updateProduct(finalProduct)
-      toast('Producto actualizado')
-    } else {
-      addProduct(finalProduct)
-      toast('Producto agregado')
+
+    setSaving(true)
+    try {
+      if (draft.id) {
+        await updateProduct(finalProduct)
+        toast('Producto actualizado', 'success')
+      } else {
+        await addProduct(finalProduct)
+        toast('Producto agregado', 'success')
+      }
+      setFormOpen(false)
+    } catch (err) {
+      console.error('Error al guardar producto:', err)
+      const errorMsg = err?.message || 'Error al guardar el producto en la base de datos'
+      toast(errorMsg, 'error')
+    } finally {
+      setSaving(false)
     }
-    setFormOpen(false)
   }
 
   if (loadingProducts) return <StockSkeleton />
@@ -648,6 +660,7 @@ export function Stock() {
         draft={draft}
         setDraft={setDraft}
         onSave={save}
+        saving={saving}
       />
 
       <BarcodeSearchModal
@@ -671,6 +684,7 @@ function ProductFormModal({
   draft,
   setDraft,
   onSave,
+  saving,
 }) {
   const { state } = useStore()
   const isAdmin = state.currentUser?.role === 'administrador'
@@ -710,8 +724,15 @@ function ProductFormModal({
         onClose={onClose}
         title={draft.id ? 'Editar producto' : 'Nuevo producto'}
         footer={
-          <Button className="h-11 w-full" onClick={onSave}>
-            {draft.id ? 'Guardar cambios' : 'Agregar producto'}
+          <Button className="h-11 w-full" onClick={onSave} disabled={saving}>
+            {saving ? (
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="size-4 animate-spin" />
+                <span>Guardando...</span>
+              </div>
+            ) : (
+              draft.id ? 'Guardar cambios' : 'Agregar producto'
+            )}
           </Button>
         }
       >
