@@ -1,9 +1,7 @@
-'use client'
-
 import { useState, useMemo } from 'react'
 import { LayoutGrid, ShoppingBag, TrendingUp, CreditCard, Inbox } from 'lucide-react'
 import { ReportsHeader } from './reports-header'
-import { ReportsKpis } from './reports-kpis'
+import { ReportsKpis, ReportsKpisSkeleton } from './reports-kpis'
 import { TabResumen } from './tab-resumen'
 import { TabVentas } from './tab-ventas'
 import { TabProductos } from './tab-productos'
@@ -19,10 +17,43 @@ function toLocalDateStr(d = new Date()) {
   return `${year}-${month}-${day}`
 }
 
+function ReportsContentSkeleton() {
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <div className="h-5 w-40 rounded-md bg-muted/60 animate-pulse" />
+            <div className="h-4 w-24 rounded-md bg-muted/40 animate-pulse" />
+          </div>
+          <div className="h-56 w-full rounded-xl bg-muted/40 animate-pulse" />
+        </div>
+        <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4 shadow-2xs">
+          <div className="h-5 w-32 rounded-md bg-muted/60 animate-pulse" />
+          <div className="space-y-3 pt-2">
+            <div className="h-10 w-full rounded-xl bg-muted/40 animate-pulse" />
+            <div className="h-10 w-full rounded-xl bg-muted/40 animate-pulse" />
+            <div className="h-10 w-full rounded-xl bg-muted/40 animate-pulse" />
+          </div>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-border/40 bg-card/60 p-6 space-y-4 shadow-2xs">
+        <div className="h-5 w-48 rounded-md bg-muted/60 animate-pulse" />
+        <div className="space-y-2 pt-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 w-full rounded-xl bg-muted/40 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ReportsModule({
   sales = [],
   products = [],
   shifts = [],
+  isLoading = false,
   onRefresh,
   dateFrom: externalDateFrom,
   dateTo: externalDateTo,
@@ -257,12 +288,16 @@ export function ReportsModule({
       )}
 
       {/* 2. KPIs del período (Fijos superior) */}
-      <ReportsKpis
-        revenue={kpis.revenue}
-        profit={kpis.profit}
-        totalSales={kpis.totalSales}
-        averageTicket={kpis.averageTicket}
-      />
+      {isLoading ? (
+        <ReportsKpisSkeleton />
+      ) : (
+        <ReportsKpis
+          revenue={kpis.revenue}
+          profit={kpis.profit}
+          totalSales={kpis.totalSales}
+          averageTicket={kpis.averageTicket}
+        />
+      )}
 
       {/* 3. Sub-navegación por Pestañas (Pill Tabs) */}
       <div className="flex items-center gap-1 rounded-2xl border border-border/60 bg-muted/50 p-1.5 shadow-2xs overflow-x-auto no-scrollbar">
@@ -287,27 +322,31 @@ export function ReportsModule({
       </div>
 
       {/* 4. Contenido dinámico según pestaña activa */}
-      <div className="animate-in fade-in-50 duration-300">
-        {reportTab === 'resumen' && (
-          <TabResumen
-            sales={filteredSales}
-            products={products}
-            dailyData={dailyData}
-            paymentMethodsData={paymentMethodsData}
-            isSingleDay={dateFrom && dateTo && dateFrom === dateTo}
-          />
-        )}
+      {isLoading ? (
+        <ReportsContentSkeleton />
+      ) : (
+        <div className="animate-in fade-in-50 duration-300">
+          {reportTab === 'resumen' && (
+            <TabResumen
+              sales={filteredSales}
+              products={products}
+              dailyData={dailyData}
+              paymentMethodsData={paymentMethodsData}
+              isSingleDay={dateFrom && dateTo && dateFrom === dateTo}
+            />
+          )}
 
-        {reportTab === 'ventas' && <TabVentas sales={filteredSales} shifts={filteredShifts || shifts} />}
+          {reportTab === 'ventas' && <TabVentas sales={filteredSales} shifts={filteredShifts || shifts} />}
 
-        {reportTab === 'productos' && (
-          <TabProductos sales={filteredSales} products={products} />
-        )}
+          {reportTab === 'productos' && (
+            <TabProductos sales={filteredSales} products={products} />
+          )}
 
-        {reportTab === 'metodos-pago' && <TabMetodosPago sales={filteredSales} />}
+          {reportTab === 'metodos-pago' && <TabMetodosPago sales={filteredSales} />}
 
-        {reportTab === 'historial-caja' && <TabHistorialCaja shifts={filteredShifts} />}
-      </div>
+          {reportTab === 'historial-caja' && <TabHistorialCaja shifts={filteredShifts} />}
+        </div>
+      )}
     </div>
   )
 }

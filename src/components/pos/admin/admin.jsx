@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/pos/page-header'
 import { useToast } from '@/components/ui/toast'
 import { ReportsModule } from './reports-module'
 import { ReportsHeader } from './reports-header'
-import { useStore } from '@/lib/store'
+import { useStore, useSalesQuery } from '@/lib/store'
 import { money, formatDate, formatTime } from '@/lib/format'
 
 function toLocalDateStr(d = new Date()) {
@@ -36,6 +36,10 @@ export function Admin() {
   const [dateFrom, setDateFrom] = useState(firstOfMonthStr)
   const [dateTo, setDateTo] = useState(todayStr)
   const [paymentMethod, setPaymentMethod] = useState('todos')
+
+  // Query 100% of sales for the selected date range directly from Supabase
+  const { data: sales = [], isLoading: loadingSales, isFetching: fetchingSales } = useSalesQuery({ dateFrom, dateTo })
+  const isReportsLoading = loadingSales || fetchingSales
 
   const handleApplyPreset = (preset) => {
     const now = new Date()
@@ -113,12 +117,13 @@ export function Admin() {
       </div>
 
       {adminTab === 'empleados' ? (
-        <UsersTab state={state} createUser={createUser} deleteUser={deleteUser} />
+        <UsersTab state={state} sales={sales} isLoading={isReportsLoading} createUser={createUser} deleteUser={deleteUser} />
       ) : (
         <ReportsModule
-          sales={state.sales}
+          sales={sales}
           products={state.products}
           shifts={shifts}
+          isLoading={isReportsLoading}
           dateFrom={dateFrom}
           dateTo={dateTo}
           onDateFromChange={setDateFrom}
@@ -136,7 +141,7 @@ export function Admin() {
   )
 }
 
-function UsersTab({ state, createUser, deleteUser }) {
+function UsersTab({ state, sales = [], isLoading = false, createUser, deleteUser }) {
   const toast = useToast()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
@@ -160,10 +165,10 @@ function UsersTab({ state, createUser, deleteUser }) {
     const empShifts = new Set(
       allShifts.filter((s) => s.openedBy === selectedEmp).map((s) => s.id)
     )
-    return (state.sales || [])
+    return (sales || [])
       .filter((s) => empShifts.has(s.shiftId))
-      .sort((a, b) => getSaleMs(b) - getSaleMs(a))
-  }, [selectedEmp, state.sales, state.shiftHistory])
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [selectedEmp, sales, state.shiftHistory])
 
   const totalEmpSalesPages = Math.ceil((selectedEmpSales?.length || 0) / EMP_SALES_PER_PAGE) || 1
   const currentEmpSalesPage = Math.min(empSalesPage, totalEmpSalesPages)
@@ -195,7 +200,7 @@ function UsersTab({ state, createUser, deleteUser }) {
     }
     
     // Sum sales
-    for (const sale of state.sales || []) {
+    for (const sale of sales || []) {
       const u = sale.soldBy || 'admin'
       if (metrics[u]) {
         metrics[u].totalSales += sale.total
@@ -212,7 +217,7 @@ function UsersTab({ state, createUser, deleteUser }) {
     }
     
     return metrics
-  }, [activeUsers, state.sales, state.shiftHistory, state.users])
+  }, [activeUsers, sales, state.shiftHistory, state.users])
 
   // Calcular métricas agrupadas por el nombre tipeado en los turnos de caja
   const employeeMetrics = useMemo(() => {
@@ -247,7 +252,7 @@ function UsersTab({ state, createUser, deleteUser }) {
       shiftsMap[shift.id] = shift.openedBy
     }
     
-    for (const sale of state.sales || []) {
+    for (const sale of sales || []) {
       const shiftOwner = shiftsMap[sale.shiftId]
       if (shiftOwner && metrics[shiftOwner]) {
         metrics[shiftOwner].totalSales += sale.total
@@ -256,7 +261,7 @@ function UsersTab({ state, createUser, deleteUser }) {
     }
     
     return Object.values(metrics).sort((a, b) => b.totalSales - a.totalSales)
-  }, [state.shiftHistory, state.sales])
+  }, [state.shiftHistory, sales])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -291,7 +296,13 @@ function UsersTab({ state, createUser, deleteUser }) {
           </p>
         </div>
 
-        {employeeMetrics.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-3 pt-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 w-full rounded-xl bg-muted/40 animate-pulse" />
+            ))}
+          </div>
+        ) : employeeMetrics.length === 0 ? (
           <EmptyState 
             title="Sin turnos registrados" 
             description="Las estadísticas aparecerán cuando los empleados abran y cierren turnos en la caja." 
