@@ -138,7 +138,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnReconnect: false,
+      staleTime: 1000 * 60 * 30, // 30 minutes (Realtime handles live updates)
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours
     },
   },
 })
@@ -149,30 +151,121 @@ function RealtimeSync() {
     const channel = supabase
       .channel('pos-realtime')
       .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        const table = payload.table
+        const { table, eventType, new: newRow, old: oldRow } = payload
         switch (table) {
-          case 'products':
-            qc.invalidateQueries({ queryKey: ['products'] })
+          case 'products': {
+            if (eventType === 'INSERT') {
+              qc.setQueryData(['products'], (old = []) => {
+                if (old.some((p) => p.id === newRow.id)) return old
+                return [...old, newRow].sort((a, b) => a.name.localeCompare(b.name))
+              })
+            } else if (eventType === 'UPDATE') {
+              qc.setQueryData(['products'], (old = []) =>
+                old.map((p) => (p.id === newRow.id ? { ...p, ...newRow } : p))
+              )
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueryData(['products'], (old = []) => old.filter((p) => p.id !== targetId))
+            }
             break
-          case 'product_batches':
-            qc.invalidateQueries({ queryKey: ['product_batches'] })
-            qc.invalidateQueries({ queryKey: ['products'] })
+          }
+          case 'product_batches': {
+            if (eventType === 'INSERT' || eventType === 'UPDATE') {
+              qc.setQueryData(['product_batches'], (old = []) => {
+                const exists = old.some((b) => b.id === newRow.id)
+                return exists ? old.map((b) => (b.id === newRow.id ? { ...b, ...newRow } : b)) : [...old, newRow]
+              })
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueryData(['product_batches'], (old = []) => old.filter((b) => b.id !== targetId))
+            }
             break
-          case 'sales':
-            qc.invalidateQueries({ queryKey: ['sales'] })
+          }
+          case 'sales': {
+            if (eventType === 'INSERT') {
+              qc.setQueriesData({ queryKey: ['sales'] }, (old = []) => {
+                if (!Array.isArray(old)) return old
+                if (old.some((s) => s.id === newRow.id)) return old
+                return [newRow, ...old]
+              })
+            } else if (eventType === 'UPDATE') {
+              qc.setQueriesData({ queryKey: ['sales'] }, (old = []) => {
+                if (!Array.isArray(old)) return old
+                return old.map((s) => (s.id === newRow.id ? { ...s, ...newRow } : s))
+              })
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueriesData({ queryKey: ['sales'] }, (old = []) => {
+                if (!Array.isArray(old)) return old
+                return old.filter((s) => s.id !== targetId)
+              })
+            }
             break
-          case 'shifts':
-            qc.invalidateQueries({ queryKey: ['shifts'] })
+          }
+          case 'shifts': {
+            if (eventType === 'INSERT') {
+              qc.setQueryData(['shifts'], (old = []) => {
+                if (old.some((s) => s.id === newRow.id)) return old
+                return [newRow, ...old]
+              })
+            } else if (eventType === 'UPDATE') {
+              qc.setQueryData(['shifts'], (old = []) =>
+                old.map((s) => (s.id === newRow.id ? { ...s, ...newRow } : s))
+              )
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueryData(['shifts'], (old = []) => old.filter((s) => s.id !== targetId))
+            }
             break
-          case 'customers':
-            qc.invalidateQueries({ queryKey: ['customers'] })
+          }
+          case 'customers': {
+            if (eventType === 'INSERT') {
+              qc.setQueryData(['customers'], (old = []) => {
+                if (old.some((c) => c.id === newRow.id)) return old
+                return [...old, newRow].sort((a, b) => a.name.localeCompare(b.name))
+              })
+            } else if (eventType === 'UPDATE') {
+              qc.setQueryData(['customers'], (old = []) =>
+                old.map((c) => (c.id === newRow.id ? { ...c, ...newRow } : c))
+              )
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueryData(['customers'], (old = []) => old.filter((c) => c.id !== targetId))
+            }
             break
-          case 'suppliers':
-            qc.invalidateQueries({ queryKey: ['suppliers'] })
+          }
+          case 'suppliers': {
+            if (eventType === 'INSERT') {
+              qc.setQueryData(['suppliers'], (old = []) => {
+                if (old.some((s) => s.id === newRow.id)) return old
+                return [...old, newRow].sort((a, b) => a.name.localeCompare(b.name))
+              })
+            } else if (eventType === 'UPDATE') {
+              qc.setQueryData(['suppliers'], (old = []) =>
+                old.map((s) => (s.id === newRow.id ? { ...s, ...newRow } : s))
+              )
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueryData(['suppliers'], (old = []) => old.filter((s) => s.id !== targetId))
+            }
             break
-          case 'users':
-            qc.invalidateQueries({ queryKey: ['users'] })
+          }
+          case 'users': {
+            if (eventType === 'INSERT') {
+              qc.setQueryData(['users'], (old = []) => {
+                if (old.some((u) => u.id === newRow.id)) return old
+                return [...old, newRow]
+              })
+            } else if (eventType === 'UPDATE') {
+              qc.setQueryData(['users'], (old = []) =>
+                old.map((u) => (u.id === newRow.id ? { ...u, ...newRow } : u))
+              )
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueryData(['users'], (old = []) => old.filter((u) => u.id !== targetId))
+            }
             break
+          }
           default:
             break
         }
@@ -783,7 +876,14 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: (newProd) => {
+      if (newProd) {
+        qc.setQueryData(['products'], (old = []) => {
+          if (old.some((p) => p.id === newProd.id)) return old
+          return [...old, newProd].sort((a, b) => a.name.localeCompare(b.name))
+        })
+      }
+    },
   })
 
   const updateProductMutation = useMutation({
@@ -794,7 +894,13 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: (updatedProd) => {
+      if (updatedProd) {
+        qc.setQueryData(['products'], (old = []) =>
+          old.map((p) => (p.id === updatedProd.id ? { ...p, ...updatedProd } : p))
+        )
+      }
+    },
   })
 
   const deleteProductMutation = useMutation({
@@ -803,7 +909,9 @@ export function useStore() {
       if (error) throw error
       return id
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: (deletedId) => {
+      qc.setQueryData(['products'], (old = []) => old.filter((p) => p.id !== deletedId))
+    },
   })
 
   const adjustStockMutation = useMutation({
@@ -815,7 +923,13 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: (updatedProd) => {
+      if (updatedProd) {
+        qc.setQueryData(['products'], (old = []) =>
+          old.map((p) => (p.id === updatedProd.id ? { ...p, ...updatedProd } : p))
+        )
+      }
+    },
   })
 
   const toggleMostSoldMutation = useMutation({
@@ -824,7 +938,13 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: (updatedProd) => {
+      if (updatedProd) {
+        qc.setQueryData(['products'], (old = []) =>
+          old.map((p) => (p.id === updatedProd.id ? { ...p, ...updatedProd } : p))
+        )
+      }
+    },
     onError: (err) => console.error('toggleMostSold error:', err),
   })
 
@@ -834,9 +954,13 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['product_batches'] })
-      qc.invalidateQueries({ queryKey: ['products'] })
+    onSuccess: (batch) => {
+      if (batch) {
+        qc.setQueryData(['product_batches'], (old = []) => {
+          const exists = old.some((b) => b.id === batch.id)
+          return exists ? old.map((b) => (b.id === batch.id ? { ...b, ...batch } : b)) : [...old, batch]
+        })
+      }
     },
   })
 
@@ -876,8 +1000,13 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
-    onError: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
+    onSuccess: (closedShift) => {
+      if (closedShift) {
+        qc.setQueryData(['shifts'], (old = []) =>
+          old.map((s) => (s.id === closedShift.id ? closedShift : s))
+        )
+      }
+    },
   })
 
   const addMovementMutation = useMutation({
@@ -892,7 +1021,13 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
+    onSuccess: (updatedShift) => {
+      if (updatedShift) {
+        qc.setQueryData(['shifts'], (old = []) =>
+          old.map((s) => (s.id === updatedShift.id ? updatedShift : s))
+        )
+      }
+    },
   })
 
   const addCustomerMutation = useMutation({
@@ -901,7 +1036,14 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+    onSuccess: (newCust) => {
+      if (newCust) {
+        qc.setQueryData(['customers'], (old = []) => {
+          if (old.some((c) => c.id === newCust.id)) return old
+          return [...old, newCust].sort((a, b) => a.name.localeCompare(b.name))
+        })
+      }
+    },
   })
 
   const registerCustomerPaymentMutation = useMutation({
@@ -916,9 +1058,24 @@ export function useStore() {
       if (error) throw error
       return { customerId, amount, date, shiftId }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['customers'] })
-      qc.invalidateQueries({ queryKey: ['shifts'] })
+    onSuccess: (res) => {
+      if (res?.shiftId) {
+        qc.setQueryData(['shifts'], (old = []) =>
+          old.map((s) => {
+            if (s.id === res.shiftId) {
+              const mov = {
+                id: uid(),
+                date: res.date,
+                type: 'ingreso',
+                amount: Math.abs(res.amount),
+                reason: 'Pago de cuenta corriente',
+              }
+              return { ...s, movements: [...(s.movements || []), mov] }
+            }
+            return s
+          })
+        )
+      }
     },
   })
 
@@ -928,7 +1085,9 @@ export function useStore() {
       if (error) throw error
       return id
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+    onSuccess: (deletedId) => {
+      qc.setQueryData(['customers'], (old = []) => old.filter((c) => c.id !== deletedId))
+    },
   })
 
 
@@ -938,7 +1097,14 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+    onSuccess: (newSup) => {
+      if (newSup) {
+        qc.setQueryData(['suppliers'], (old = []) => {
+          if (old.some((s) => s.id === newSup.id)) return old
+          return [...old, newSup].sort((a, b) => a.name.localeCompare(b.name))
+        })
+      }
+    },
   })
 
   const updateSupplierMutation = useMutation({
@@ -947,7 +1113,13 @@ export function useStore() {
       if (error) throw error
       return data[0]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+    onSuccess: (updatedSup) => {
+      if (updatedSup) {
+        qc.setQueryData(['suppliers'], (old = []) =>
+          old.map((s) => (s.id === updatedSup.id ? { ...s, ...updatedSup } : s))
+        )
+      }
+    },
   })
 
   const deleteSupplierMutation = useMutation({
@@ -956,7 +1128,9 @@ export function useStore() {
       if (error) throw error
       return id
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
+    onSuccess: (deletedId) => {
+      qc.setQueryData(['suppliers'], (old = []) => old.filter((s) => s.id !== deletedId))
+    },
   })
 
   const receiveGoodsMutation = useMutation({
@@ -1024,12 +1198,51 @@ export function useStore() {
           }
           return updated
         })
-      } else {
-        qc.invalidateQueries({ queryKey: ['suppliers'] })
       }
-      qc.invalidateQueries({ queryKey: ['shifts'] })
-      qc.invalidateQueries({ queryKey: ['products'] })
-      qc.invalidateQueries({ queryKey: ['product_batches'] })
+
+      // Surgical update for received product stock and costs
+      if (result.items && result.items.length > 0) {
+        const itemMap = new Map()
+        for (const item of result.items) {
+          if (item.productId) {
+            itemMap.set(item.productId, item)
+          }
+        }
+        qc.setQueryData(['products'], (old = []) =>
+          old.map((p) => {
+            const it = itemMap.get(p.id)
+            if (it) {
+              const addedUnits = Number(it.totalUnits) || 0
+              const unitCost = Number(((it.cost || 0) / (addedUnits || 1)).toFixed(2))
+              return {
+                ...p,
+                cost: unitCost > 0 ? unitCost : p.cost,
+                stock: (Number(p.stock) || 0) + addedUnits,
+              }
+            }
+            return p
+          })
+        )
+      }
+
+      // Surgical update for shift movements if cash purchase
+      if (result.paidCash && result.shiftId) {
+        qc.setQueryData(['shifts'], (old = []) =>
+          old.map((s) => {
+            if (s.id === result.shiftId) {
+              const mov = {
+                id: uid(),
+                date: result.date,
+                type: 'pago_proveedor',
+                amount: -Math.abs(result.amount),
+                reason: `Pago mercadería: ${result.detail || 'Factura'}`,
+              }
+              return { ...s, movements: [...(s.movements || []), mov] }
+            }
+            return s
+          })
+        )
+      }
     },
   })
 
@@ -1046,9 +1259,24 @@ export function useStore() {
       if (error) throw error
       return { supplierId, amount, fromCash, date, shiftId }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['suppliers'] })
-      qc.invalidateQueries({ queryKey: ['shifts'] })
+    onSuccess: (res) => {
+      if (res?.fromCash && res?.shiftId) {
+        qc.setQueryData(['shifts'], (old = []) =>
+          old.map((s) => {
+            if (s.id === res.shiftId) {
+              const mov = {
+                id: uid(),
+                date: res.date,
+                type: 'pago_proveedor',
+                amount: -Math.abs(res.amount),
+                reason: 'Pago a proveedor',
+              }
+              return { ...s, movements: [...(s.movements || []), mov] }
+            }
+            return s
+          })
+        )
+      }
     },
   })
 
@@ -1096,12 +1324,51 @@ export function useStore() {
         shiftId: currentShift.id,
       }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sales'] })
-      qc.invalidateQueries({ queryKey: ['products'] })
-      qc.invalidateQueries({ queryKey: ['shifts'] })
-      qc.invalidateQueries({ queryKey: ['customers'] })
-      qc.invalidateQueries({ queryKey: ['product_batches'] })
+    onSuccess: (newSale) => {
+      // 1. Prepend sale to local sales queries
+      qc.setQueriesData({ queryKey: ['sales'] }, (old = []) => {
+        if (!Array.isArray(old)) return old
+        if (old.some((s) => s.id === newSale.id)) return old
+        return [newSale, ...old]
+      })
+
+      // 2. Subtract sold stock from local products
+      if (newSale?.items && newSale.items.length > 0) {
+        const itemDeltas = new Map()
+        for (const it of newSale.items) {
+          if (it.productId) {
+            itemDeltas.set(it.productId, (itemDeltas.get(it.productId) || 0) + (it.qty || 1))
+          }
+        }
+        qc.setQueryData(['products'], (old = []) =>
+          old.map((p) => {
+            const qtySold = itemDeltas.get(p.id)
+            if (qtySold) {
+              return { ...p, stock: Math.max(0, (Number(p.stock) || 0) - qtySold) }
+            }
+            return p
+          })
+        )
+      }
+
+      // 3. If cash sale, add shift movement
+      if (newSale?.method === 'efectivo' && newSale?.shiftId) {
+        qc.setQueryData(['shifts'], (old = []) =>
+          old.map((s) => {
+            if (s.id === newSale.shiftId) {
+              const mov = {
+                id: uid(),
+                date: newSale.date,
+                type: 'venta',
+                amount: newSale.total,
+                reason: `Venta #${newSale.id.slice(-6)}`,
+              }
+              return { ...s, movements: [...(s.movements || []), mov] }
+            }
+            return s
+          })
+        )
+      }
     },
   })
 
@@ -1140,7 +1407,14 @@ export function useStore() {
       if (profileError) throw profileError
       return profile
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: (newUser) => {
+      if (newUser) {
+        qc.setQueryData(['users'], (old = []) => {
+          if (old.some((u) => u.id === newUser.id)) return old
+          return [...old, newUser]
+        })
+      }
+    },
   })
 
   const deleteUserMutation = useMutation({
@@ -1149,7 +1423,9 @@ export function useStore() {
       if (error) throw error
       return id
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: (deletedId) => {
+      qc.setQueryData(['users'], (old = []) => old.filter((u) => u.id !== deletedId))
+    },
   })
 
   // Callback wrapper definitions to preserve component APIs
