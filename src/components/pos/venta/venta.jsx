@@ -12,6 +12,7 @@ import { cn, matchProduct, normalizeText } from '@/lib/utils'
 import { PaymentModal } from './payment-modal'
 import { ScannerModal } from './scanner-modal'
 import { ExtrasModal } from './extras-modal'
+import { useBarcodeScanner } from '@/lib/use-barcode-scanner'
 
 const LOCAL_CATEGORIES = ['Todos', ...CATEGORIES]
 const LOCAL_CATEGORY_ICON = CATEGORY_ICON
@@ -278,15 +279,25 @@ export function Venta() {
   }
 
   function handleScan(code) {
-    const prod = state.products.find((p) => p.barcode === code)
+    const trimmed = (code || '').trim()
+    if (!trimmed) return
+
+    const prod = state.products.find(
+      (p) => p.barcode && p.barcode.trim().toLowerCase() === trimmed.toLowerCase()
+    )
     if (prod) {
       addProductToCart(prod)
       toast(`Agregado: ${prod.name}`)
       setScannerOpen(false)
     } else {
-      toast(`Código no encontrado: ${code}`, 'error')
+      toast(`Código no encontrado: ${trimmed}`, 'error')
     }
   }
+
+  useBarcodeScanner({
+    onScan: handleScan,
+    enabled: !payOpen && !extrasModalOpen && !scannerOpen,
+  })
 
   async function handleConfirmSale(args) {
     setIsSaving(true)

@@ -10,6 +10,7 @@ import { formatDateTime, money, uid } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
 import { cn, matchProduct } from '@/lib/utils'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
+import { useBarcodeScanner } from '@/lib/use-barcode-scanner'
 
 import { PurchasesList } from '@/components/pos/compras/purchases-list'
 import { NewPurchaseModal } from '@/components/pos/compras/new-purchase-modal'
@@ -874,7 +875,11 @@ function SupplierDetail({
 
   function handleScan(code) {
     setScannerOpen(false)
-    const prod = state.products.find((p) => p.barcode === code)
+    const trimmed = (code || '').trim()
+    if (!trimmed) return
+    const prod = state.products.find(
+      (p) => p.barcode && p.barcode.trim().toLowerCase() === trimmed.toLowerCase()
+    )
     if (prod) {
       // Agregar directamente a la lista de recibo
       const existing = items.find((it) => it.productId === prod.id)
@@ -913,6 +918,11 @@ function SupplierDetail({
       toast('Producto no encontrado en el catálogo', 'error')
     }
   }
+
+  useBarcodeScanner({
+    onScan: handleScan,
+    enabled: receiveOpen && step === 2 && !scannerOpen,
+  })
 
   function submitReceive() {
     if (!canReceive) {

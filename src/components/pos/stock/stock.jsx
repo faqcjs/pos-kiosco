@@ -12,6 +12,7 @@ import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
 import { cn, matchProduct } from '@/lib/utils'
 import { fetchOpenFoodFacts } from '@/lib/open-food-facts'
+import { useBarcodeScanner } from '@/lib/use-barcode-scanner'
 
 const EMPTY = {
   barcode: '',
@@ -176,11 +177,17 @@ export function Stock() {
 
   function handleStockScan(code) {
     setStockScannerOpen(false)
-    if (code) {
-      setQuery(code)
-      toast(`Buscando código: ${code}`, 'success')
+    const trimmed = (code || '').trim()
+    if (trimmed) {
+      setQuery(trimmed)
+      toast(`Buscando código: ${trimmed}`, 'success')
     }
   }
+
+  useBarcodeScanner({
+    onScan: handleStockScan,
+    enabled: !formOpen && !barcodeSearchOpen && !stockScannerOpen,
+  })
   const [offLookupLoading, setOffLookupLoading] = useState(false)
   const [filterAlertsOnly, setFilterAlertsOnly] = useState(false)
 
@@ -729,6 +736,17 @@ function ProductFormModal({
     })
   }
 
+  useBarcodeScanner({
+    onScan: (code) => {
+      const trimmed = (code || '').trim()
+      if (trimmed) {
+        setDraft((prev) => ({ ...prev, barcode: trimmed }))
+        lookupBarcode(trimmed)
+      }
+    },
+    enabled: open && !scannerOpen,
+  })
+
   return (
     <>
       <Modal
@@ -969,6 +987,17 @@ function BarcodeSearchModal({
     onSelectBarcode(barcode.trim())
     setBarcode('')
   }
+
+  useBarcodeScanner({
+    onScan: (code) => {
+      const trimmed = (code || '').trim()
+      if (trimmed) {
+        onSelectBarcode(trimmed)
+        setBarcode('')
+      }
+    },
+    enabled: open && !scannerOpen,
+  })
 
   return (
     <>

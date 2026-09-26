@@ -8,6 +8,7 @@ import { money, uid } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
 import { cn, matchProduct, searchProducts } from '@/lib/utils'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
+import { useBarcodeScanner } from '@/lib/use-barcode-scanner'
 
 export function NewPurchaseModal({
   open,
@@ -105,13 +106,22 @@ export function NewPurchaseModal({
 
   function handleScan(code) {
     setScannerOpen(false)
-    const prod = products.find((p) => p.barcode === code)
+    const trimmed = (code || '').trim()
+    if (!trimmed) return
+    const prod = products.find(
+      (p) => p.barcode && p.barcode.trim().toLowerCase() === trimmed.toLowerCase()
+    )
     if (prod) {
       handleSelectSuggestion(prod)
     } else {
       toast('Producto no encontrado en el catálogo', 'error')
     }
   }
+
+  useBarcodeScanner({
+    onScan: handleScan,
+    enabled: open && !scannerOpen,
+  })
 
   function handleRemoveItem(id) {
     setItems(items.filter((it) => it.id !== id))
