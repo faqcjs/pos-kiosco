@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { Modal, Select } from '@/components/ui/kit'
 import { money } from '@/lib/format'
+import { buildProductsMap, getSaleLineCosts } from '@/lib/sale-cost'
 
 export function TabProductos({ sales, products }) {
   // Estado para filtros de Productos
@@ -81,28 +82,20 @@ export function TabProductos({ sales, products }) {
     if (!sales) return []
     const map = new Map()
 
-    const prodCatalogMap = new Map()
-    if (products) {
-      products.forEach((p) => {
-        if (p.id) prodCatalogMap.set(p.id, p)
-        if (p.name) prodCatalogMap.set(p.name, p)
-      })
-    }
+    const productsMap = buildProductsMap(products)
 
     sales.forEach((s) => {
-      s.items?.forEach((item) => {
+      const lineCosts = getSaleLineCosts(s, productsMap)
+
+      s.items?.forEach((item, index) => {
         const key = item.name
         const prev = map.get(key) || { name: item.name, qty: 0, revenue: 0, cost: 0 }
         const itemQty = Number(item.qty) || 1
         const itemPrice = Number(item.price) || 0
-        const prodObj = prodCatalogMap.get(item.productId) || prodCatalogMap.get(item.name)
-        const unitCost = item.cost ?? prodObj?.cost ?? 0
-        const itemRev = itemPrice * itemQty
-        const itemCost = unitCost * itemQty
 
         prev.qty += itemQty
-        prev.revenue += itemRev
-        prev.cost += itemCost
+        prev.revenue += itemPrice * itemQty
+        prev.cost += lineCosts[index] || 0
         map.set(key, prev)
       })
     })

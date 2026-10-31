@@ -156,6 +156,8 @@ CREATE UNIQUE INDEX shifts_only_one_open ON public.shifts (status) WHERE (status
 
 -- Drop old function signatures to prevent duplicates
 DROP FUNCTION IF EXISTS public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ, TEXT, NUMERIC);
 DROP FUNCTION IF EXISTS public.register_customer_payment_rpc(TEXT, NUMERIC, TIMESTAMPTZ);
 DROP FUNCTION IF EXISTS public.receive_goods_rpc(TEXT, NUMERIC, TEXT, BOOLEAN, TIMESTAMPTZ);
 DROP FUNCTION IF EXISTS public.register_supplier_payment_rpc(TEXT, NUMERIC, BOOLEAN, TIMESTAMPTZ);
@@ -278,10 +280,12 @@ CREATE OR REPLACE FUNCTION public.complete_sale_rpc(
     p_cost NUMERIC,
     p_sold_by TEXT,
     p_date TIMESTAMPTZ,
-    p_shift_id TEXT
-) RETURNS VOID AS $$
+    p_shift_id TEXT,
+    p_discount NUMERIC DEFAULT 0
+) RETURNS VOID AS $
 DECLARE
     item RECORD;
+    v_subtotal NUMERIC := 0;
     v_total NUMERIC := 0;
     v_current_stock NUMERIC;
     active_shift RECORD;
@@ -319,7 +323,7 @@ BEGIN
     -- 2. Validate stock levels and execute decrement
     FOR item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(id TEXT, "productId" TEXT, name TEXT, price NUMERIC, qty NUMERIC)
     LOOP
-        v_total := v_total + (item.price * item.qty);
+        v_subtotal := v_subtotal + (item.price * item.qty);
         
         IF item."productId" IS NOT NULL THEN
             DECLARE
@@ -388,7 +392,14 @@ BEGIN
         END IF;
     END LOOP;
 
-    -- 3. Insert Sale including shiftId
+    -- 3. Calculate final total applying validated discount
+    p_discount := COALESCE(p_discount, 0);
+    IF p_discount < 0 OR p_discount > v_subtotal THEN
+        RAISE EXCEPTION 'El descuento no puede ser negativo ni mayor al subtotal.';
+    END IF;
+    v_total := v_subtotal - p_discount;
+
+    -- 4. Insert Sale including shiftId
     INSERT INTO public.sales (id, date, created_at, items, total, method, "customerId", "cashReceived", change, cost, "soldBy", "shiftId")
     VALUES (p_sale_id, p_date, p_date, p_items, v_total, p_method, p_customer_id, p_cash_received, p_change, p_cost, p_sold_by, p_shift_id);
 
@@ -441,8 +452,8 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Revocar ejecución pública de la función y habilitarla solo para autenticados
-REVOKE EXECUTE ON FUNCTION public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ, TEXT) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ, TEXT, NUMERIC) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ, TEXT, NUMERIC) TO authenticated;
 
 -- 2. Función atómica para registro de pagos de clientes
 CREATE OR REPLACE FUNCTION public.register_customer_payment_rpc(
@@ -583,9 +594,9 @@ BEGIN
                         v_calculated_unit_cost := 0;
                     END IF;
 
-                    -- Update product cost
+                    -- Update product cost (keep current cost if line has no cost)
                     UPDATE public.products 
-                    SET cost = v_calculated_unit_cost
+                    SET cost = CASE WHEN v_calculated_unit_cost > 0 THEN v_calculated_unit_cost ELSE cost END
                     WHERE id = item."productId";
 
                     IF NOT v_control_lotes THEN

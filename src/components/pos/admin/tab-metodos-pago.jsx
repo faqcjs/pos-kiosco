@@ -3,14 +3,16 @@
 import { useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { money } from '@/lib/format'
+import { buildProductsMap, getSaleCost } from '@/lib/sale-cost'
 
 const DONUT_COLORS = ['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)', 'var(--color-chart-6)']
 
-export function TabMetodosPago({ sales }) {
+export function TabMetodosPago({ sales, products }) {
   // Datos calculados por medio de pago
   const methodStats = useMemo(() => {
     if (!sales) return []
     const map = {}
+    const productsMap = buildProductsMap(products)
 
     sales.forEach((s) => {
       const method = s.method || 'efectivo'
@@ -36,7 +38,7 @@ export function TabMetodosPago({ sales }) {
       }
       map[method].count += 1
       map[method].revenue += s.total || 0
-      map[method].cost += s.cost || 0
+      map[method].cost += getSaleCost(s, productsMap)
     })
 
     return Object.values(map).map((m) => ({
@@ -44,7 +46,7 @@ export function TabMetodosPago({ sales }) {
       profit: m.revenue - m.cost,
       avgTicket: m.count > 0 ? m.revenue / m.count : 0,
     }))
-  }, [sales])
+  }, [sales, products])
 
   const totalSalesCount = useMemo(() => {
     return methodStats.reduce((sum, m) => sum + m.count, 0)

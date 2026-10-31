@@ -1,12 +1,13 @@
 'use client'
 
-import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Minus, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, Camera, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Minus, Pencil, Plus, Search, Trash2, Package } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input, Label, Modal, Select, Skeleton } from '@/components/ui/kit'
 import { useToast } from '@/components/ui/toast'
 import { PageHeader } from '@/components/pos/page-header'
 import { ScannerModal } from '@/components/pos/venta/scanner-modal'
+import { CombosModal } from './combos-modal'
 import { money } from '@/lib/format'
 import { useStore } from '@/lib/store'
 import { CATEGORIES, CATEGORY_ICON } from '@/lib/types'
@@ -173,6 +174,7 @@ export function Stock() {
   const [draft, setDraft] = useState(EMPTY)
   const [barcodeSearchOpen, setBarcodeSearchOpen] = useState(false)
   const [stockScannerOpen, setStockScannerOpen] = useState(false)
+  const [combosModalOpen, setCombosModalOpen] = useState(false)
   const [expandedProductId, setExpandedProductId] = useState(null)
 
   function handleStockScan(code) {
@@ -386,10 +388,20 @@ export function Stock() {
         title="Stock"
         description="Catálogo e inventario de productos."
         action={
-          <Button onClick={openNew}>
-            <Plus className="size-4" />
-            Nuevo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCombosModalOpen(true)}
+              className="flex items-center gap-1.5 border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 cursor-pointer"
+            >
+              <Package className="size-4 text-purple-600" />
+              Gestor de Combos
+            </Button>
+            <Button onClick={openNew}>
+              <Plus className="size-4" />
+              Nuevo
+            </Button>
+          </div>
         }
       />
 
@@ -589,7 +601,7 @@ export function Stock() {
               <span>Producto</span>
               <span className="text-right">Costo</span>
               <span className="text-right">Venta</span>
-              <span className="text-right">Margen</span>
+              <span className="text-right" title="Markup sobre costo: (Precio - Costo) / Costo">Markup</span>
             </div>
             <div className="divide-y divide-border">
               {paginated.map((p) => (
@@ -692,6 +704,11 @@ export function Stock() {
         open={stockScannerOpen}
         onClose={() => setStockScannerOpen(false)}
         onDetect={handleStockScan}
+      />
+
+      <CombosModal
+        open={combosModalOpen}
+        onClose={() => setCombosModalOpen(false)}
       />
     </div>
   )

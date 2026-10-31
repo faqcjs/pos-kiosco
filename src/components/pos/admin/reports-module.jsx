@@ -7,6 +7,7 @@ import { TabVentas } from './tab-ventas'
 import { TabProductos } from './tab-productos'
 import { TabMetodosPago } from './tab-metodos-pago'
 import { TabHistorialCaja } from './tab-historial-caja'
+import { buildProductsMap, getSaleCost } from '@/lib/sale-cost'
 
 function toLocalDateStr(d = new Date()) {
   const date = new Date(d)
@@ -65,27 +66,8 @@ export function ReportsModule({
 }) {
   const [reportTab, setReportTab] = useState('resumen')
 
-  // Map for fast product cost lookup
-  const productsMap = useMemo(() => {
-    const map = new Map()
-    if (products) {
-      products.forEach((p) => {
-        if (p.id) map.set(p.id, p)
-        if (p.name) map.set(p.name, p)
-      })
-    }
-    return map
-  }, [products])
-
-  // Helper for sale cost
-  const getSaleCost = (s) => {
-    if (typeof s.cost === 'number' && s.cost > 0) return s.cost
-    if (!s.items || s.items.length === 0) return 0
-    return s.items.reduce((sum, item) => {
-      const unitCost = item.cost ?? (item.productId ? productsMap.get(item.productId)?.cost : 0) ?? (productsMap.get(item.name)?.cost) ?? 0
-      return sum + unitCost * (item.qty || 1)
-    }, 0)
-  }
+  // Productos por id para consultar costos del catálogo vía helper centralizado
+  const productsMap = useMemo(() => buildProductsMap(products), [products])
 
   // Fechas por defecto si no se reciben props externas
   const todayStr = useMemo(() => toLocalDateStr(new Date()), [])
@@ -170,7 +152,7 @@ export function ReportsModule({
 
     filteredSales.forEach((s) => {
       revenue += s.total || 0
-      cost += getSaleCost(s)
+      cost += getSaleCost(s, productsMap)
     })
 
     const profit = revenue - cost
@@ -199,7 +181,7 @@ export function ReportsModule({
         const blockHour = Math.floor(hour / 2) * 2
         const label = `${String(blockHour).padStart(2, '0')}:00`
         const prev = map.get(label) || { label, ventas: 0, ganancia: 0 }
-        const saleCost = getSaleCost(s)
+        const saleCost = getSaleCost(s, productsMap)
         prev.ventas += s.total || 0
         prev.ganancia += (s.total || 0) - saleCost
         map.set(label, prev)
@@ -233,7 +215,7 @@ export function ReportsModule({
       const key = toLocalDateStr(dateObj)
       const label = dateObj.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }).replace('.', '')
       const prev = map.get(key) || { label, ventas: 0, ganancia: 0 }
-      const saleCost = getSaleCost(s)
+      const saleCost = getSaleCost(s, productsMap)
       prev.ventas += s.total || 0
       prev.ganancia += (s.total || 0) - saleCost
       map.set(key, prev)
@@ -342,7 +324,7 @@ export function ReportsModule({
             <TabProductos sales={filteredSales} products={products} />
           )}
 
-          {reportTab === 'metodos-pago' && <TabMetodosPago sales={filteredSales} />}
+          {reportTab === 'metodos-pago' && <TabMetodosPago sales={filteredSales} products={products} />}
 
           {reportTab === 'historial-caja' && <TabHistorialCaja shifts={filteredShifts} />}
         </div>

@@ -6,6 +6,8 @@ import { persist } from 'zustand/middleware'
 import { supabase } from './supabase'
 import { uid } from './format'
 import { SEED_PRODUCTS, SEED_CUSTOMERS, SEED_SUPPLIERS, generateMockSales } from './seed'
+import { calculateComboMetrics } from './promotions'
+import { freezeItemCosts, sumItemsCost } from './sale-cost'
 
 function sanitizeProduct(p) {
   return {
@@ -19,7 +21,8 @@ function sanitizeProduct(p) {
     "minStock": Number(p.minStock) || 0,
     isMostSold: !!p.isMostSold,
     unidad: Number(p.unidad) || 1,
-    controlLotes: !!p.controlLotes
+    controlLotes: !!p.controlLotes,
+    isCombo: !!p.isCombo
   }
 }
 
@@ -178,6 +181,30 @@ function RealtimeSync() {
             } else if (eventType === 'DELETE') {
               const targetId = oldRow?.id || newRow?.id
               qc.setQueryData(['product_batches'], (old = []) => old.filter((b) => b.id !== targetId))
+            }
+            break
+          }
+          case 'combo_items': {
+            if (eventType === 'INSERT' || eventType === 'UPDATE') {
+              qc.setQueryData(['combo_items'], (old = []) => {
+                const exists = old.some((b) => b.id === newRow.id)
+                return exists ? old.map((b) => (b.id === newRow.id ? { ...b, ...newRow } : b)) : [...old, newRow]
+              })
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueryData(['combo_items'], (old = []) => old.filter((b) => b.id !== targetId))
+            }
+            break
+          }
+          case 'promotions': {
+            if (eventType === 'INSERT' || eventType === 'UPDATE') {
+              qc.setQueryData(['promotions'], (old = []) => {
+                const exists = old.some((b) => b.id === newRow.id)
+                return exists ? old.map((b) => (b.id === newRow.id ? { ...b, ...newRow } : b)) : [...old, newRow]
+              })
+            } else if (eventType === 'DELETE') {
+              const targetId = oldRow?.id || newRow?.id
+              qc.setQueryData(['promotions'], (old = []) => old.filter((b) => b.id !== targetId))
             }
             break
           }
@@ -592,6 +619,30 @@ export function useStore() {
     },
   })
 
+  const { data: comboItems = [] } = useQuery({
+    queryKey: ['combo_items'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('combo_items').select('*')
+      if (error) {
+        if (error.code !== 'PGRST205') console.warn('Error fetching combo_items:', error)
+        return []
+      }
+      return data || []
+    },
+  })
+
+  const { data: promotions = [] } = useQuery({
+    queryKey: ['promotions'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('promotions').select('*')
+      if (error) {
+        if (error.code !== 'PGRST205') console.warn('Error fetching promotions:', error)
+        return []
+      }
+      return data || []
+    },
+  })
+
   // Sync product batches query results with batchesCache
   useEffect(() => {
     if (productBatches && productBatches.length > 0) {
@@ -614,11 +665,19 @@ export function useStore() {
   }, [products, setProductsCache])
 
   const displayedProducts = useMemo(() => {
-    if (!products || products.length === 0) {
-      return productsCache || []
-    }
-    return products
-  }, [products, productsCache])
+    const raw = !products || products.length === 0 ? productsCache || [] : products
+    if (!comboItems || comboItems.length === 0) return raw
+
+    return raw.map((p) => {
+      if (!p.isCombo) return p
+      const metrics = calculateComboMetrics(p.id, comboItems, raw)
+      return {
+        ...p,
+        stock: metrics.virtualStock,
+        cost: metrics.unitCost > 0 ? metrics.unitCost : p.cost,
+      }
+    })
+  }, [products, productsCache, comboItems])
 
   // Background offline sales synchronization function
   const syncOfflineSales = useCallback(async () => {
@@ -642,6 +701,7 @@ export function useStore() {
           p_sold_by: sale.soldBy,
           p_date: sale.date,
           p_shift_id: sale.shiftId,
+          p_discount: sale.discount || 0,
         })
         if (error) throw error
 
@@ -1147,9 +1207,12 @@ export function useStore() {
             const prod = currentProducts.find((p) => p.id === item.productId)
             if (prod) {
               const newStock = (Number(prod.stock) || 0) + (Number(item.totalUnits) || 0)
+              const updates = calculatedUnitCost > 0
+                ? { cost: calculatedUnitCost, stock: newStock }
+                : { stock: newStock }
               await supabase
                 .from('products')
-                .update({ cost: calculatedUnitCost, stock: newStock })
+                .update(updates)
                 .eq('id', item.productId)
             }
           }
@@ -1286,18 +1349,14 @@ export function useStore() {
 
       const date = new Date().toISOString()
       
-      let cost = 0
-      for (const item of args.items) {
-        if (item.productId) {
-          const prod = products.find((p) => p.id === item.productId)
-          if (prod) cost += prod.cost * item.qty
-        }
-      }
+      const itemsWithCost = freezeItemCosts(args.items, products, comboItems)
+      const cost = sumItemsCost(itemsWithCost)
+      const discount = Math.max(0, Number(args.discount) || 0)
 
       const saleId = uid()
       const { error } = await supabase.rpc('complete_sale_rpc', {
         p_sale_id: saleId,
-        p_items: args.items,
+        p_items: itemsWithCost,
         p_method: args.method,
         p_customer_id: args.customerId || null,
         p_cash_received: args.cashReceived || 0,
@@ -1306,15 +1365,18 @@ export function useStore() {
         p_sold_by: currentUser?.username || 'admin',
         p_date: date,
         p_shift_id: currentShift.id,
+        p_discount: discount,
       })
       if (error) throw error
 
-      const total = args.items.reduce((sum, i) => sum + i.price * i.qty, 0)
+      const subtotal = itemsWithCost.reduce((sum, i) => sum + (Number(i.price) || 0) * (Number(i.qty) || 1), 0)
+      const total = Math.max(0, subtotal - discount)
       return {
         id: saleId,
         date,
-        items: args.items,
+        items: itemsWithCost,
         total,
+        discount,
         method: args.method,
         customerId: args.customerId || null,
         cashReceived: args.cashReceived || 0,
@@ -1332,12 +1394,21 @@ export function useStore() {
         return [newSale, ...old]
       })
 
-      // 2. Subtract sold stock from local products
+      // 2. Subtract sold stock from local products (handling combo components)
       if (newSale?.items && newSale.items.length > 0) {
         const itemDeltas = new Map()
         for (const it of newSale.items) {
           if (it.productId) {
-            itemDeltas.set(it.productId, (itemDeltas.get(it.productId) || 0) + (it.qty || 1))
+            const prod = products.find((p) => p.id === it.productId)
+            if (prod?.isCombo) {
+              const comps = comboItems.filter((ci) => ci.comboId === it.productId)
+              for (const c of comps) {
+                const delta = (it.qty || 1) * (Number(c.quantity) || 1)
+                itemDeltas.set(c.productId, (itemDeltas.get(c.productId) || 0) + delta)
+              }
+            } else {
+              itemDeltas.set(it.productId, (itemDeltas.get(it.productId) || 0) + (it.qty || 1))
+            }
           }
         }
         qc.setQueryData(['products'], (old = []) =>
@@ -1425,6 +1496,69 @@ export function useStore() {
     },
     onSuccess: (deletedId) => {
       qc.setQueryData(['users'], (old = []) => old.filter((u) => u.id !== deletedId))
+    },
+  })
+
+  const addComboItemMutation = useMutation({
+    mutationFn: async (comboItem) => {
+      const { data, error } = await supabase.from('combo_items').insert([comboItem]).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: (newItem) => {
+      if (newItem) {
+        qc.setQueryData(['combo_items'], (old = []) => [...old, newItem])
+      }
+    },
+  })
+
+  const deleteComboItemMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('combo_items').delete().eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onSuccess: (deletedId) => {
+      qc.setQueryData(['combo_items'], (old = []) => old.filter((ci) => ci.id !== deletedId))
+    },
+  })
+
+  const addPromotionMutation = useMutation({
+    mutationFn: async (promo) => {
+      const { data, error } = await supabase.from('promotions').insert([promo]).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: (newPromo) => {
+      if (newPromo) {
+        qc.setQueryData(['promotions'], (old = []) => [...old, newPromo])
+      }
+    },
+  })
+
+  const updatePromotionMutation = useMutation({
+    mutationFn: async (promo) => {
+      const { data, error } = await supabase.from('promotions').update(promo).eq('id', promo.id).select()
+      if (error) throw error
+      return data[0]
+    },
+    onSuccess: (updatedPromo) => {
+      if (updatedPromo) {
+        qc.setQueryData(['promotions'], (old = []) =>
+          old.map((p) => (p.id === updatedPromo.id ? { ...p, ...updatedPromo } : p))
+        )
+      }
+    },
+  })
+
+  const deletePromotionMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('promotions').delete().eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onSuccess: (deletedId) => {
+      qc.setQueryData(['promotions'], (old = []) => old.filter((p) => p.id !== deletedId))
     },
   })
 
@@ -1859,7 +1993,8 @@ export function useStore() {
         const updated = oldProds.map((p) => {
           const item = items.find((it) => it.productId === p.id)
           if (item) {
-            const calculatedUnitCost = Number((item.cost / item.totalUnits).toFixed(2))
+            const rawUnitCost = Number((item.cost / item.totalUnits).toFixed(2))
+            const calculatedUnitCost = Number.isFinite(rawUnitCost) && rawUnitCost > 0 ? rawUnitCost : p.cost
             if (p.controlLotes) {
               const latestBatches = qc.getQueryData(['product_batches']) || []
               const totalStock = latestBatches
@@ -1999,21 +2134,18 @@ export function useStore() {
 
     if (!isOnline) {
       const date = new Date().toISOString()
-      const total = args.items.reduce((sum, i) => sum + i.price * i.qty, 0)
-      
-      let cost = 0
-      for (const item of args.items) {
-        if (item.productId) {
-          const prod = displayedProducts.find((p) => p.id === item.productId)
-          if (prod) cost += prod.cost * item.qty
-        }
-      }
+      const itemsWithCost = freezeItemCosts(args.items, displayedProducts, comboItems)
+      const cost = sumItemsCost(itemsWithCost)
+      const discount = Math.max(0, Number(args.discount) || 0)
+      const subtotal = itemsWithCost.reduce((sum, i) => sum + (Number(i.price) || 0) * (Number(i.qty) || 1), 0)
+      const total = Math.max(0, subtotal - discount)
 
       const sale = {
         id: `off-${uid()}`,
         date,
-        items: args.items,
+        items: itemsWithCost,
         total,
+        discount,
         method: args.method,
         customerId: args.customerId,
         cashReceived: args.cashReceived,
@@ -2233,10 +2365,18 @@ export function useStore() {
     deleteUserMutation.mutate(id, options)
   }, [deleteUserMutation])
 
+  const addComboItem = useCallback((item) => addComboItemMutation.mutateAsync(item), [addComboItemMutation])
+  const deleteComboItem = useCallback((id) => deleteComboItemMutation.mutateAsync(id), [deleteComboItemMutation])
+  const addPromotion = useCallback((promo) => addPromotionMutation.mutateAsync(promo), [addPromotionMutation])
+  const updatePromotion = useCallback((promo) => updatePromotionMutation.mutateAsync(promo), [updatePromotionMutation])
+  const deletePromotion = useCallback((id) => deletePromotionMutation.mutateAsync(id), [deletePromotionMutation])
+
   // Combine query and Zustand states
   const state = useMemo(() => ({
     products: displayedProducts,
     productBatches: displayedProductBatches,
+    comboItems,
+    promotions,
     sales,
     customers,
     suppliers,
@@ -2254,6 +2394,8 @@ export function useStore() {
   }), [
     displayedProducts,
     displayedProductBatches,
+    comboItems,
+    promotions,
     sales,
     customers,
     suppliers,
@@ -2292,6 +2434,11 @@ export function useStore() {
     receiveGoods,
     registerSupplierPayment,
     updateProductBatch,
+    addComboItem,
+    deleteComboItem,
+    addPromotion,
+    updatePromotion,
+    deletePromotion,
     resetData,
     login,
     logout,

@@ -13,6 +13,7 @@ import { PaymentModal } from './payment-modal'
 import { ScannerModal } from './scanner-modal'
 import { ExtrasModal } from './extras-modal'
 import { useBarcodeScanner } from '@/lib/use-barcode-scanner'
+import { evaluateCartPromotions } from '@/lib/promotions'
 
 const LOCAL_CATEGORIES = ['Todos', ...CATEGORIES]
 const LOCAL_CATEGORY_ICON = CATEGORY_ICON
@@ -122,33 +123,46 @@ export function Venta() {
       return matchesCat && matchesQ
     })
 
-    if (!q && category === 'Todos') {
-      return [...matches]
-        .sort((a, b) => (salesCount[b.id] || 0) - (salesCount[a.id] || 0))
-        .slice(0, 24)
+    // Prioritize Combos first so they appear at the top for quick selection
+    const sortWithCombosFirst = (a, b) => {
+      if (a.isCombo && !b.isCombo) return -1
+      if (!a.isCombo && b.isCombo) return 1
+      return (salesCount[b.id] || 0) - (salesCount[a.id] || 0)
     }
 
-    return matches
+    if (!q && category === 'Todos') {
+      return [...matches]
+        .sort(sortWithCombosFirst)
+        .slice(0, 32)
+    }
+
+    return [...matches].sort(sortWithCombosFirst)
   }, [state.products, salesCount, query, category])
 
-  // Cálculos de Subtotal, Extras y Total final
+  // Cálculos de Subtotal, Promociones, Extras y Total final
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart])
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart])
 
+  const promoEvaluation = useMemo(() => {
+    return evaluateCartPromotions(cart, state.promotions || [])
+  }, [cart, state.promotions])
+
   const extraAmount = useMemo(() => {
     if (!extraValue || extraValue <= 0) return 0
+    const baseAfterPromo = Math.max(0, subtotal - promoEvaluation.totalDiscount)
     if (extraCalc === 'porcentaje') {
-      return (subtotal * extraValue) / 100
+      return (baseAfterPromo * extraValue) / 100
     }
     return Number(extraValue)
-  }, [subtotal, extraCalc, extraValue])
+  }, [subtotal, promoEvaluation.totalDiscount, extraCalc, extraValue])
 
   const total = useMemo(() => {
+    const afterPromo = Math.max(0, subtotal - promoEvaluation.totalDiscount)
     if (extraType === 'descuento') {
-      return Math.max(0, subtotal - extraAmount)
+      return Math.max(0, afterPromo - extraAmount)
     }
-    return subtotal + extraAmount
-  }, [subtotal, extraAmount, extraType])
+    return afterPromo + extraAmount
+  }, [subtotal, promoEvaluation.totalDiscount, extraAmount, extraType])
 
   const isShiftOpen = state.currentShift?.status === 'open'
 
@@ -302,7 +316,8 @@ export function Venta() {
   async function handleConfirmSale(args) {
     setIsSaving(true)
     try {
-      await completeSale({ items: cart, ...args })
+      const discount = Math.max(0, Number((subtotal - total).toFixed(2)))
+      await completeSale({ items: cart, discount, ...args })
       const label =
         args.method === 'efectivo' ? 'Efectivo' : args.method === 'qr' ? 'QR/Transferencia' : 'Fiado'
       const isOnline = typeof navigator !== 'undefined' && navigator.onLine
@@ -461,6 +476,11 @@ export function Venta() {
                     <div className="flex items-start justify-between w-full">
                       <span className="text-2xl">{LOCAL_CATEGORY_ICON[p.category] || CATEGORY_ICON[p.category]}</span>
                       <div className="flex items-center gap-1.5">
+                        {p.isCombo && (
+                          <Badge tone="primary" className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30">
+                            Combo
+                          </Badge>
+                        )}
                         {out ? (
                           <Badge tone="danger">Sin stock</Badge>
                         ) : low ? (
@@ -584,6 +604,7 @@ export function Venta() {
             subtotal={subtotal}
             total={total}
             cartCount={cartCount}
+            promoDiscounts={promoEvaluation.promoDiscounts}
             extraType={extraType}
             extraCalc={extraCalc}
             extraValue={extraValue}
@@ -650,6 +671,7 @@ export function Venta() {
               subtotal={subtotal}
               total={total}
               cartCount={cartCount}
+              promoDiscounts={promoEvaluation.promoDiscounts}
               extraType={extraType}
               extraCalc={extraCalc}
               extraValue={extraValue}
@@ -697,6 +719,7 @@ function CartPanel({
   subtotal,
   total,
   cartCount,
+  promoDiscounts = [],
   extraType,
   extraCalc,
   extraValue,
@@ -796,6 +819,20 @@ function CartPanel({
             <span>{cartCount} {cartCount === 1 ? 'ítem' : 'ítems'}</span>
             <span>Subtotal: <strong className="text-foreground font-semibold">{money(subtotal)}</strong></span>
           </div>
+
+          {promoDiscounts?.length > 0 && (
+            <div className="space-y-1 py-1 border-y border-dashed border-border/80">
+              {promoDiscounts.map((pd, idx) => (
+                <div key={idx} className="flex items-center justify-between text-success font-medium">
+                  <span className="flex items-center gap-1">
+                    <span>🎁</span>
+                    <span className="truncate max-w-[170px]">{pd.promoName}</span>
+                  </span>
+                  <span className="font-bold">-{money(pd.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {extraValue > 0 && (
             <div className="flex items-center justify-between font-medium">
