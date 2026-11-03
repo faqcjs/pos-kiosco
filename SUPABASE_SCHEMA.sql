@@ -912,11 +912,11 @@ CREATE POLICY "Allow update shifts for shift owner or admin"
             public.has_role('administrador')
         )
     )
+    -- No status check here: the new row may be closed (closing a shift).
+    -- USING already limits updates to open shifts.
     WITH CHECK (
-        status = 'open' AND (
-            "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR 
-            public.has_role('administrador')
-        )
+        "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR 
+        public.has_role('administrador')
     );
 
 CREATE POLICY "Allow delete shifts for administrators only" 
