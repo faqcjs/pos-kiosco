@@ -702,7 +702,7 @@ export function Venta() {
       />
       <PaymentModal
         open={payOpen}
-        onClose={() => !isSaving && handleFinishSale()}
+        onClose={() => !isSaving && setPayOpen(false)}
         total={total}
         items={cart}
         onConfirm={handleConfirmSale}
