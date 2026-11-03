@@ -40,6 +40,23 @@ describe('calculateComboMetrics', () => {
     expect(metrics.isAvailable).toBe(false)
   })
 
+  it('reports no missing cost when every component has a cost', () => {
+    const metrics = calculateComboMetrics('combo-previa', comboItems, products)
+    expect(metrics.hasMissingCost).toBe(false)
+    expect(metrics.missingCostProducts).toEqual([])
+  })
+
+  it('flags components without a cost loaded', () => {
+    const noCostCoca = [
+      { id: 'prod-fernet', name: 'Fernet Branca', stock: 10, cost: 8000 },
+      { id: 'prod-coca', name: 'Coca-Cola 1.5L', stock: 4, cost: 0 },
+    ]
+    const metrics = calculateComboMetrics('combo-previa', comboItems, noCostCoca)
+    expect(metrics.hasMissingCost).toBe(true)
+    expect(metrics.missingCostProducts).toEqual(['Coca-Cola 1.5L'])
+    expect(metrics.unitCost).toBe(8000)
+  })
+
   it('handles unknown comboId gracefully', () => {
     const metrics = calculateComboMetrics('non-existent', comboItems, products)
     expect(metrics.virtualStock).toBe(0)

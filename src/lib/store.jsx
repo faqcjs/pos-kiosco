@@ -675,7 +675,8 @@ export function useStore() {
       return {
         ...p,
         stock: metrics.virtualStock,
-        cost: metrics.unitCost > 0 ? metrics.unitCost : p.cost,
+        // Unknown cost when any component has no cost loaded
+        cost: metrics.hasMissingCost ? 0 : metrics.unitCost > 0 ? metrics.unitCost : p.cost,
       }
     })
   }, [products, productsCache, comboItems])

@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { money } from '@/lib/format'
-import { buildProductsMap, getSaleCost } from '@/lib/sale-cost'
+import { buildProductsMap, getSaleProfit } from '@/lib/sale-cost'
 
 const DONUT_COLORS = ['var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)', 'var(--color-chart-6)']
 
@@ -33,17 +33,16 @@ export function TabMetodosPago({ sales, products }) {
               : 'Crédito',
           count: 0,
           revenue: 0,
-          cost: 0,
+          profit: 0,
         }
       }
       map[method].count += 1
       map[method].revenue += s.total || 0
-      map[method].cost += getSaleCost(s, productsMap)
+      map[method].profit += getSaleProfit(s, productsMap)
     })
 
     return Object.values(map).map((m) => ({
       ...m,
-      profit: m.revenue - m.cost,
       avgTicket: m.count > 0 ? m.revenue / m.count : 0,
     }))
   }, [sales, products])

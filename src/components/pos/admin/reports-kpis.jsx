@@ -3,7 +3,7 @@
 import { DollarSign, TrendingUp, BarChart3, Receipt, HelpCircle } from 'lucide-react'
 import { money } from '@/lib/format'
 
-export function ReportsKpis({ revenue, profit, totalSales, averageTicket }) {
+export function ReportsKpis({ revenue, profit, uncostedRevenue = 0, totalSales, averageTicket }) {
   const kpis = [
     {
       title: 'Ingresos del período',
@@ -16,7 +16,8 @@ export function ReportsKpis({ revenue, profit, totalSales, averageTicket }) {
       value: money(profit),
       icon: TrendingUp,
       iconBg: 'bg-primary/10 text-primary',
-      help: 'Estimación basada en el costo total de los productos vendidos.',
+      help: 'Estimación basada en el costo de los productos vendidos. No incluye las ventas sin costo: monto rápido y productos sin costo cargado.',
+      detail: uncostedRevenue > 0 ? `No incluye ${money(uncostedRevenue)} de ventas sin costo` : null,
     },
     {
       title: 'Total de Ventas',
@@ -59,6 +60,9 @@ export function ReportsKpis({ revenue, profit, totalSales, averageTicket }) {
               <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-heading">
                 {kpi.value}
               </div>
+              {kpi.detail && (
+                <p className="text-xs font-medium text-muted-foreground">{kpi.detail}</p>
+              )}
             </div>
           </div>
         )

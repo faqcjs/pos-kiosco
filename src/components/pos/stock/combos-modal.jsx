@@ -74,6 +74,12 @@ export function CombosModal({ open, onClose }) {
     return selectedComponents.reduce((sum, item) => sum + (item.product.cost || 0) * item.quantity, 0)
   }, [selectedComponents])
 
+  // Componentes sin costo cargado: el combo cuenta como venta sin costo en los reportes
+  const missingCostNames = useMemo(
+    () => selectedComponents.filter((item) => !(item.product.cost > 0)).map((item) => item.product.name),
+    [selectedComponents]
+  )
+
   const margin = useMemo(() => {
     const p = Number(comboPrice) || 0
     return p - estimatedCost
@@ -383,6 +389,13 @@ export function CombosModal({ open, onClose }) {
               </div>
             )}
 
+            {missingCostNames.length > 0 && (
+              <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+                Sin costo cargado: <strong>{missingCostNames.join(', ')}</strong>. Mientras falte, las ventas de este combo
+                no se cuentan en la ganancia estimada.
+              </p>
+            )}
+
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <Button variant="outline" onClick={resetForm} disabled={isSaving}>
                 Cancelar
@@ -460,7 +473,12 @@ export function CombosModal({ open, onClose }) {
                         ) : (
                           components.map((c) => (
                             <div key={c.id} className="flex items-center justify-between text-xs text-foreground/80">
-                              <span className="truncate">{c.quantity}x {c.productName}</span>
+                              <span className="truncate">
+                                {c.quantity}x {c.productName}
+                                {!(c.productCost > 0) && (
+                                  <span className="ml-1.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">Sin costo</span>
+                                )}
+                              </span>
                               <span className="text-muted-foreground text-[11px] tabular-nums">({c.productStock} disp.)</span>
                             </div>
                           ))

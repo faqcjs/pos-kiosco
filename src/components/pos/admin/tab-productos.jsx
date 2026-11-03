@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { Modal, Select } from '@/components/ui/kit'
 import { money } from '@/lib/format'
-import { buildProductsMap, getSaleLineCosts } from '@/lib/sale-cost'
+import { buildProductsMap, getSaleLineCosts, getUncostedLines } from '@/lib/sale-cost'
 
 export function TabProductos({ sales, products }) {
   // Estado para filtros de Productos
@@ -86,23 +86,26 @@ export function TabProductos({ sales, products }) {
 
     sales.forEach((s) => {
       const lineCosts = getSaleLineCosts(s, productsMap)
+      const uncostedLines = getUncostedLines(s, productsMap)
 
       s.items?.forEach((item, index) => {
         const key = item.name
-        const prev = map.get(key) || { name: item.name, qty: 0, revenue: 0, cost: 0 }
+        const prev = map.get(key) || { name: item.name, qty: 0, revenue: 0, cost: 0, uncosted: false }
         const itemQty = Number(item.qty) || 1
         const itemPrice = Number(item.price) || 0
 
         prev.qty += itemQty
         prev.revenue += itemPrice * itemQty
         prev.cost += lineCosts[index] || 0
+        // Monto rápido o producto sin costo cargado: no aporta a la ganancia
+        if (uncostedLines[index]) prev.uncosted = true
         map.set(key, prev)
       })
     })
 
     let list = Array.from(map.values()).map((p) => ({
       ...p,
-      profit: p.revenue - p.cost,
+      profit: p.uncosted ? 0 : p.revenue - p.cost,
     }))
 
     if (productSearch.trim()) {
@@ -115,7 +118,7 @@ export function TabProductos({ sales, products }) {
     } else if (productFilter === 'vendido') {
       list.sort((a, b) => b.qty - a.qty)
     } else if (productFilter === 'ganancia') {
-      list.sort((a, b) => b.profit - a.profit)
+      list = list.filter((p) => !p.uncosted).sort((a, b) => b.profit - a.profit)
     }
 
     return list
@@ -261,6 +264,11 @@ export function TabProductos({ sales, products }) {
                       <span className="truncate max-w-[200px] sm:max-w-xs text-foreground">
                         <span className="text-muted-foreground mr-1.5">{idx + 1}.</span>
                         {prod.name}
+                        {prod.uncosted && (
+                          <span className="ml-1.5 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            Sin costo
+                          </span>
+                        )}
                       </span>
                       <div className="text-right">
                         <span className="text-foreground font-bold">

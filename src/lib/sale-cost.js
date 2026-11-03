@@ -27,6 +27,8 @@ const getCatalogUnitCost = (item, productsMap, comboItems = []) => {
   if (prod.isCombo && Array.isArray(comboItems) && comboItems.length > 0) {
     const rawProducts = Array.from(productsMap.values())
     const metrics = calculateComboMetrics(item.productId, comboItems, rawProducts)
+    // Si falta el costo de algún componente, el costo del combo es desconocido
+    if (metrics.hasMissingCost) return 0
     if (metrics.unitCost > 0) return metrics.unitCost
   }
   return toNumber(prod.cost)
@@ -92,6 +94,92 @@ export function getSaleCost(sale, productsMap, comboItems = []) {
   if (!hasFrozenItemCosts(items) && savedCost > 0) return savedCost
 
   return getSaleLineCosts(sale, productsMap, comboItems).reduce((sum, c) => sum + c, 0)
+}
+
+/**
+ * Marca qué líneas de la venta no tienen costo conocido, en el mismo orden que `sale.items`:
+ *  - ítems de monto rápido (sin producto);
+ *  - en ventas nuevas, productos sin costo congelado ni costo en el catálogo
+ *    (por ejemplo, el costo no se había cargado). Si después se carga el costo
+ *    en el catálogo, la línea vuelve a tener costo.
+ * En ventas viejas solo se conoce el costo total, así que solo cuenta el monto rápido.
+ */
+export function getUncostedLines(sale, productsMap, comboItems = []) {
+  const items = Array.isArray(sale?.items) ? sale.items : []
+  if (!hasFrozenItemCosts(items)) return items.map((item) => !item?.productId)
+
+  const lineCosts = getSaleLineCosts(sale, productsMap, comboItems)
+  return items.map((item, index) => !item?.productId || lineCosts[index] <= 0)
+}
+
+/**
+ * Ingresos de la venta que no tienen costo conocido (ver `getUncostedLines`).
+ * Los descuentos y recargos se reparten en proporción al importe de cada ítem,
+ * así la parte sin costo coincide con lo que realmente se cobró.
+ */
+export function getUncostedRevenue(sale, productsMap, comboItems = []) {
+  return getUncostedItems(sale, productsMap, comboItems).reduce((sum, line) => sum + line.revenue, 0)
+}
+
+const lineAmount = (item) => toNumber(item?.price) * getQty(item)
+
+/**
+ * Ítems de la venta sin costo conocido, con su motivo y lo cobrado por ellos
+ * (descuentos y recargos repartidos en proporción al importe de cada ítem).
+ * reason: 'quick' (monto rápido) | 'combo' (falta el costo de un componente) | 'product'
+ * @returns {Array<{ index: number, item: object, reason: string, revenue: number }>}
+ */
+export function getUncostedItems(sale, productsMap, comboItems = []) {
+  const items = Array.isArray(sale?.items) ? sale.items : []
+  const subtotal = items.reduce((sum, item) => sum + lineAmount(item), 0)
+  if (subtotal <= 0) return []
+
+  const ratio = toNumber(sale?.total) / subtotal
+  const uncostedLines = getUncostedLines(sale, productsMap, comboItems)
+
+  return items.flatMap((item, index) => {
+    if (!uncostedLines[index]) return []
+    const reason = !item?.productId ? 'quick' : productsMap?.get(item.productId)?.isCombo ? 'combo' : 'product'
+    return [{ index, item, reason, revenue: lineAmount(item) * ratio }]
+  })
+}
+
+/**
+ * Agrupa los ítems sin costo de varias ventas: por producto, o por nombre en el monto rápido.
+ * Ordenado de mayor a menor por lo cobrado.
+ */
+export function summarizeUncostedSales(sales, productsMap, comboItems = []) {
+  const groups = new Map()
+
+  ;(sales || []).forEach((sale) => {
+    const keysInSale = new Set()
+    getUncostedItems(sale, productsMap, comboItems).forEach(({ item, reason, revenue }) => {
+      const name = String(item?.name ?? '').trim() || 'Monto rápido'
+      const key = reason === 'quick' ? `quick:${name.toLowerCase()}` : `${reason}:${item.productId}`
+      const prev = groups.get(key) || { key, name, reason, qty: 0, revenue: 0, salesCount: 0 }
+      prev.qty += getQty(item)
+      prev.revenue += revenue
+      if (!keysInSale.has(key)) {
+        prev.salesCount += 1
+        keysInSale.add(key)
+      }
+      groups.set(key, prev)
+    })
+  })
+
+  return Array.from(groups.values()).sort((a, b) => b.revenue - a.revenue)
+}
+
+/**
+ * Ganancia estimada de la venta: solo sobre los ítems con costo conocido.
+ * Los ingresos sin costo se informan aparte con `getUncostedRevenue`.
+ */
+export function getSaleProfit(sale, productsMap, comboItems = []) {
+  return (
+    toNumber(sale?.total) -
+    getUncostedRevenue(sale, productsMap, comboItems) -
+    getSaleCost(sale, productsMap, comboItems)
+  )
 }
 
 /**

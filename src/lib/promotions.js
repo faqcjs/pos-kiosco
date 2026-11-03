@@ -8,18 +8,21 @@
  * @param {string} comboId 
  * @param {Array} comboItems - Array of { comboId, productId, quantity }
  * @param {Array} products - Array of product objects { id, stock, cost, ... }
- * @returns {{ virtualStock: number, unitCost: number, isAvailable: boolean }}
+ * @returns {{ virtualStock: number, unitCost: number, isAvailable: boolean, hasMissingCost: boolean, missingCostProducts: string[] }}
+ *   unitCost sums only the components with a known cost; when hasMissingCost is true it is
+ *   incomplete and must not be used as the combo cost.
  */
 export function calculateComboMetrics(comboId, comboItems = [], products = []) {
   const components = comboItems.filter((ci) => ci.comboId === comboId)
   if (!components.length) {
-    return { virtualStock: 0, unitCost: 0, isAvailable: false }
+    return { virtualStock: 0, unitCost: 0, isAvailable: false, hasMissingCost: false, missingCostProducts: [] }
   }
 
   const productMap = new Map(products.map((p) => [p.id, p]))
 
   let minStock = Infinity
   let totalCost = 0
+  const missingCostProducts = []
 
   for (const comp of components) {
     const prod = productMap.get(comp.productId)
@@ -28,8 +31,10 @@ export function calculateComboMetrics(comboId, comboItems = [], products = []) {
     const prodCost = Number(prod?.cost) || 0
 
     if (!prod || requiredQty <= 0) {
-      return { virtualStock: 0, unitCost: 0, isAvailable: false }
+      return { virtualStock: 0, unitCost: 0, isAvailable: false, hasMissingCost: false, missingCostProducts: [] }
     }
+
+    if (prodCost <= 0) missingCostProducts.push(prod.name)
 
     const possibleCombos = Math.floor(availableStock / requiredQty)
     if (possibleCombos < minStock) {
@@ -45,6 +50,8 @@ export function calculateComboMetrics(comboId, comboItems = [], products = []) {
     virtualStock,
     unitCost: Number(totalCost.toFixed(2)),
     isAvailable: virtualStock > 0,
+    hasMissingCost: missingCostProducts.length > 0,
+    missingCostProducts,
   }
 }
 

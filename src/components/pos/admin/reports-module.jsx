@@ -7,7 +7,7 @@ import { TabVentas } from './tab-ventas'
 import { TabProductos } from './tab-productos'
 import { TabMetodosPago } from './tab-metodos-pago'
 import { TabHistorialCaja } from './tab-historial-caja'
-import { buildProductsMap, getSaleCost } from '@/lib/sale-cost'
+import { buildProductsMap, getSaleProfit, getUncostedRevenue } from '@/lib/sale-cost'
 
 function toLocalDateStr(d = new Date()) {
   const date = new Date(d)
@@ -148,18 +148,19 @@ export function ReportsModule({
   // KPIs Totales del período filtrado
   const kpis = useMemo(() => {
     let revenue = 0
-    let cost = 0
+    let profit = 0
+    let uncostedRevenue = 0
 
     filteredSales.forEach((s) => {
       revenue += s.total || 0
-      cost += getSaleCost(s, productsMap)
+      profit += getSaleProfit(s, productsMap)
+      uncostedRevenue += getUncostedRevenue(s, productsMap)
     })
 
-    const profit = revenue - cost
     const totalSales = filteredSales.length
     const averageTicket = totalSales > 0 ? revenue / totalSales : 0
 
-    return { revenue, profit, totalSales, averageTicket }
+    return { revenue, profit, uncostedRevenue, totalSales, averageTicket }
   }, [filteredSales, productsMap])
 
   // Datos para gráfico de área (por horas si es 1 solo día, por días si es un rango)
@@ -181,9 +182,8 @@ export function ReportsModule({
         const blockHour = Math.floor(hour / 2) * 2
         const label = `${String(blockHour).padStart(2, '0')}:00`
         const prev = map.get(label) || { label, ventas: 0, ganancia: 0 }
-        const saleCost = getSaleCost(s, productsMap)
         prev.ventas += s.total || 0
-        prev.ganancia += (s.total || 0) - saleCost
+        prev.ganancia += getSaleProfit(s, productsMap)
         map.set(label, prev)
       })
 
@@ -215,9 +215,8 @@ export function ReportsModule({
       const key = toLocalDateStr(dateObj)
       const label = dateObj.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }).replace('.', '')
       const prev = map.get(key) || { label, ventas: 0, ganancia: 0 }
-      const saleCost = getSaleCost(s, productsMap)
       prev.ventas += s.total || 0
-      prev.ganancia += (s.total || 0) - saleCost
+      prev.ganancia += getSaleProfit(s, productsMap)
       map.set(key, prev)
     })
 
@@ -276,6 +275,7 @@ export function ReportsModule({
         <ReportsKpis
           revenue={kpis.revenue}
           profit={kpis.profit}
+          uncostedRevenue={kpis.uncostedRevenue}
           totalSales={kpis.totalSales}
           averageTicket={kpis.averageTicket}
         />
