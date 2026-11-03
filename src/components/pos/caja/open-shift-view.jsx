@@ -11,7 +11,16 @@ import { SaleDetailModal } from './sale-detail-modal'
 import { ShiftStats } from './shift-stats'
 import { ShiftTimeline } from './shift-timeline'
 
-export function OpenShiftView({ shift, sales, currentUser, onClose, onMovement, toast, closeShiftPending }) {
+export function OpenShiftView({
+  shift,
+  sales,
+  currentUser,
+  suppliers,
+  onClose,
+  movementActions,
+  toast,
+  closeShiftPending,
+}) {
   const totals = useMemo(() => shiftTotals(shift, sales), [shift, sales])
   const theoretical = useMemo(() => shiftTheoretical(shift), [shift])
   const shiftOpName = getCashierDisplayName(shift.openedBy, currentUser)
@@ -23,7 +32,7 @@ export function OpenShiftView({ shift, sales, currentUser, onClose, onMovement, 
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <Badge tone="success" className="text-xs">
-          <span className="size-2 rounded-full bg-success animate-pulse" />
+          <span className="size-2 bg-success rounded-full animate-pulse" />
           Turno abierto por{' '}
           <span className="inline-block max-w-[12ch] align-bottom truncate">{shiftOpName || 'Desconocido'}</span>{' '}
           desde {formatTime(shift.openedAt)}
@@ -36,7 +45,7 @@ export function OpenShiftView({ shift, sales, currentUser, onClose, onMovement, 
 
       <ShiftStats openingAmount={shift.openingAmount} totals={totals} theoretical={theoretical} />
 
-      <MovementForm onMovement={onMovement} toast={toast} />
+      <MovementForm actions={movementActions} suppliers={suppliers} toast={toast} />
 
       <ShiftTimeline shift={shift} sales={sales} onSelectSale={setSelectedSale} />
 
