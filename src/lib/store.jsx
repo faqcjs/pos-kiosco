@@ -11,6 +11,7 @@ import { freezeItemCosts, sumItemsCost } from './sale-cost'
 import { applyPurchaseItems } from './purchase-cost'
 import { RealtimeSync } from './realtime-sync'
 import { MANUAL_IN_MOVEMENT_TYPES, MANUAL_OUT_MOVEMENT_TYPES, signMovementAmount } from './cash-movements'
+import { SHIFT_ORIGIN, buildExpenseMovement, buildExpenseRpcArgs, validateExpense } from './expenses'
 import {
   DIRECT_PURCHASE_SUPPLIER_ID,
   DIRECT_PURCHASE_SUPPLIER_NAME,
@@ -463,6 +464,23 @@ export function useStore() {
     },
   })
 
+  // Operating expenses: only administrators can read them (RLS)
+  const { data: expenses = [] } = useQuery({
+    queryKey: ['expenses'],
+    queryFn: async () => {
+      try {
+        return await fetchAllPages((from, to) =>
+          supabase.from('expenses').select('*').order('paidAt', { ascending: false }).range(from, to),
+        )
+      } catch (error) {
+        // The table exists only after supabase_patch_gastos.sql is applied
+        if (error?.code !== PGRST_TABLE_NOT_FOUND) console.warn('Error fetching expenses:', error)
+        return []
+      }
+    },
+    enabled: isAdmin,
+  })
+
   // Sync product batches query results with batchesCache
   useEffect(() => {
     if (productBatches && productBatches.length > 0) {
@@ -632,6 +650,12 @@ export function useStore() {
               p_date: date,
               p_shift_id: shiftId,
             })
+            if (error) throw error
+            break
+          }
+          case 'REGISTER_EXPENSE': {
+            // register_expense_rpc is idempotent on the expense id
+            const { error } = await supabase.rpc('register_expense_rpc', buildExpenseRpcArgs(action.payload))
             if (error) throw error
             break
           }
@@ -1247,6 +1271,7 @@ export function useStore() {
       await supabase.from('sales').delete().neq('id', RESET_SENTINEL_ID)
       await supabase.from('customers').delete().neq('id', RESET_SENTINEL_ID)
       await supabase.from('suppliers').delete().neq('id', RESET_SENTINEL_ID)
+      await supabase.from('expenses').delete().neq('id', RESET_SENTINEL_ID)
       await supabase.from('shifts').delete().neq('id', RESET_SENTINEL_ID)
 
       await supabase.from('products').insert(SEED_PRODUCTS)
@@ -2163,6 +2188,67 @@ export function useStore() {
     deleteUserMutation.mutate(id, options)
   }, [deleteUserMutation])
 
+  // Saves an expense. Paid from the drawer (origin 'turno') it also adds a 'gasto'
+  // movement to the open shift; both are written together by register_expense_rpc.
+  const registerExpense = useCallback(async (input) => {
+    const isShift = input.origin === SHIFT_ORIGIN
+    const expense = {
+      id: uid(),
+      category: input.category,
+      amount: Number(input.amount),
+      description: input.description?.trim() ?? '',
+      period: input.period,
+      paidAt: input.paidAt ?? new Date().toISOString(),
+      origin: input.origin,
+      shiftId: isShift ? currentShift?.id ?? null : null,
+      movementId: isShift ? uid() : null,
+      createdBy: currentUser?.username ?? null,
+    }
+    const validationError = validateExpense(expense)
+    if (validationError) throw new Error(validationError)
+
+    if (isOnline) {
+      const { error } = await supabase.rpc('register_expense_rpc', buildExpenseRpcArgs(expense))
+      if (error) throw error
+    } else {
+      enqueueOfflineAction({ id: uid(), type: 'REGISTER_EXPENSE', payload: expense })
+    }
+
+    qc.setQueryData(['expenses'], (old = []) => [expense, ...old.filter((e) => e.id !== expense.id)])
+    if (isShift) {
+      const movement = buildExpenseMovement(expense)
+      qc.setQueryData(['shifts'], (old = []) =>
+        old.map((s) => (s.id === expense.shiftId ? { ...s, movements: [...(s.movements ?? []), movement] } : s)),
+      )
+    }
+    return expense
+  }, [currentShift, currentUser, isOnline, enqueueOfflineAction, qc])
+
+  // Admin only, for expenses paid outside the drawer (RLS blocks origin 'turno')
+  const updateExpense = useCallback(async (expense) => {
+    const fields = {
+      category: expense.category,
+      amount: Number(expense.amount),
+      description: expense.description?.trim() || null,
+      period: expense.period,
+      paidAt: expense.paidAt,
+      origin: expense.origin,
+    }
+    const validationError = validateExpense(fields)
+    if (validationError) throw new Error(validationError)
+    const { data, error } = await supabase.from('expenses').update(fields).eq('id', expense.id).select()
+    if (error) throw error
+    const saved = data?.[0] ?? { ...expense, ...fields }
+    qc.setQueryData(['expenses'], (old = []) => old.map((e) => (e.id === saved.id ? saved : e)))
+    return saved
+  }, [qc])
+
+  const deleteExpense = useCallback(async (id) => {
+    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    if (error) throw error
+    qc.setQueryData(['expenses'], (old = []) => old.filter((e) => e.id !== id))
+  }, [qc])
+
   const addComboItem = useCallback((item) => addComboItemMutation.mutateAsync(item), [addComboItemMutation])
   const deleteComboItem = useCallback((id) => deleteComboItemMutation.mutateAsync(id), [deleteComboItemMutation])
   const addPromotion = useCallback((promo) => addPromotionMutation.mutateAsync(promo), [addPromotionMutation])
@@ -2175,6 +2261,7 @@ export function useStore() {
     productBatches: displayedProductBatches,
     comboItems,
     promotions,
+    expenses,
     sales,
     customers,
     suppliers,
@@ -2194,6 +2281,7 @@ export function useStore() {
     displayedProductBatches,
     comboItems,
     promotions,
+    expenses,
     sales,
     customers,
     suppliers,
@@ -2234,6 +2322,9 @@ export function useStore() {
     updateProductBatch,
     addComboItem,
     deleteComboItem,
+    registerExpense,
+    updateExpense,
+    deleteExpense,
     addPromotion,
     updatePromotion,
     deletePromotion,

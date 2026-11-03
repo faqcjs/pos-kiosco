@@ -8,6 +8,8 @@ export const MOVEMENT_LABELS = {
   egreso: 'Egreso',
   cobro_fiado: 'Cobro fiado',
   pago_proveedor: 'Pago proveedor',
+  gasto: 'Gasto',
+  retiro: 'Retiro',
 }
 
 // Longer labels shown in the admin shift detail modal.
@@ -19,12 +21,15 @@ export const MOVEMENT_DETAIL_LABELS = {
   egreso: 'Egreso / Retiro',
   cobro_fiado: 'Cobro de Fiado',
   pago_proveedor: 'Pago a Proveedor',
+  gasto: 'Gasto Operativo',
+  retiro: 'Retiro de Caja',
 }
 
 // Movements that mirror a sale (the sale itself is listed instead).
 export const SALE_MOVEMENT_TYPES = ['venta', 'venta_qr']
 export const MANUAL_IN_MOVEMENT_TYPES = ['ingreso', 'cobro_fiado']
-export const MANUAL_OUT_MOVEMENT_TYPES = ['egreso', 'pago_proveedor']
+// 'gasto' is an operating expense paid from the drawer; 'retiro' takes cash out of the drawer.
+export const MANUAL_OUT_MOVEMENT_TYPES = ['egreso', 'pago_proveedor', 'gasto', 'retiro']
 
 // Shift movements are stored signed: outflows negative, everything else positive.
 export function signMovementAmount(type, amount) {

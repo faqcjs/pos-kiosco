@@ -17,6 +17,7 @@ export const REALTIME_TABLES = {
   product_batches: { queryKey: ['product_batches'], upsert: true },
   combo_items: { queryKey: ['combo_items'], upsert: true },
   promotions: { queryKey: ['promotions'], upsert: true },
+  expenses: { queryKey: ['expenses'], insertAt: 'start' },
   sales: { queryKey: ['sales'], insertAt: 'start', ranged: true },
   shifts: { queryKey: ['shifts'], insertAt: 'start' },
   customers: { queryKey: ['customers'], insertAt: 'end', sort: byName },

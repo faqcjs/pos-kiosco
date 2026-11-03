@@ -21,6 +21,8 @@ describe('movement labels', () => {
       egreso: 'Egreso',
       cobro_fiado: 'Cobro fiado',
       pago_proveedor: 'Pago proveedor',
+      gasto: 'Gasto',
+      retiro: 'Retiro',
     })
   })
 
@@ -33,6 +35,8 @@ describe('movement labels', () => {
       egreso: 'Egreso / Retiro',
       cobro_fiado: 'Cobro de Fiado',
       pago_proveedor: 'Pago a Proveedor',
+      gasto: 'Gasto Operativo',
+      retiro: 'Retiro de Caja',
     })
   })
 
@@ -183,9 +187,11 @@ describe('computeShiftDetailStats', () => {
 })
 
 describe('signMovementAmount', () => {
-  it('stores outflows (egreso, pago_proveedor) as negative', () => {
+  it('stores outflows (egreso, pago_proveedor, gasto, retiro) as negative', () => {
     expect(signMovementAmount('egreso', 500)).toBe(-500)
     expect(signMovementAmount('pago_proveedor', -300)).toBe(-300)
+    expect(signMovementAmount('gasto', 700)).toBe(-700)
+    expect(signMovementAmount('retiro', 900)).toBe(-900)
   })
 
   it('stores every other movement as positive', () => {

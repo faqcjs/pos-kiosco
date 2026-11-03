@@ -80,7 +80,7 @@ describe('applyRealtimeChange', () => {
 describe('REALTIME_TABLES', () => {
   it('keeps the per-table semantics of the realtime channel', () => {
     expect(Object.keys(REALTIME_TABLES).sort()).toEqual(
-      ['combo_items', 'customers', 'product_batches', 'products', 'promotions', 'sales', 'shifts', 'suppliers', 'users'],
+      ['combo_items', 'customers', 'expenses', 'product_batches', 'products', 'promotions', 'sales', 'shifts', 'suppliers', 'users'],
     )
     expect(REALTIME_TABLES.customers.sort).toBeTypeOf('function')
     expect(REALTIME_TABLES.suppliers.sort).toBeTypeOf('function')
@@ -88,5 +88,6 @@ describe('REALTIME_TABLES', () => {
     expect(REALTIME_TABLES.combo_items.upsert).toBe(true)
     expect(REALTIME_TABLES.promotions.upsert).toBe(true)
     expect(REALTIME_TABLES.sales.insertAt).toBe('start')
+    expect(REALTIME_TABLES.expenses.insertAt).toBe('start')
   })
 })
