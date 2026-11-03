@@ -9,17 +9,84 @@ import { SEED_PRODUCTS, SEED_CUSTOMERS, SEED_SUPPLIERS, generateMockSales } from
 import { calculateComboMetrics } from './promotions'
 import { freezeItemCosts, sumItemsCost } from './sale-cost'
 import { applyPurchaseItems } from './purchase-cost'
+import { RealtimeSync } from './realtime-sync'
+import { MANUAL_IN_MOVEMENT_TYPES, MANUAL_OUT_MOVEMENT_TYPES, signMovementAmount } from './cash-movements'
+import {
+  DIRECT_PURCHASE_SUPPLIER_ID,
+  DIRECT_PURCHASE_SUPPLIER_NAME,
+  DIRECT_PURCHASES_STORAGE_KEY,
+  SUPABASE_PAGE_SIZE,
+  DIRECT_PURCHASE_SUPPLIER_CATEGORY,
+  ROLES,
+  UI_STATE_STORAGE_KEY,
+  AUTH_EMAIL_DOMAIN,
+  PGRST_TABLE_NOT_FOUND,
+  DEFAULT_CATEGORY,
+  DEFAULT_SELLER_USERNAME,
+  OFFLINE_SALE_ID_PREFIX,
+  OFFLINE_SYNC_COMPLETED_EVENT,
+  OFFLINE_SALE_REGISTERED_EVENT,
+} from './constants'
+
+// Max distance between a supplier entry and its cash movement to consider them the same event
+const MOVEMENT_MATCH_TOLERANCE_MS = 5000
+// Number of closed shifts loaded in the history
+const SHIFT_HISTORY_LIMIT = 100
+// Characters of the sale id shown in shift movements ("Venta #abc123")
+const SALE_ID_SUFFIX_LENGTH = 6
+// Id that never exists: used with .neq() to delete every row on data reset
+const RESET_SENTINEL_ID = '_none_'
+
+const QUERY_STALE_TIME_MS = 1000 * 60 * 30 // 30 minutes
+const QUERY_GC_TIME_MS = 1000 * 60 * 60 * 24 // 24 hours
+
+// Returns a copy of obj without the given keys
+const omitKeys = (obj, keys) => Object.fromEntries(Object.entries(obj).filter(([key]) => !keys.includes(key)))
+
+const isDirectPurchaseSupplier = (s) =>
+  s.id === DIRECT_PURCHASE_SUPPLIER_ID || s.name === DIRECT_PURCHASE_SUPPLIER_NAME
+
+const persistDirectPurchases = (entries) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(DIRECT_PURCHASES_STORAGE_KEY, JSON.stringify(entries))
+  }
+}
+
+// Fetches every page of a Supabase query; buildQuery(from, to) returns the ranged query
+async function fetchAllPages(buildQuery) {
+  let rows = []
+  let page = 0
+  let hasMore = true
+
+  while (hasMore) {
+    const { data, error } = await buildQuery(page * SUPABASE_PAGE_SIZE, (page + 1) * SUPABASE_PAGE_SIZE - 1)
+    if (error) throw error
+
+    if (!data || data.length === 0) {
+      hasMore = false
+    } else {
+      rows = [...rows, ...data]
+      if (data.length < SUPABASE_PAGE_SIZE) {
+        hasMore = false
+      } else {
+        page += 1
+      }
+    }
+  }
+
+  return rows
+}
 
 function sanitizeProduct(p) {
   return {
     id: p.id,
     barcode: p.barcode || '',
     name: p.name || '',
-    category: p.category || 'Varios',
+    category: p.category || DEFAULT_CATEGORY,
     cost: Number(p.cost) || 0,
     price: Number(p.price) || 0,
     stock: Number(p.stock) || 0,
-    "minStock": Number(p.minStock) || 0,
+    minStock: Number(p.minStock) || 0,
     isMostSold: !!p.isMostSold,
     unidad: Number(p.unidad) || 1,
     controlLotes: !!p.controlLotes,
@@ -59,8 +126,8 @@ export function shiftTotals(shift, sales) {
       qrSales += m.amount
       hasQrMovements = true
     }
-    else if (m.type === 'ingreso' || m.type === 'cobro_fiado') manualIn += m.amount
-    else if (m.type === 'egreso' || m.type === 'pago_proveedor') manualOut += m.amount
+    else if (MANUAL_IN_MOVEMENT_TYPES.includes(m.type)) manualIn += m.amount
+    else if (MANUAL_OUT_MOVEMENT_TYPES.includes(m.type)) manualOut += m.amount
   }
 
   if (!hasQrMovements) {
@@ -132,7 +199,7 @@ export const useUIStore = create()(
       }),
     }),
     {
-      name: 'kiosko-pos-ui-state',
+      name: UI_STATE_STORAGE_KEY,
     }
   )
 )
@@ -143,168 +210,11 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
-      staleTime: 1000 * 60 * 30, // 30 minutes (Realtime handles live updates)
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+      staleTime: QUERY_STALE_TIME_MS, // Realtime handles live updates
+      gcTime: QUERY_GC_TIME_MS,
     },
   },
 })
-
-function RealtimeSync() {
-  const qc = useQueryClient()
-  useEffect(() => {
-    const channel = supabase
-      .channel('pos-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        const { table, eventType, new: newRow, old: oldRow } = payload
-        switch (table) {
-          case 'products': {
-            if (eventType === 'INSERT') {
-              qc.setQueryData(['products'], (old = []) => {
-                if (old.some((p) => p.id === newRow.id)) return old
-                return [...old, newRow].sort((a, b) => a.name.localeCompare(b.name))
-              })
-            } else if (eventType === 'UPDATE') {
-              qc.setQueryData(['products'], (old = []) =>
-                old.map((p) => (p.id === newRow.id ? { ...p, ...newRow } : p))
-              )
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueryData(['products'], (old = []) => old.filter((p) => p.id !== targetId))
-            }
-            break
-          }
-          case 'product_batches': {
-            if (eventType === 'INSERT' || eventType === 'UPDATE') {
-              qc.setQueryData(['product_batches'], (old = []) => {
-                const exists = old.some((b) => b.id === newRow.id)
-                return exists ? old.map((b) => (b.id === newRow.id ? { ...b, ...newRow } : b)) : [...old, newRow]
-              })
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueryData(['product_batches'], (old = []) => old.filter((b) => b.id !== targetId))
-            }
-            break
-          }
-          case 'combo_items': {
-            if (eventType === 'INSERT' || eventType === 'UPDATE') {
-              qc.setQueryData(['combo_items'], (old = []) => {
-                const exists = old.some((b) => b.id === newRow.id)
-                return exists ? old.map((b) => (b.id === newRow.id ? { ...b, ...newRow } : b)) : [...old, newRow]
-              })
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueryData(['combo_items'], (old = []) => old.filter((b) => b.id !== targetId))
-            }
-            break
-          }
-          case 'promotions': {
-            if (eventType === 'INSERT' || eventType === 'UPDATE') {
-              qc.setQueryData(['promotions'], (old = []) => {
-                const exists = old.some((b) => b.id === newRow.id)
-                return exists ? old.map((b) => (b.id === newRow.id ? { ...b, ...newRow } : b)) : [...old, newRow]
-              })
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueryData(['promotions'], (old = []) => old.filter((b) => b.id !== targetId))
-            }
-            break
-          }
-          case 'sales': {
-            if (eventType === 'INSERT') {
-              qc.setQueriesData({ queryKey: ['sales'] }, (old = []) => {
-                if (!Array.isArray(old)) return old
-                if (old.some((s) => s.id === newRow.id)) return old
-                return [newRow, ...old]
-              })
-            } else if (eventType === 'UPDATE') {
-              qc.setQueriesData({ queryKey: ['sales'] }, (old = []) => {
-                if (!Array.isArray(old)) return old
-                return old.map((s) => (s.id === newRow.id ? { ...s, ...newRow } : s))
-              })
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueriesData({ queryKey: ['sales'] }, (old = []) => {
-                if (!Array.isArray(old)) return old
-                return old.filter((s) => s.id !== targetId)
-              })
-            }
-            break
-          }
-          case 'shifts': {
-            if (eventType === 'INSERT') {
-              qc.setQueryData(['shifts'], (old = []) => {
-                if (old.some((s) => s.id === newRow.id)) return old
-                return [newRow, ...old]
-              })
-            } else if (eventType === 'UPDATE') {
-              qc.setQueryData(['shifts'], (old = []) =>
-                old.map((s) => (s.id === newRow.id ? { ...s, ...newRow } : s))
-              )
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueryData(['shifts'], (old = []) => old.filter((s) => s.id !== targetId))
-            }
-            break
-          }
-          case 'customers': {
-            if (eventType === 'INSERT') {
-              qc.setQueryData(['customers'], (old = []) => {
-                if (old.some((c) => c.id === newRow.id)) return old
-                return [...old, newRow].sort((a, b) => a.name.localeCompare(b.name))
-              })
-            } else if (eventType === 'UPDATE') {
-              qc.setQueryData(['customers'], (old = []) =>
-                old.map((c) => (c.id === newRow.id ? { ...c, ...newRow } : c))
-              )
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueryData(['customers'], (old = []) => old.filter((c) => c.id !== targetId))
-            }
-            break
-          }
-          case 'suppliers': {
-            if (eventType === 'INSERT') {
-              qc.setQueryData(['suppliers'], (old = []) => {
-                if (old.some((s) => s.id === newRow.id)) return old
-                return [...old, newRow].sort((a, b) => a.name.localeCompare(b.name))
-              })
-            } else if (eventType === 'UPDATE') {
-              qc.setQueryData(['suppliers'], (old = []) =>
-                old.map((s) => (s.id === newRow.id ? { ...s, ...newRow } : s))
-              )
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueryData(['suppliers'], (old = []) => old.filter((s) => s.id !== targetId))
-            }
-            break
-          }
-          case 'users': {
-            if (eventType === 'INSERT') {
-              qc.setQueryData(['users'], (old = []) => {
-                if (old.some((u) => u.id === newRow.id)) return old
-                return [...old, newRow]
-              })
-            } else if (eventType === 'UPDATE') {
-              qc.setQueryData(['users'], (old = []) =>
-                old.map((u) => (u.id === newRow.id ? { ...u, ...newRow } : u))
-              )
-            } else if (eventType === 'DELETE') {
-              const targetId = oldRow?.id || newRow?.id
-              qc.setQueryData(['users'], (old = []) => old.filter((u) => u.id !== targetId))
-            }
-            break
-          }
-          default:
-            break
-        }
-      })
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [qc])
-  return null
-}
 
 export function StoreProvider({ children }) {
   return (
@@ -320,18 +230,13 @@ export function StoreProvider({ children }) {
 export function useSalesQuery({ dateFrom, dateTo, enabled = true } = {}) {
   return useQuery({
     queryKey: ['sales', dateFrom || 'all-from', dateTo || 'all-to'],
-    queryFn: async () => {
-      const allSales = []
-      let page = 0
-      const pageSize = 1000
-      let hasMore = true
-
-      while (hasMore) {
+    queryFn: () =>
+      fetchAllPages((from, to) => {
         let query = supabase
           .from('sales')
           .select('*')
           .order('date', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1)
+          .range(from, to)
 
         if (dateFrom) {
           const startIso = new Date(`${dateFrom}T00:00:00`).toISOString()
@@ -342,23 +247,8 @@ export function useSalesQuery({ dateFrom, dateTo, enabled = true } = {}) {
           query = query.lte('date', endIso)
         }
 
-        const { data, error } = await query
-        if (error) throw error
-
-        if (!data || data.length === 0) {
-          hasMore = false
-        } else {
-          allSales.push(...data)
-          if (data.length < pageSize) {
-            hasMore = false
-          } else {
-            page++
-          }
-        }
-      }
-
-      return allSales
-    },
+        return query
+      }),
     enabled,
   })
 }
@@ -447,37 +337,11 @@ export function useStore() {
   // React Query server state queries
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ['products'],
-    queryFn: async () => {
-      const allProducts = []
-      let page = 0
-      const pageSize = 1000
-      let hasMore = true
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('name')
-          .range(page * pageSize, (page + 1) * pageSize - 1)
-
-        if (error) throw error
-        if (!data || data.length === 0) {
-          hasMore = false
-        } else {
-          allProducts.push(...data)
-          if (data.length < pageSize) {
-            hasMore = false
-          } else {
-            page++
-          }
-        }
-      }
-
-      return allProducts
-    },
+    queryFn: () =>
+      fetchAllPages((from, to) => supabase.from('products').select('*').order('name').range(from, to)),
   })
 
-  const isAdmin = currentUser?.role === 'administrador'
+  const isAdmin = currentUser?.role === ROLES.ADMIN
 
   const salesQueryStartDate = useMemo(() => {
     const now = new Date()
@@ -491,35 +355,15 @@ export function useStore() {
 
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ['sales', isAdmin ? 'admin-month' : 'cajero-today'],
-    queryFn: async () => {
-      const allSales = []
-      let page = 0
-      const pageSize = 1000
-      let hasMore = true
-
-      while (hasMore) {
-        const { data, error } = await supabase
+    queryFn: () =>
+      fetchAllPages((from, to) =>
+        supabase
           .from('sales')
           .select('*')
           .gte('date', salesQueryStartDate)
           .order('date', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1)
-
-        if (error) throw error
-        if (!data || data.length === 0) {
-          hasMore = false
-        } else {
-          allSales.push(...data)
-          if (data.length < pageSize) {
-            hasMore = false
-          } else {
-            page++
-          }
-        }
-      }
-
-      return allSales
-    },
+          .range(from, to),
+      ),
   })
 
   const { data: customers = [], isLoading: loadingCustomers } = useQuery({
@@ -536,26 +380,25 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase.from('suppliers').select('*').order('name')
       if (error) throw error
-      const list = data || []
+      const list = data ?? []
 
-      const storedDirect = typeof window !== 'undefined' ? localStorage.getItem('kiosko_direct_purchases') : null
+      const storedDirect = typeof window !== 'undefined' ? localStorage.getItem(DIRECT_PURCHASES_STORAGE_KEY) : null
       if (storedDirect) {
         try {
           const directEntries = JSON.parse(storedDirect)
-          const existingDirectIdx = list.findIndex((s) => s.id === 'compra_directa' || s.name === 'Compra Directa')
+          const existingDirectIdx = list.findIndex(isDirectPurchaseSupplier)
           if (existingDirectIdx !== -1) {
-            list[existingDirectIdx] = {
-              ...list[existingDirectIdx],
-              entries: directEntries,
-            }
-          } else {
-            list.push({
-              id: 'compra_directa',
-              name: 'Compra Directa',
-              category: 'General',
-              entries: directEntries,
-            })
+            return list.map((s, idx) => (idx === existingDirectIdx ? { ...s, entries: directEntries } : s))
           }
+          return [
+            ...list,
+            {
+              id: DIRECT_PURCHASE_SUPPLIER_ID,
+              name: DIRECT_PURCHASE_SUPPLIER_NAME,
+              category: DIRECT_PURCHASE_SUPPLIER_CATEGORY,
+              entries: directEntries,
+            },
+          ]
         } catch (e) {
           console.error(e)
         }
@@ -571,7 +414,7 @@ export function useStore() {
         .from('shifts')
         .select('*')
         .order('openedAt', { ascending: false })
-        .limit(100)
+        .limit(SHIFT_HISTORY_LIMIT)
 
       if (error) throw error
       return data || []
@@ -585,39 +428,15 @@ export function useStore() {
       if (error) throw error
       return data || []
     },
-    enabled: currentUser?.role === 'administrador',
+    enabled: currentUser?.role === ROLES.ADMIN,
   })
 
   const { data: productBatches = [], isLoading: loadingProductBatches } = useQuery({
     queryKey: ['product_batches'],
-    queryFn: async () => {
-      const allBatches = []
-      let page = 0
-      const pageSize = 1000
-      let hasMore = true
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('product_batches')
-          .select('*')
-          .order('expirationDate')
-          .range(page * pageSize, (page + 1) * pageSize - 1)
-
-        if (error) throw error
-        if (!data || data.length === 0) {
-          hasMore = false
-        } else {
-          allBatches.push(...data)
-          if (data.length < pageSize) {
-            hasMore = false
-          } else {
-            page++
-          }
-        }
-      }
-
-      return allBatches
-    },
+    queryFn: () =>
+      fetchAllPages((from, to) =>
+        supabase.from('product_batches').select('*').order('expirationDate').range(from, to),
+      ),
   })
 
   const { data: comboItems = [] } = useQuery({
@@ -625,7 +444,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase.from('combo_items').select('*')
       if (error) {
-        if (error.code !== 'PGRST205') console.warn('Error fetching combo_items:', error)
+        if (error.code !== PGRST_TABLE_NOT_FOUND) console.warn('Error fetching combo_items:', error)
         return []
       }
       return data || []
@@ -637,7 +456,7 @@ export function useStore() {
     queryFn: async () => {
       const { data, error } = await supabase.from('promotions').select('*')
       if (error) {
-        if (error.code !== 'PGRST205') console.warn('Error fetching promotions:', error)
+        if (error.code !== PGRST_TABLE_NOT_FOUND) console.warn('Error fetching promotions:', error)
         return []
       }
       return data || []
@@ -732,7 +551,7 @@ export function useStore() {
     const remainingActions = useUIStore.getState().offlineActionsQueue.length
     if (remainingSales === 0 && remainingActions === 0) {
       if (typeof window !== 'undefined' && window.dispatchEvent) {
-        window.dispatchEvent(new CustomEvent('offline-sync-completed'))
+        window.dispatchEvent(new CustomEvent(OFFLINE_SYNC_COMPLETED_EVENT))
       }
     }
   }, [dequeueOfflineSale, qc])
@@ -820,7 +639,7 @@ export function useStore() {
             const { type, amount, reason, date, shiftId } = action.payload
             const { data: shiftData, error: fetchError } = await supabase.from('shifts').select('*').eq('id', shiftId).single()
             if (fetchError) throw fetchError
-            const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
+            const signed = signMovementAmount(type, amount)
             const mov = { id: action.id, date, type, amount: signed, reason }
             const updated = {
               ...shiftData,
@@ -893,7 +712,7 @@ export function useStore() {
     const remainingActions = useUIStore.getState().offlineActionsQueue.length
     if (remainingSales === 0 && remainingActions === 0) {
       if (typeof window !== 'undefined' && window.dispatchEvent) {
-        window.dispatchEvent(new CustomEvent('offline-sync-completed'))
+        window.dispatchEvent(new CustomEvent(OFFLINE_SYNC_COMPLETED_EVENT))
       }
     }
   }, [dequeueOfflineAction, qc])
@@ -928,7 +747,7 @@ export function useStore() {
     return shifts.filter((s) => s.status === 'closed')
   }, [shifts])
 
-  const hydrated = !isOnline || (!loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts && !loadingProductBatches && (currentUser?.role === 'administrador' ? !loadingUsers : true))
+  const hydrated = !isOnline || (!loadingProducts && !loadingSales && !loadingCustomers && !loadingSuppliers && !loadingShifts && !loadingProductBatches && (currentUser?.role === ROLES.ADMIN ? !loadingUsers : true))
 
   // Mutations
   const addProductMutation = useMutation({
@@ -950,8 +769,7 @@ export function useStore() {
 
   const updateProductMutation = useMutation({
     mutationFn: async (p) => {
-      const sanitized = sanitizeProduct(p)
-      delete sanitized.id
+      const sanitized = omitKeys(sanitizeProduct(p), ['id'])
       const { data, error } = await supabase.from('products').update(sanitized).eq('id', p.id).select()
       if (error) throw error
       return data[0]
@@ -1073,7 +891,7 @@ export function useStore() {
 
   const addMovementMutation = useMutation({
     mutationFn: async ({ shiftId, currentMovements, type, amount, reason }) => {
-      const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
+      const signed = signMovementAmount(type, amount)
       const mov = { id: uid(), date: new Date().toISOString(), type, amount: signed, reason }
       const { data, error } = await supabase
         .from('shifts')
@@ -1198,7 +1016,7 @@ export function useStore() {
   const receiveGoodsMutation = useMutation({
     mutationFn: async ({ supplierId, amount, detail, paidCash, shiftId, items = [] }) => {
       const date = new Date().toISOString()
-      const dbSupplierId = supplierId === 'compra_directa' || !supplierId ? null : supplierId
+      const dbSupplierId = supplierId === DIRECT_PURCHASE_SUPPLIER_ID || !supplierId ? null : supplierId
 
       if (!dbSupplierId) {
         // Direct purchase without a supplier: update products directly in Supabase to bypass RPC supplier validation.
@@ -1226,10 +1044,10 @@ export function useStore() {
         })
         if (error) throw error
       }
-      return { supplierId: supplierId || 'compra_directa', amount, detail, paidCash, date, shiftId, items }
+      return { supplierId: supplierId || DIRECT_PURCHASE_SUPPLIER_ID, amount, detail, paidCash, date, shiftId, items }
     },
     onSuccess: (result) => {
-      if (!result.supplierId || result.supplierId === 'compra_directa') {
+      if (!result.supplierId || result.supplierId === DIRECT_PURCHASE_SUPPLIER_ID) {
         const newEntry = {
           id: uid(),
           date: result.date,
@@ -1240,21 +1058,21 @@ export function useStore() {
           items: result.items,
         }
         qc.setQueryData(['suppliers'], (old = []) => {
-          const exists = old.some((s) => s.id === 'compra_directa' || s.name === 'Compra Directa')
-          let updated
-          if (exists) {
-            updated = old.map((s) => {
-              if (s.id === 'compra_directa' || s.name === 'Compra Directa') {
-                return { ...s, entries: [...(s.entries || []), newEntry] }
-              }
-              return s
-            })
-          } else {
-            updated = [...old, { id: 'compra_directa', name: 'Compra Directa', category: 'General', entries: [newEntry] }]
-          }
-          const directSup = updated.find((s) => s.id === 'compra_directa' || s.name === 'Compra Directa')
-          if (directSup && typeof window !== 'undefined') {
-            localStorage.setItem('kiosko_direct_purchases', JSON.stringify(directSup.entries || []))
+          const exists = old.some(isDirectPurchaseSupplier)
+          const updated = exists
+            ? old.map((s) => (isDirectPurchaseSupplier(s) ? { ...s, entries: [...(s.entries || []), newEntry] } : s))
+            : [
+                ...old,
+                {
+                  id: DIRECT_PURCHASE_SUPPLIER_ID,
+                  name: DIRECT_PURCHASE_SUPPLIER_NAME,
+                  category: DIRECT_PURCHASE_SUPPLIER_CATEGORY,
+                  entries: [newEntry],
+                },
+              ]
+          const directSup = updated.find(isDirectPurchaseSupplier)
+          if (directSup) {
+            persistDirectPurchases(directSup.entries || [])
           }
           return updated
         })
@@ -1342,7 +1160,7 @@ export function useStore() {
         p_cash_received: args.cashReceived || 0,
         p_change: args.change || 0,
         p_cost: cost,
-        p_sold_by: currentUser?.username || 'admin',
+        p_sold_by: currentUser?.username || DEFAULT_SELLER_USERNAME,
         p_date: date,
         p_shift_id: currentShift.id,
         p_discount: discount,
@@ -1362,7 +1180,7 @@ export function useStore() {
         cashReceived: args.cashReceived || 0,
         change: args.change || 0,
         cost,
-        soldBy: currentUser?.username || 'admin',
+        soldBy: currentUser?.username || DEFAULT_SELLER_USERNAME,
         shiftId: currentShift.id,
       }
     },
@@ -1412,7 +1230,7 @@ export function useStore() {
                 date: newSale.date,
                 type: 'venta',
                 amount: newSale.total,
-                reason: `Venta #${newSale.id.slice(-6)}`,
+                reason: `Venta #${newSale.id.slice(-SALE_ID_SUFFIX_LENGTH)}`,
               }
               return { ...s, movements: [...(s.movements || []), mov] }
             }
@@ -1425,11 +1243,11 @@ export function useStore() {
 
   const resetDataMutation = useMutation({
     mutationFn: async () => {
-      await supabase.from('products').delete().neq('id', '_none_')
-      await supabase.from('sales').delete().neq('id', '_none_')
-      await supabase.from('customers').delete().neq('id', '_none_')
-      await supabase.from('suppliers').delete().neq('id', '_none_')
-      await supabase.from('shifts').delete().neq('id', '_none_')
+      await supabase.from('products').delete().neq('id', RESET_SENTINEL_ID)
+      await supabase.from('sales').delete().neq('id', RESET_SENTINEL_ID)
+      await supabase.from('customers').delete().neq('id', RESET_SENTINEL_ID)
+      await supabase.from('suppliers').delete().neq('id', RESET_SENTINEL_ID)
+      await supabase.from('shifts').delete().neq('id', RESET_SENTINEL_ID)
 
       await supabase.from('products').insert(SEED_PRODUCTS)
       await supabase.from('sales').insert(generateMockSales())
@@ -1447,7 +1265,7 @@ export function useStore() {
         p_username: username.toLowerCase().trim(),
         p_password: password,
         p_name: name,
-        p_role: role || 'cajero',
+        p_role: role || ROLES.CASHIER,
       })
       if (error) throw error
       const { data: profile, error: profileError } = await supabase
@@ -1694,7 +1512,7 @@ export function useStore() {
         type: 'ADD_MOVEMENT',
         payload: { type, amount, reason, date: new Date().toISOString(), shiftId: currentShift?.id }
       })
-      const signed = type === 'egreso' || type === 'pago_proveedor' ? -Math.abs(amount) : Math.abs(amount)
+      const signed = signMovementAmount(type, amount)
       const mov = { id: uid(), date: new Date().toISOString(), type, amount: signed, reason }
       qc.setQueryData(['shifts'], (oldShifts = []) => {
         return oldShifts.map((s) => {
@@ -1739,7 +1557,7 @@ export function useStore() {
 
 
   const registerCustomerPayment = useCallback((customerId, amount) => {
-    if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero') return Promise.resolve(null)
+    if (currentUser?.role !== ROLES.ADMIN && currentUser?.role !== ROLES.CASHIER) return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
       const date = new Date().toISOString()
@@ -1790,9 +1608,9 @@ export function useStore() {
     } else {
       return registerCustomerPaymentMutation.mutateAsync({ customerId, amount, shiftId })
     }
-  }, [registerCustomerPaymentMutation, isOnline, enqueueOfflineAction, currentShift, qc])
+  }, [registerCustomerPaymentMutation, currentUser, isOnline, enqueueOfflineAction, currentShift, qc, setCurrentShiftCache])
 
-  const addSupplier = useCallback((name, phone = '', contactName = '', category = 'Varios', deliveryDays = []) => {
+  const addSupplier = useCallback((name, phone = '', contactName = '', category = DEFAULT_CATEGORY, deliveryDays = []) => {
     const sup = {
       id: uid(),
       name,
@@ -1879,7 +1697,7 @@ export function useStore() {
       const shiftMov = (currentShift.movements || []).find((m) => {
         const isType = m.type === 'pago_proveedor'
         const isAmount = Math.abs(m.amount) === Math.abs(deletedEntry.amount)
-        const isTimeClose = Math.abs(new Date(m.date).getTime() - shiftTime) < 5000
+        const isTimeClose = Math.abs(new Date(m.date).getTime() - shiftTime) < MOVEMENT_MATCH_TOLERANCE_MS
         return isType && isAmount && isTimeClose
       })
 
@@ -1905,10 +1723,8 @@ export function useStore() {
     }
 
     // If direct purchase, sync with localStorage and update query cache
-    if (supplierId === 'compra_directa' || supplier.name === 'Compra Directa') {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kiosko_direct_purchases', JSON.stringify(updatedEntries))
-      }
+    if (supplierId === DIRECT_PURCHASE_SUPPLIER_ID || supplier.name === DIRECT_PURCHASE_SUPPLIER_NAME) {
+      persistDirectPurchases(updatedEntries)
       qc.setQueryData(['suppliers'], (old = []) =>
         old.map((s) => (s.id === supplier.id ? updatedSupplier : s)),
       )
@@ -1922,10 +1738,10 @@ export function useStore() {
     } else {
       await updateSupplierMutation.mutateAsync(updatedSupplier)
     }
-  }, [currentShift, isOnline, qc, updateSupplierMutation, enqueueOfflineAction, setCurrentShiftCache])
+  }, [currentShift, isOnline, qc, updateSupplierMutation, enqueueOfflineAction, setCurrentShiftCache, setProductsCache])
 
   const receiveGoods = useCallback((supplierId, amount, detail, paidCash, items = []) => {
-    if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero' && currentUser?.role !== 'repositor') return Promise.resolve(null)
+    if (currentUser?.role !== ROLES.ADMIN && currentUser?.role !== ROLES.CASHIER && currentUser?.role !== ROLES.STOCKER) return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
       if (paidCash && !currentShift?.id) {
@@ -1942,24 +1758,23 @@ export function useStore() {
         for (const item of items) {
           if (item.productId) {
             const prod = displayedProducts.find((p) => p.id === item.productId)
-            if (prod && prod.controlLotes) {
+            if (prod?.controlLotes) {
               batchesUpdated = true
               const existingIdx = updated.findIndex((b) => b.productId === item.productId && b.batchCode === item.batchCode)
-              if (existingIdx !== -1) {
-                updated[existingIdx] = {
-                  ...updated[existingIdx],
-                  stock: updated[existingIdx].stock + item.totalUnits
-                }
-              } else {
-                updated.push({
-                  id: uid(),
-                  productId: item.productId,
-                  batchCode: item.batchCode,
-                  expirationDate: item.expirationDate,
-                  stock: item.totalUnits,
-                  created_at: date
-                })
-              }
+              updated =
+                existingIdx !== -1
+                  ? updated.map((b, idx) => (idx === existingIdx ? { ...b, stock: b.stock + item.totalUnits } : b))
+                  : [
+                      ...updated,
+                      {
+                        id: uid(),
+                        productId: item.productId,
+                        batchCode: item.batchCode,
+                        expirationDate: item.expirationDate,
+                        stock: item.totalUnits,
+                        created_at: date,
+                      },
+                    ]
             }
           }
         }
@@ -1997,29 +1812,37 @@ export function useStore() {
       })
 
       // Update suppliers local cache
-      const targetSupplierId = supplierId || 'compra_directa'
+      const targetSupplierId = supplierId || DIRECT_PURCHASE_SUPPLIER_ID
+      const isTargetSupplier = (s) =>
+        s.id === targetSupplierId || (targetSupplierId === DIRECT_PURCHASE_SUPPLIER_ID && isDirectPurchaseSupplier(s))
       qc.setQueryData(['suppliers'], (old = []) => {
-        const exists = old.some((s) => s.id === targetSupplierId || (targetSupplierId === 'compra_directa' && (s.id === 'compra_directa' || s.name === 'Compra Directa')))
+        const exists = old.some(isTargetSupplier)
 
-          const updated = exists
-            ? old.map((s) => {
-                if (s.id === targetSupplierId || (targetSupplierId === 'compra_directa' && (s.id === 'compra_directa' || s.name === 'Compra Directa'))) {
-                  let entries = [...(s.entries || []), { id: uid(), date, type: 'factura', amount, detail, paidCash, items }]
-                  if (paidCash) {
-                    entries.push({ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` })
-                  }
-                  return { ...s, entries }
-                }
-                return s
-              })
-            : [...old, { id: 'compra_directa', name: 'Compra Directa', category: 'General', entries: [{ id: uid(), date, type: 'factura', amount, detail, paidCash, items }] }]
+        const updated = exists
+          ? old.map((s) => {
+              if (!isTargetSupplier(s)) return s
+              const invoice = { id: uid(), date, type: 'factura', amount, detail, paidCash, items }
+              const cashPayment = paidCash
+                ? [{ id: uid(), date, type: 'pago', amount, detail: `Pago contado: ${detail}` }]
+                : []
+              return { ...s, entries: [...(s.entries || []), invoice, ...cashPayment] }
+            })
+          : [
+              ...old,
+              {
+                id: DIRECT_PURCHASE_SUPPLIER_ID,
+                name: DIRECT_PURCHASE_SUPPLIER_NAME,
+                category: DIRECT_PURCHASE_SUPPLIER_CATEGORY,
+                entries: [{ id: uid(), date, type: 'factura', amount, detail, paidCash, items }],
+              },
+            ]
 
-          const directSup = updated.find((s) => s.id === 'compra_directa' || s.name === 'Compra Directa')
-          if (directSup && typeof window !== 'undefined') {
-            localStorage.setItem('kiosko_direct_purchases', JSON.stringify(directSup.entries || []))
-          }
-          return updated
-        })
+        const directSup = updated.find(isDirectPurchaseSupplier)
+        if (directSup) {
+          persistDirectPurchases(directSup.entries || [])
+        }
+        return updated
+      })
 
       // Update shift movement local cache
       if (paidCash && currentShift) {
@@ -2048,10 +1871,10 @@ export function useStore() {
     } else {
       return receiveGoodsMutation.mutateAsync({ supplierId, amount, detail, paidCash, shiftId, items })
     }
-  }, [receiveGoodsMutation, isOnline, enqueueOfflineAction, currentShift, qc, displayedProducts, setBatchesCache, setProductsCache])
+  }, [receiveGoodsMutation, currentUser, isOnline, enqueueOfflineAction, currentShift, qc, displayedProducts, setBatchesCache, setProductsCache, setCurrentShiftCache])
 
   const registerSupplierPayment = useCallback((supplierId, amount, fromCash) => {
-    if (currentUser?.role !== 'administrador' && currentUser?.role !== 'cajero') return Promise.resolve(null)
+    if (currentUser?.role !== ROLES.ADMIN && currentUser?.role !== ROLES.CASHIER) return Promise.resolve(null)
     const shiftId = currentShift?.id || null
     if (!isOnline) {
       if (fromCash && !currentShift?.id) {
@@ -2106,7 +1929,7 @@ export function useStore() {
     } else {
       return registerSupplierPaymentMutation.mutateAsync({ supplierId, amount, fromCash, shiftId })
     }
-  }, [registerSupplierPaymentMutation, isOnline, enqueueOfflineAction, currentShift, qc])
+  }, [registerSupplierPaymentMutation, currentUser, isOnline, enqueueOfflineAction, currentShift, qc, setCurrentShiftCache])
 
   const completeSale = useCallback((args) => {
     const shiftId = currentShift?.id || null
@@ -2120,7 +1943,7 @@ export function useStore() {
       const total = Math.max(0, subtotal - discount)
 
       const sale = {
-        id: `off-${uid()}`,
+        id: `${OFFLINE_SALE_ID_PREFIX}${uid()}`,
         date,
         items: itemsWithCost,
         total,
@@ -2130,7 +1953,7 @@ export function useStore() {
         cashReceived: args.cashReceived,
         change: args.change,
         cost,
-        soldBy: currentUser?.username || 'admin',
+        soldBy: currentUser?.username || DEFAULT_SELLER_USERNAME,
         isOfflinePending: true,
         shiftId,
       }
@@ -2141,10 +1964,10 @@ export function useStore() {
         let updated = [...oldBatches]
         for (const item of args.items) {
           const prod = displayedProducts.find((p) => p.id === item.productId)
-          if (prod && prod.controlLotes) {
+          if (prod?.controlLotes) {
             batchesUpdated = true
             // Find active batches for this product
-            let activeBatches = updated
+            const activeBatches = updated
               .filter((b) => b.productId === item.productId && b.stock > 0)
               .sort((a, b) => {
                 const dateA = new Date(a.expirationDate).getTime()
@@ -2247,14 +2070,14 @@ export function useStore() {
       }
 
       if (typeof window !== 'undefined' && window.dispatchEvent) {
-        window.dispatchEvent(new CustomEvent('offline-sale-registered', { detail: sale }))
+        window.dispatchEvent(new CustomEvent(OFFLINE_SALE_REGISTERED_EVENT, { detail: sale }))
       }
 
       return Promise.resolve(sale)
     } else {
       return completeSaleMutation.mutateAsync(args)
     }
-  }, [completeSaleMutation, displayedProducts, currentUser, enqueueOfflineSale, currentShift, qc, isOnline, setBatchesCache, setProductsCache])
+  }, [completeSaleMutation, displayedProducts, comboItems, currentUser, enqueueOfflineSale, currentShift, qc, isOnline, setBatchesCache, setProductsCache, setCurrentShiftCache])
 
   const resetData = useCallback(() => {
     resetDataMutation.mutate()
@@ -2262,9 +2085,7 @@ export function useStore() {
 
   const retryFailedSale = useCallback((sale) => {
     dequeueFailedSale(sale.id)
-    const cleanSale = { ...sale }
-    delete cleanSale.failedAt
-    delete cleanSale.error
+    const cleanSale = omitKeys(sale, ['failedAt', 'error'])
     enqueueOfflineSale(cleanSale)
     if (navigator.onLine) {
       syncOfflineSales()
@@ -2278,9 +2099,7 @@ export function useStore() {
 
   const retryFailedAction = useCallback((action) => {
     dequeueFailedAction(action.id)
-    const cleanAction = { ...action }
-    delete cleanAction.failedAt
-    delete cleanAction.error
+    const cleanAction = omitKeys(action, ['failedAt', 'error'])
     enqueueOfflineAction(cleanAction)
     if (navigator.onLine) {
       syncOfflineActions()
@@ -2306,7 +2125,7 @@ export function useStore() {
   }, [syncAllOfflineData, isOnline, isSyncing])
 
   const login = useCallback(async (username, password) => {
-    const email = `${username.toLowerCase().trim()}@kiosko.com`
+    const email = `${username.toLowerCase().trim()}${AUTH_EMAIL_DOMAIN}`
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
