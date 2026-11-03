@@ -4,12 +4,14 @@ import { useState, useMemo } from 'react'
 import { Search, ChevronLeft, ChevronRight, BarChart2, Eye, Receipt, User, Calendar, CreditCard, ShoppingBag } from 'lucide-react'
 import { Badge, Modal } from '@/components/ui/kit'
 import { money, formatDateTime } from '@/lib/format'
+import { getUncostedItems, summarizeUncostedSales } from '@/lib/sale-cost'
+import { UncostedSummary } from './uncosted-summary'
 
-export function TabVentas({ sales, shifts = [] }) {
+export function TabVentas({ sales, shifts = [], productsMap }) {
   const [search, setSearch] = useState('')
+  const [onlyUncosted, setOnlyUncosted] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [selectedSales, setSelectedSales] = useState([])
   const [selectedSaleDetail, setSelectedSaleDetail] = useState(null)
 
   // Map shift ID -> cashier name typed at opening/closing
@@ -40,9 +42,20 @@ export function TabVentas({ sales, shifts = [] }) {
     )
   }
 
+  // Venta id -> índices de sus ítems sin costo conocido
+  const uncostedBySale = useMemo(() => {
+    const map = new Map()
+    ;(sales || []).forEach((s) => {
+      const lines = getUncostedItems(s, productsMap)
+      if (lines.length > 0) map.set(s.id, new Set(lines.map((line) => line.index)))
+    })
+    return map
+  }, [sales, productsMap])
+
   const filteredSales = useMemo(() => {
     if (!sales) return []
     return sales.filter((s) => {
+      if (onlyUncosted && !uncostedBySale.has(s.id)) return false
       if (!search.trim()) return true
       const query = search.toLowerCase()
       const idMatch = s.id?.toLowerCase().includes(query)
@@ -52,29 +65,18 @@ export function TabVentas({ sales, shifts = [] }) {
       const itemMatch = s.items?.some((i) => i.name?.toLowerCase().includes(query))
       return idMatch || userMatch || customerMatch || itemMatch
     })
-  }, [sales, search, shiftsMap])
+  }, [sales, search, shiftsMap, onlyUncosted, uncostedBySale])
+
+  const uncostedSummary = useMemo(
+    () => (onlyUncosted ? summarizeUncostedSales(filteredSales, productsMap) : []),
+    [onlyUncosted, filteredSales, productsMap]
+  )
 
   const totalPages = Math.max(1, Math.ceil(filteredSales.length / pageSize))
   const paginatedSales = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return filteredSales.slice(start, start + pageSize)
   }, [filteredSales, currentPage, pageSize])
-
-  const toggleSelectAll = () => {
-    if (selectedSales.length === paginatedSales.length) {
-      setSelectedSales([])
-    } else {
-      setSelectedSales(paginatedSales.map((s) => s.id))
-    }
-  }
-
-  const toggleSelectSale = (id) => {
-    if (selectedSales.includes(id)) {
-      setSelectedSales(selectedSales.filter((item) => item !== id))
-    } else {
-      setSelectedSales([...selectedSales, id])
-    }
-  }
 
   return (
     <div className="rounded-2xl border border-border/70 bg-card p-4 sm:p-6 shadow-2xs space-y-4">
@@ -90,35 +92,45 @@ export function TabVentas({ sales, shifts = [] }) {
           </p>
         </div>
 
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar por ID, cajero, cliente, producto..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
+        <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+          <button
+            type="button"
+            aria-pressed={onlyUncosted}
+            onClick={() => {
+              setOnlyUncosted((v) => !v)
               setCurrentPage(1)
             }}
-            className="h-9 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary"
-          />
+            className={`h-9 shrink-0 rounded-xl border px-3 text-xs font-semibold transition-colors ${
+              onlyUncosted
+                ? 'border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                : 'border-border bg-background text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            Sin costo ({uncostedBySale.size})
+          </button>
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Buscar por ID, cajero, cliente, producto..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="h-9 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary"
+            />
+          </div>
         </div>
       </div>
+
+      {onlyUncosted && <UncostedSummary rows={uncostedSummary} />}
 
       {/* Tabla Adaptable Mobile First */}
       <div className="overflow-x-auto rounded-xl border border-border/60">
         <table className="w-full text-left text-xs text-foreground">
           <thead className="border-b border-border/60 bg-muted/40 uppercase tracking-wider text-[10px] text-muted-foreground font-semibold">
             <tr>
-              <th className="p-3 w-8">
-                <input
-                  type="checkbox"
-                  checked={paginatedSales.length > 0 && selectedSales.length === paginatedSales.length}
-                  onChange={toggleSelectAll}
-                  className="rounded-xs border-border"
-                />
-              </th>
-              <th className="p-3">ID</th>
               <th className="p-3">Fecha</th>
               <th className="p-3">Cajero</th>
               <th className="p-3">Cliente</th>
@@ -132,7 +144,6 @@ export function TabVentas({ sales, shifts = [] }) {
           <tbody className="divide-y divide-border/50 font-medium">
             {paginatedSales.length > 0 ? (
               paginatedSales.map((sale) => {
-                const isSelected = selectedSales.includes(sale.id)
                 const itemsSummary =
                   sale.items?.map((i) => `${i.name} x${i.qty}`).join(', ') || 'Sin items'
                 const displayId = String(sale.id).slice(0, 8).toUpperCase()
@@ -141,19 +152,13 @@ export function TabVentas({ sales, shifts = [] }) {
                 const cashier = getCashierName(sale)
 
                 return (
-                  <tr key={sale.id} className={isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'}>
-                    <td className="p-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelectSale(sale.id)}
-                        className="rounded-xs border-border"
-                      />
+                  <tr key={sale.id} className="hover:bg-muted/30">
+                    <td className="p-3 whitespace-nowrap text-muted-foreground">
+                      <span className="block">{formattedDate}</span>
+                      <span className="block font-mono text-[10px] text-muted-foreground/70" title="ID del ticket">
+                        #{displayId}
+                      </span>
                     </td>
-                    <td className="p-3 font-mono font-bold text-muted-foreground text-[11px]">
-                      <span className="rounded-md bg-muted px-1.5 py-0.5">{displayId}</span>
-                    </td>
-                    <td className="p-3 whitespace-nowrap text-muted-foreground">{formattedDate}</td>
                     <td className="p-3 text-foreground font-semibold">
                       <span className="inline-flex items-center gap-1.5">
                         <User className="size-3.5 text-primary shrink-0" />
@@ -162,6 +167,11 @@ export function TabVentas({ sales, shifts = [] }) {
                     </td>
                     <td className="p-3 text-muted-foreground">{sale.customerName || 'Cliente general'}</td>
                     <td className="p-3 max-w-xs truncate text-muted-foreground" title={itemsSummary}>
+                      {uncostedBySale.has(sale.id) && (
+                        <span className="mr-1.5 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                          Sin costo
+                        </span>
+                      )}
                       {itemsSummary}
                     </td>
                     <td className="p-3">
@@ -193,7 +203,7 @@ export function TabVentas({ sales, shifts = [] }) {
               })
             ) : (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-xs text-muted-foreground">
+                <td colSpan={8} className="p-8 text-center text-xs text-muted-foreground">
                   No se encontraron ventas para la búsqueda.
                 </td>
               </tr>
@@ -302,7 +312,14 @@ export function TabVentas({ sales, shifts = [] }) {
                   <tbody className="divide-y divide-border/40 font-medium">
                     {selectedSaleDetail.items?.map((item, idx) => (
                       <tr key={idx} className="hover:bg-muted/20">
-                        <td className="p-2.5 font-semibold text-foreground">{item.name}</td>
+                        <td className="p-2.5 font-semibold text-foreground">
+                          {item.name}
+                          {uncostedBySale.get(selectedSaleDetail.id)?.has(idx) && (
+                            <span className="ml-1.5 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                              Sin costo
+                            </span>
+                          )}
+                        </td>
                         <td className="p-2.5 text-center text-muted-foreground">x{item.qty}</td>
                         <td className="p-2.5 text-right text-muted-foreground tabular-nums">{money(item.price)}</td>
                         <td className="p-2.5 text-right font-bold text-foreground tabular-nums">{money(item.price * item.qty)}</td>
