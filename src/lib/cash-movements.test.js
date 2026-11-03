@@ -146,16 +146,27 @@ describe('computeShiftDetailStats', () => {
     })
   })
 
-  it('current behavior pending T0: the fallback theoretical adds egresos back because manualOut is negative', () => {
+  it('the fallback theoretical subtracts egresos (manualOut is stored negative)', () => {
     const stats = computeShiftDetailStats({
       shift: { movements },
       openingAmount: 1000,
       closingCounted: 1600,
       isOpen: false,
     })
-    // 1000 + 500 + 300 - (-200) = 2000
-    expect(stats.theoretical).toBe(2000)
-    expect(stats.diff).toBe(-400)
+    // 1000 + 500 + 300 + (-200) = 1600
+    expect(stats.theoretical).toBe(1600)
+    expect(stats.diff).toBe(0)
+  })
+
+  it('keeps the stored closingTheoretical when present', () => {
+    const stats = computeShiftDetailStats({
+      shift: { movements, closingTheoretical: 1234, difference: 5 },
+      openingAmount: 1000,
+      closingCounted: 1239,
+      isOpen: false,
+    })
+    expect(stats.theoretical).toBe(1234)
+    expect(stats.diff).toBe(5)
   })
 
   it('uses salesCashTotal when no movements were logged and leaves diff null while open', () => {

@@ -105,8 +105,8 @@ export function computeShiftDetailStats({ shift, openingAmount, closingCounted, 
     cashSales = shift.salesCashTotal
   }
 
-  // Known bug (task T0): manualOut is already negative, so subtracting it adds egresos back.
-  const theoretical = shift.closingTheoretical ?? (openingAmount + cashSales + manualIn - manualOut)
+  // manualOut is stored negative, so it is added (not subtracted).
+  const theoretical = shift.closingTheoretical ?? openingAmount + cashSales + manualIn + manualOut
   const diff = shift.difference ?? (isOpen ? null : closingCounted - theoretical)
 
   return { cashSales, qrSales, manualIn, manualOut, theoretical, diff }

@@ -104,7 +104,7 @@ function ShiftDetailKpis({ openingAmount, stats }) {
       <KpiCard label="Ingresos / Egresos">
         <p className="flex items-center justify-between font-mono text-sm font-bold">
           <span className={POSITIVE_TEXT}>+{money(stats.manualIn)}</span>
-          <span className={NEGATIVE_TEXT}>-{money(stats.manualOut)}</span>
+          <span className={NEGATIVE_TEXT}>-{money(Math.abs(stats.manualOut))}</span>
         </p>
       </KpiCard>
       <KpiCard label="Saldo Teórico">
