@@ -52,3 +52,11 @@ export function applyPurchaseItems(product, items = []) {
       { cost: toNumber(product.cost), stock: toNumber(product.stock) }
     )
 }
+
+/**
+ * Líneas de compra con producto que no tienen costo unitario cargado.
+ * Se usan para exigir el precio real de la factura antes de registrar la compra.
+ */
+export function findItemsWithoutUnitCost(items = []) {
+  return (items || []).filter((item) => item?.productId && !(toNumber(item.unitCost) > 0))
+}

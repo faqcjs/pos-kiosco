@@ -5,6 +5,8 @@ import { Search, ShoppingCart, Calendar, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, EmptyState, Input, Modal } from '@/components/ui/kit'
 import { formatDateTime, money } from '@/lib/format'
+import { DIRECT_PURCHASE_SUPPLIER_NAME } from '@/lib/constants'
+import { isDirectPurchaseSupplier } from './purchase-draft'
 import { parseInvoiceDetail } from '../proveedores/proveedores'
 
 export function PurchasesList({
@@ -27,8 +29,8 @@ export function PurchasesList({
             list.push({
               ...entry,
               supplierId: sup.id,
-              supplierName: sup.name === 'Compra Directa' ? 'Sin proveedor' : sup.name,
-              isDirect: sup.name === 'Compra Directa' || sup.id === 'compra_directa',
+              supplierName: sup.name === DIRECT_PURCHASE_SUPPLIER_NAME ? 'Sin proveedor' : sup.name,
+              isDirect: isDirectPurchaseSupplier(sup),
               parsedDetail: parsed,
             })
           }
@@ -56,7 +58,7 @@ export function PurchasesList({
       {/* Search & Action bar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute top-1/2 left-3 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -79,7 +81,7 @@ export function PurchasesList({
             }
             action={
               !query && (
-                <Button onClick={onOpenNewPurchase} className="mt-2 font-bold h-11">
+                <Button onClick={onOpenNewPurchase} className="mt-2 h-11 font-bold">
                   Registrar Primera Compra
                 </Button>
               )
@@ -92,29 +94,29 @@ export function PurchasesList({
             <Card
               key={purchase.id}
               onClick={() => setSelectedPurchase(purchase)}
-              className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:border-primary/40 hover:shadow-sm active:scale-[0.99] transition-all bg-card"
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-card cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm active:scale-[0.99]"
             >
               <div className="space-y-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge
                     variant={purchase.isDirect ? 'outline' : 'secondary'}
                     className="text-[11px] font-semibold"
                   >
-                    {purchase.isDirect ? '🛒 Compra Directa' : `🚚 ${purchase.supplierName}`}
+                    {purchase.isDirect ? `🛒 ${DIRECT_PURCHASE_SUPPLIER_NAME}` : `🚚 ${purchase.supplierName}`}
                   </Badge>
                 </div>
 
-                <p className="font-semibold text-xs sm:text-sm text-foreground line-clamp-1">
+                <p className="line-clamp-1 text-xs sm:text-sm font-semibold text-foreground">
                   {purchase.parsedDetail?.text || purchase.detail}
                 </p>
 
-                <p className="text-[11px] sm:text-xs text-muted-foreground flex items-center gap-1">
+                <p className="flex items-center gap-1 text-[11px] sm:text-xs text-muted-foreground">
                   <Calendar className="size-3" />
                   {formatDateTime(purchase.date)}
                 </p>
               </div>
 
-              <div className="text-right shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 flex sm:flex-col items-center sm:items-end justify-between gap-2">
+              <div className="flex sm:flex-col shrink-0 items-center sm:items-end justify-between gap-2 pt-2 sm:pt-0 text-right border-t sm:border-t-0">
                 <p className="text-[11px] text-muted-foreground sm:hidden">Total:</p>
                 <div>
                   <p className="hidden sm:block text-xs text-muted-foreground">Monto Total</p>
@@ -137,10 +139,10 @@ export function PurchasesList({
           subtitle={formatDateTime(selectedPurchase.date)}
         >
           <div className="space-y-4">
-            <div className="rounded-xl border border-border p-3 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-muted/20 rounded-xl border border-border">
               <div>
                 <p className="text-xs text-muted-foreground">Proveedor:</p>
-                <p className="font-bold text-sm">{selectedPurchase.supplierName}</p>
+                <p className="text-sm font-bold">{selectedPurchase.supplierName}</p>
               </div>
 
               {/* Action buttons */}
@@ -157,7 +159,7 @@ export function PurchasesList({
                       onEditPurchase(p)
                     }}
                   >
-                    <Pencil className="size-3.5 mr-1" /> Editar
+                    <Pencil className="mr-1 size-3.5" /> Editar
                   </Button>
                 )}
                 {onDeletePurchase && (
@@ -165,7 +167,7 @@ export function PurchasesList({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="flex-1 sm:flex-initial h-10 text-xs font-bold text-destructive hover:bg-destructive/10 border-destructive/30"
+                    className="flex-1 sm:flex-initial h-10 text-xs font-bold text-destructive border-destructive/30 hover:bg-destructive/10"
                     onClick={() => {
                       if (window.confirm('¿Eliminar este registro de compra?')) {
                         const supId = selectedPurchase.supplierId
@@ -175,7 +177,7 @@ export function PurchasesList({
                       }
                     }}
                   >
-                    <Trash2 className="size-3.5 mr-1" /> Eliminar
+                    <Trash2 className="mr-1 size-3.5" /> Eliminar
                   </Button>
                 )}
               </div>
@@ -183,34 +185,34 @@ export function PurchasesList({
 
             {/* Items table inside detail */}
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Productos Ingresados
               </p>
               {selectedPurchase.items && selectedPurchase.items.length > 0 ? (
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                <div className="overflow-y-auto space-y-1.5 pr-1 max-h-60">
                   {selectedPurchase.items.map((it, idx) => (
                     <div
                       key={idx}
-                      className="flex justify-between items-center p-2.5 rounded-lg border border-border/60 text-xs bg-card"
+                      className="flex items-center justify-between p-2.5 text-xs bg-card rounded-lg border border-border/60"
                     >
-                      <div className="min-w-0 pr-2">
-                        <p className="font-semibold text-foreground truncate">{it.name}</p>
+                      <div className="pr-2 min-w-0">
+                        <p className="truncate font-semibold text-foreground">{it.name}</p>
                         <p className="text-[10px] text-muted-foreground">
                           {it.totalUnits} un. x {money(it.unitCost || (it.cost / (it.totalUnits || 1)))}
                         </p>
                       </div>
-                      <p className="font-bold tabular-nums shrink-0">{money(it.cost)}</p>
+                      <p className="shrink-0 font-bold tabular-nums">{money(it.cost)}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground italic">
+                <p className="text-xs italic text-muted-foreground">
                   {selectedPurchase.parsedDetail?.text || 'Sin detalle de productos'}
                 </p>
               )}
             </div>
 
-            <div className="flex justify-between items-center border-t border-border pt-3">
+            <div className="flex items-center justify-between pt-3 border-t border-border">
               <span className="text-sm font-bold">Total Compra</span>
               <span className="text-lg sm:text-xl font-black text-foreground tabular-nums">
                 {money(selectedPurchase.amount)}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyPurchaseItems, calculateWeightedAverageCost } from './purchase-cost'
+import { applyPurchaseItems, calculateWeightedAverageCost, findItemsWithoutUnitCost } from './purchase-cost'
 
 describe('calculateWeightedAverageCost', () => {
   it('averages existing stock cost with the purchase unit cost', () => {
@@ -65,5 +65,20 @@ describe('applyPurchaseItems', () => {
       cost: 100,
       stock: 50,
     })
+  })
+})
+
+describe('findItemsWithoutUnitCost', () => {
+  it('returns product lines with an empty or zero unit cost', () => {
+    const items = [
+      { id: '1', productId: 'a', name: 'Alfajor', unitCost: 120 },
+      { id: '2', productId: 'b', name: 'Gaseosa', unitCost: null },
+      { id: '3', productId: 'c', name: 'Galletitas', unitCost: 0 },
+    ]
+    expect(findItemsWithoutUnitCost(items).map((it) => it.name)).toEqual(['Gaseosa', 'Galletitas'])
+  })
+
+  it('ignores lines without a product', () => {
+    expect(findItemsWithoutUnitCost([{ id: '1', name: 'Flete', unitCost: null }])).toEqual([])
   })
 })
