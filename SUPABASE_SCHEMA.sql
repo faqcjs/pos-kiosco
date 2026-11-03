@@ -144,6 +144,7 @@ CREATE TABLE public.shifts (
     difference NUMERIC,
     status TEXT DEFAULT 'open',
     "openedBy" TEXT,
+    "openedByUser" TEXT, -- username of the logged-in user (set by trigger)
     "closedBy" TEXT,
     movements JSONB DEFAULT '[]'::jsonb
 );
@@ -153,6 +154,25 @@ ALTER TABLE public.shifts ENABLE ROW LEVEL SECURITY;
 
 -- Ensure at most one open shift exists at any time
 CREATE UNIQUE INDEX shifts_only_one_open ON public.shifts (status) WHERE (status = 'open');
+
+-- The shift owner is always the logged-in user, never a client-provided value
+CREATE OR REPLACE FUNCTION public.set_shift_owner()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_username TEXT;
+BEGIN
+    SELECT username INTO v_username FROM public.users WHERE id = auth.uid();
+    IF v_username IS NOT NULL THEN
+        NEW."openedByUser" := v_username;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS set_shift_owner_before_insert ON public.shifts;
+CREATE TRIGGER set_shift_owner_before_insert
+    BEFORE INSERT ON public.shifts
+    FOR EACH ROW EXECUTE FUNCTION public.set_shift_owner();
 
 -- Drop old function signatures to prevent duplicates
 DROP FUNCTION IF EXISTS public.complete_sale_rpc(TEXT, JSONB, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, TEXT, TIMESTAMPTZ);
@@ -908,14 +928,14 @@ CREATE POLICY "Allow update shifts for shift owner or admin"
     ON public.shifts FOR UPDATE TO authenticated 
     USING (
         status = 'open' AND (
-            "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR 
+            COALESCE("openedByUser", "openedBy") = (SELECT username FROM public.users WHERE id = auth.uid()) OR 
             public.has_role('administrador')
         )
     )
     -- No status check here: the new row may be closed (closing a shift).
     -- USING already limits updates to open shifts.
     WITH CHECK (
-        "openedBy" = (SELECT username FROM public.users WHERE id = auth.uid()) OR 
+        COALESCE("openedByUser", "openedBy") = (SELECT username FROM public.users WHERE id = auth.uid()) OR 
         public.has_role('administrador')
     );
 
