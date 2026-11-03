@@ -594,9 +594,19 @@ BEGIN
                         v_calculated_unit_cost := 0;
                     END IF;
 
-                    -- Update product cost (keep current cost if line has no cost)
-                    UPDATE public.products 
-                    SET cost = CASE WHEN v_calculated_unit_cost > 0 THEN v_calculated_unit_cost ELSE cost END
+                    -- Weighted average cost, computed before adding the new stock.
+                    -- Keeps the current cost if the line has no cost.
+                    -- Same rule as src/lib/purchase-cost.js: keep both in sync.
+                    UPDATE public.products
+                    SET cost = CASE
+                        WHEN v_calculated_unit_cost <= 0 THEN cost
+                        WHEN GREATEST(COALESCE(stock, 0), 0) = 0 OR COALESCE(cost, 0) <= 0 THEN v_calculated_unit_cost
+                        ELSE ROUND(
+                            (GREATEST(stock, 0) * cost + item."totalUnits" * v_calculated_unit_cost)
+                            / (GREATEST(stock, 0) + item."totalUnits"),
+                            2
+                        )
+                    END
                     WHERE id = item."productId";
 
                     IF NOT v_control_lotes THEN

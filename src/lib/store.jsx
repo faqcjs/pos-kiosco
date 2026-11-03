@@ -8,6 +8,7 @@ import { uid } from './format'
 import { SEED_PRODUCTS, SEED_CUSTOMERS, SEED_SUPPLIERS, generateMockSales } from './seed'
 import { calculateComboMetrics } from './promotions'
 import { freezeItemCosts, sumItemsCost } from './sale-cost'
+import { applyPurchaseItems } from './purchase-cost'
 
 function sanitizeProduct(p) {
   return {
@@ -1199,23 +1200,18 @@ export function useStore() {
       const dbSupplierId = supplierId === 'compra_directa' || !supplierId ? null : supplierId
 
       if (!dbSupplierId) {
-        // Direct purchase without a supplier: update products directly in Supabase to bypass RPC supplier validation
-        for (const item of items) {
-          if (item.productId) {
-            const calculatedUnitCost = Number(((item.cost || 0) / (item.totalUnits || 1)).toFixed(2))
-            const currentProducts = qc.getQueryData(['products']) || []
-            const prod = currentProducts.find((p) => p.id === item.productId)
-            if (prod) {
-              const newStock = (Number(prod.stock) || 0) + (Number(item.totalUnits) || 0)
-              const updates = calculatedUnitCost > 0
-                ? { cost: calculatedUnitCost, stock: newStock }
-                : { stock: newStock }
-              await supabase
-                .from('products')
-                .update(updates)
-                .eq('id', item.productId)
-            }
-          }
+        // Direct purchase without a supplier: update products directly in Supabase to bypass RPC supplier validation.
+        // One update per product, applying all of its lines in order (same as the local cache in onSuccess).
+        const currentProducts = qc.getQueryData(['products']) || []
+        const purchasedIds = [...new Set(items.map((item) => item.productId).filter(Boolean))]
+        for (const productId of purchasedIds) {
+          const prod = currentProducts.find((p) => p.id === productId)
+          if (!prod) continue
+          const { error } = await supabase
+            .from('products')
+            .update(applyPurchaseItems(prod, items))
+            .eq('id', productId)
+          if (error) throw error
         }
       } else {
         const { error } = await supabase.rpc('receive_goods_rpc', {
@@ -1265,26 +1261,9 @@ export function useStore() {
 
       // Surgical update for received product stock and costs
       if (result.items && result.items.length > 0) {
-        const itemMap = new Map()
-        for (const item of result.items) {
-          if (item.productId) {
-            itemMap.set(item.productId, item)
-          }
-        }
+        const purchasedIds = new Set(result.items.map((item) => item.productId).filter(Boolean))
         qc.setQueryData(['products'], (old = []) =>
-          old.map((p) => {
-            const it = itemMap.get(p.id)
-            if (it) {
-              const addedUnits = Number(it.totalUnits) || 0
-              const unitCost = Number(((it.cost || 0) / (addedUnits || 1)).toFixed(2))
-              return {
-                ...p,
-                cost: unitCost > 0 ? unitCost : p.cost,
-                stock: (Number(p.stock) || 0) + addedUnits,
-              }
-            }
-            return p
-          })
+          old.map((p) => (purchasedIds.has(p.id) ? { ...p, ...applyPurchaseItems(p, result.items) } : p))
         )
       }
 
@@ -1993,8 +1972,7 @@ export function useStore() {
         const updated = oldProds.map((p) => {
           const item = items.find((it) => it.productId === p.id)
           if (item) {
-            const rawUnitCost = Number((item.cost / item.totalUnits).toFixed(2))
-            const calculatedUnitCost = Number.isFinite(rawUnitCost) && rawUnitCost > 0 ? rawUnitCost : p.cost
+            const { cost: calculatedUnitCost, stock: purchasedStock } = applyPurchaseItems(p, items)
             if (p.controlLotes) {
               const latestBatches = qc.getQueryData(['product_batches']) || []
               const totalStock = latestBatches
@@ -2002,7 +1980,7 @@ export function useStore() {
                 .reduce((sum, b) => sum + b.stock, 0)
               return { ...p, cost: calculatedUnitCost, stock: totalStock }
             } else {
-              return { ...p, cost: calculatedUnitCost, stock: p.stock + item.totalUnits }
+              return { ...p, cost: calculatedUnitCost, stock: purchasedStock }
             }
           }
           return p
