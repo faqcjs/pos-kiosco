@@ -166,6 +166,13 @@ export function Venta() {
 
   const isShiftOpen = state.currentShift?.status === 'open'
 
+  // Called before the early return below so the hook order never changes between renders.
+  // handleScan is a function declaration, so it is hoisted.
+  useBarcodeScanner({
+    onScan: handleScan,
+    enabled: isShiftOpen && !payOpen && !extrasModalOpen && !scannerOpen,
+  })
+
   if (!isShiftOpen) {
     return (
       <div className="flex h-[60vh] items-center justify-center p-4">
@@ -307,11 +314,6 @@ export function Venta() {
       toast(`Código no encontrado: ${trimmed}`, 'error')
     }
   }
-
-  useBarcodeScanner({
-    onScan: handleScan,
-    enabled: !payOpen && !extrasModalOpen && !scannerOpen,
-  })
 
   async function handleConfirmSale(args) {
     setIsSaving(true)
