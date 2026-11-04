@@ -163,7 +163,7 @@ BEGIN
                     'date', p_date,
                     'type', 'pago_proveedor',
                     'amount', -ABS(p_amount),
-                    'reason', 'Pago contado - ' || supplier_name
+                    'reason', 'Pago contado - ' || COALESCE(supplier_name, 'Compra directa')
                 )
             ),
             "closingTheoretical" = CASE 

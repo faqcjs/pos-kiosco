@@ -1,6 +1,7 @@
 -- =========================================================================
 -- PARCHE SQL: GANANCIA ESTIMADA, ARQUEO DE CAJA Y PROTECCIÓN DE COSTO
 -- Ejecutar este script en el SQL Editor de Supabase
+-- (después de supabase_patch_combos.sql)
 -- =========================================================================
 
 -- 1. Limpiar firmas anteriores de complete_sale_rpc para evitar ambigüedades
