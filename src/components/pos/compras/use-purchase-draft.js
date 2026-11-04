@@ -8,10 +8,13 @@ import {
   addProductToDraft,
   buildPurchasePayload,
   getDraftTotal,
+  getPurchaseSuccessMessage,
+  PURCHASE_PAYMENT,
   removeDraftItem,
   resolveEditingSupplierId,
   updateDraftItemQty,
   updateDraftItemUnitCost,
+  validatePurchasePayment,
 } from './purchase-draft'
 
 const MAX_PRODUCT_SUGGESTIONS = 10
@@ -21,9 +24,12 @@ export function usePurchaseDraft({
   open,
   onClose,
   onReceive,
+  onPay,
   onDeleteEntry,
   products,
   canReceive,
+  canPay,
+  cashOpen,
   initialSupplierId,
   editingPurchase,
 }) {
@@ -34,6 +40,7 @@ export function usePurchaseDraft({
   const [showCostErrors, setShowCostErrors] = useState(false)
   const [prodQuery, setProdQuery] = useState('')
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [payment, setPayment] = useState(PURCHASE_PAYMENT.ACCOUNT)
 
   // Reset or populate the draft when the modal opens
   useEffect(() => {
@@ -47,6 +54,7 @@ export function usePurchaseDraft({
     }
     setProdQuery('')
     setShowCostErrors(false)
+    setPayment(PURCHASE_PAYMENT.ACCOUNT)
   }, [open, initialSupplierId, editingPurchase])
 
   const productSuggestions = useMemo(
@@ -113,31 +121,51 @@ export function usePurchaseDraft({
       return
     }
 
+    // Editing keeps the original payment untouched, so it never pays the purchase again
+    const effectivePayment = editingPurchase ? PURCHASE_PAYMENT.ACCOUNT : payment
+    const paymentError = validatePurchasePayment({ payment: effectivePayment, cashOpen, canPay })
+    if (paymentError) {
+      toast(paymentError, 'error')
+      return
+    }
+
     const payload = buildPurchasePayload({
       items,
       supplierId,
       invoiceDate: editingPurchase?.date,
       now: new Date().toISOString(),
+      payment: effectivePayment,
     })
 
     if (editingPurchase && onDeleteEntry) {
       await onDeleteEntry(editingPurchase.supplierId, editingPurchase.id)
     }
 
-    onReceive(payload.supplierId, payload.total, payload.detail, false, payload.items)
+    try {
+      await onReceive(payload.supplierId, payload.total, payload.detail, payload.paidCash, payload.items)
+    } catch {
+      toast('No se pudo guardar la compra. Revisá la conexión y volvé a intentar.', 'destructive')
+      return
+    }
     onClose()
 
-    toast(
-      editingPurchase
-        ? 'Compra actualizada exitosamente'
-        : 'Compra registrada, stock y costos de productos actualizados',
-      'success',
-    )
+    if (payload.settleWithoutCash) {
+      try {
+        await onPay(payload.supplierId, payload.total, false)
+      } catch {
+        toast('La compra se guardó, pero no el pago. Registralo con "Pagar" en Agenda de Proveedores.', 'destructive')
+        return
+      }
+    }
+
+    toast(getPurchaseSuccessMessage({ isEditing: Boolean(editingPurchase), payment: effectivePayment }), 'success')
   }
 
   return {
     supplierId,
     setSupplierId,
+    payment,
+    setPayment,
     items,
     showCostErrors,
     prodQuery,

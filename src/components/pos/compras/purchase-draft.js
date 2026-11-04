@@ -3,6 +3,49 @@
 import { money } from '@/lib/format'
 import { DIRECT_PURCHASE_SUPPLIER_ID, DIRECT_PURCHASE_SUPPLIER_NAME } from '@/lib/constants'
 
+// How a purchase was paid. ACCOUNT also covers a purchase the cashier already paid with a
+// "Pago a proveedor" egreso: that payment cancels the debt this purchase adds.
+export const PURCHASE_PAYMENT = Object.freeze({ CASH: 'caja', OTHER: 'otro', ACCOUNT: 'cuenta' })
+
+export const PURCHASE_PAYMENT_OPTIONS = [
+  {
+    id: PURCHASE_PAYMENT.CASH,
+    label: 'Con plata de la caja',
+    hint: 'Queda pagada y se descuenta de la caja abierta.',
+  },
+  {
+    id: PURCHASE_PAYMENT.OTHER,
+    label: 'Pagada por transferencia u otro medio',
+    hint: 'Queda pagada, sin tocar la caja.',
+  },
+  {
+    id: PURCHASE_PAYMENT.ACCOUNT,
+    label: 'A cuenta',
+    hint: 'Queda como deuda con el proveedor. Usala si se paga después o si el cajero ya la pagó con "Pago a proveedor".',
+  },
+]
+
+/** @returns {string | null} the error that blocks saving, or null */
+export function validatePurchasePayment({ payment, cashOpen, canPay }) {
+  if (payment === PURCHASE_PAYMENT.CASH && !cashOpen) {
+    return 'No hay una caja abierta. Abrí la caja para pagar con plata de la caja, o elegí otra forma de pago.'
+  }
+  if (payment === PURCHASE_PAYMENT.OTHER && !canPay) {
+    return 'Tu usuario no puede registrar pagos a proveedores. Elegí "A cuenta" y que un administrador o cajero registre el pago.'
+  }
+  return null
+}
+
+const PURCHASE_SUCCESS_MESSAGES = Object.freeze({
+  [PURCHASE_PAYMENT.CASH]: 'Compra registrada y pagada con plata de la caja',
+  [PURCHASE_PAYMENT.OTHER]: 'Compra registrada y pagada',
+  [PURCHASE_PAYMENT.ACCOUNT]: 'Compra registrada, stock y costos de productos actualizados',
+})
+const EDITED_PURCHASE_MESSAGE = 'Compra actualizada exitosamente'
+
+export const getPurchaseSuccessMessage = ({ isEditing, payment }) =>
+  isEditing ? EDITED_PURCHASE_MESSAGE : (PURCHASE_SUCCESS_MESSAGES[payment] ?? PURCHASE_SUCCESS_MESSAGES[PURCHASE_PAYMENT.ACCOUNT])
+
 export const isDirectPurchaseSupplier = ({ id, name } = {}) =>
   id === DIRECT_PURCHASE_SUPPLIER_ID || name === DIRECT_PURCHASE_SUPPLIER_NAME
 
@@ -76,10 +119,11 @@ export const removeDraftItem = (items, id) => items.filter((it) => it.id !== id)
 export const getDraftTotal = (items) => items.reduce((sum, it) => sum + (Number(it.cost) || 0), 0)
 
 /**
- * Arguments for `onReceive(supplierId, total, detail, false, items)`.
- * @param {{ items: object[], supplierId: string, invoiceDate?: string|null, now: string }} params
+ * Arguments for `onReceive(supplierId, total, detail, paidCash, items)`, plus whether the purchase
+ * must then be settled with a supplier payment that does not touch the register.
+ * @param {{ items: object[], supplierId: string, invoiceDate?: string|null, now: string, payment?: string }} params
  */
-export function buildPurchasePayload({ items, supplierId, invoiceDate, now }) {
+export function buildPurchasePayload({ items, supplierId, invoiceDate, now, payment = PURCHASE_PAYMENT.ACCOUNT }) {
   const text = items
     .map((it) => `${it.name} (x${it.totalUnits} un. a ${money(it.unitCost)})`)
     .join(', ')
@@ -87,6 +131,9 @@ export function buildPurchasePayload({ items, supplierId, invoiceDate, now }) {
   return {
     supplierId: supplierId || DIRECT_PURCHASE_SUPPLIER_ID,
     total: getDraftTotal(items),
+    paidCash: payment === PURCHASE_PAYMENT.CASH,
+    // A direct purchase has no supplier account to settle
+    settleWithoutCash: payment === PURCHASE_PAYMENT.OTHER && Boolean(supplierId),
     detail: JSON.stringify({ text, invoiceDate: invoiceDate ?? now }),
     items: items.map((it) => ({
       productId: it.productId || null,

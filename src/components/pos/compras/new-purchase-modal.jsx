@@ -9,15 +9,19 @@ import { usePurchaseDraft } from './use-purchase-draft'
 import { isDirectPurchaseSupplier } from './purchase-draft'
 import { PurchaseItemRow } from './purchase-item-row'
 import { ProductSearch } from './product-suggestions'
+import { PurchasePaymentField } from './purchase-payment-field'
 
 export function NewPurchaseModal({
   open,
   onClose,
   onReceive,
+  onPay,
   onDeleteEntry,
   suppliers = [],
   products = [],
   canReceive = true,
+  canPay = false,
+  cashOpen = false,
   initialSupplierId = null,
   editingPurchase = null,
 }) {
@@ -25,9 +29,12 @@ export function NewPurchaseModal({
     open,
     onClose,
     onReceive,
+    onPay,
     onDeleteEntry,
     products,
     canReceive,
+    canPay,
+    cashOpen,
     initialSupplierId,
     editingPurchase,
   })
@@ -109,6 +116,17 @@ export function NewPurchaseModal({
             </ul>
           )}
 
+          {editingPurchase ? (
+            <p className="text-xs text-muted-foreground">Editar la compra no cambia cómo se pagó.</p>
+          ) : (
+            <PurchasePaymentField
+              value={draft.payment}
+              onChange={draft.setPayment}
+              cashOpen={cashOpen}
+              canPay={canPay}
+            />
+          )}
+
           {/* Total and confirm */}
           <footer className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-card rounded-xl border border-border">
             <div>
@@ -137,7 +155,7 @@ export function NewPurchaseModal({
       <ScannerModal
         open={draft.scannerOpen}
         onClose={() => draft.setScannerOpen(false)}
-        onScan={draft.handleScan}
+        onDetect={draft.handleScan}
       />
     </>
   )

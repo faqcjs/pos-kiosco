@@ -3,6 +3,9 @@ import { money } from '@/lib/format'
 import {
   addProductToDraft,
   buildPurchasePayload,
+  getPurchaseSuccessMessage,
+  PURCHASE_PAYMENT,
+  validatePurchasePayment,
   getDraftTotal,
   removeDraftItem,
   resolveEditingSupplierId,
@@ -121,6 +124,7 @@ describe('buildPurchasePayload', () => {
     const payload = buildPurchasePayload({ items, supplierId: 's1', invoiceDate: null, now: '2026-11-03T10:00:00.000Z' })
     expect(payload.supplierId).toBe('s1')
     expect(payload.total).toBe(700)
+    expect(payload.paidCash).toBe(false)
     expect(JSON.parse(payload.detail)).toEqual({
       text: `Coca 500 (x6 un. a ${money(100)}), Libre (x2 un. a ${money(50)})`,
       invoiceDate: '2026-11-03T10:00:00.000Z',
@@ -135,5 +139,46 @@ describe('buildPurchasePayload', () => {
     const payload = buildPurchasePayload({ items, supplierId: '', invoiceDate: '2026-01-01T00:00:00.000Z', now: 'later' })
     expect(payload.supplierId).toBe('compra_directa')
     expect(JSON.parse(payload.detail).invoiceDate).toBe('2026-01-01T00:00:00.000Z')
+  })
+})
+
+describe('purchase payment', () => {
+  const items = [line({ unitCost: 100, cost: 600 })]
+  const build = (payment, supplierId = 's1') => buildPurchasePayload({ items, supplierId, now: 'now', payment })
+
+  it('pays from the register only when it is paid with register cash', () => {
+    expect(build(PURCHASE_PAYMENT.CASH)).toMatchObject({ paidCash: true, settleWithoutCash: false })
+    expect(build(PURCHASE_PAYMENT.OTHER)).toMatchObject({ paidCash: false, settleWithoutCash: true })
+    expect(build(PURCHASE_PAYMENT.ACCOUNT)).toMatchObject({ paidCash: false, settleWithoutCash: false })
+  })
+
+  it('does not settle a direct purchase without supplier, which has no account to pay', () => {
+    expect(build(PURCHASE_PAYMENT.OTHER, '')).toMatchObject({ paidCash: false, settleWithoutCash: false })
+  })
+
+  it('requires an open register to pay from it', () => {
+    expect(validatePurchasePayment({ payment: PURCHASE_PAYMENT.CASH, cashOpen: false, canPay: true })).toBe(
+      'No hay una caja abierta. Abrí la caja para pagar con plata de la caja, o elegí otra forma de pago.',
+    )
+    expect(validatePurchasePayment({ payment: PURCHASE_PAYMENT.CASH, cashOpen: true, canPay: true })).toBeNull()
+    expect(validatePurchasePayment({ payment: PURCHASE_PAYMENT.ACCOUNT, cashOpen: false, canPay: false })).toBeNull()
+  })
+
+  it('requires permission to register supplier payments to pay by other means', () => {
+    expect(validatePurchasePayment({ payment: PURCHASE_PAYMENT.OTHER, cashOpen: false, canPay: false })).toBe(
+      'Tu usuario no puede registrar pagos a proveedores. Elegí "A cuenta" y que un administrador o cajero registre el pago.',
+    )
+    expect(validatePurchasePayment({ payment: PURCHASE_PAYMENT.OTHER, cashOpen: false, canPay: true })).toBeNull()
+  })
+})
+
+describe('getPurchaseSuccessMessage', () => {
+  it('describes how the new purchase was paid, or that it was edited', () => {
+    expect(getPurchaseSuccessMessage({ isEditing: false, payment: PURCHASE_PAYMENT.CASH })).toBe('Compra registrada y pagada con plata de la caja')
+    expect(getPurchaseSuccessMessage({ isEditing: false, payment: PURCHASE_PAYMENT.OTHER })).toBe('Compra registrada y pagada')
+    expect(getPurchaseSuccessMessage({ isEditing: false, payment: PURCHASE_PAYMENT.ACCOUNT })).toBe(
+      'Compra registrada, stock y costos de productos actualizados',
+    )
+    expect(getPurchaseSuccessMessage({ isEditing: true, payment: PURCHASE_PAYMENT.CASH })).toBe('Compra actualizada exitosamente')
   })
 })
