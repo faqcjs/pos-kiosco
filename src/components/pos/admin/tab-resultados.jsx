@@ -8,15 +8,17 @@ const listLabels = (months) => months.map((m) => m.label).join(', ')
 
 /**
  * Monthly net result: gross profit (same as the KPI) minus operating expenses.
- * Purchases only reach it as cost of goods sold. Only complete, finished months are shown.
+ * Purchases only reach it as cost of goods sold. Complete, finished months get a result;
+ * the current month shows a partial one.
  */
 export function TabResultados({ sales, productsMap, expenses, shifts, dateFrom, dateTo }) {
-  const { complete, skipped } = useMemo(
+  const { complete, inProgress, skipped } = useMemo(
     () => selectCompleteMonths(buildMonthlyResults({ sales, productsMap, expenses, shifts, dateFrom, dateTo })),
     [sales, productsMap, expenses, shifts, dateFrom, dateTo],
   )
   const newestFirst = useMemo(() => [...complete].reverse(), [complete])
   const hasSkipped = skipped.length > 0
+  const hasResults = complete.length > 0 || inProgress !== null
 
   return (
     <section className="flex flex-col gap-4">
@@ -27,7 +29,7 @@ export function TabResultados({ sales, productsMap, expenses, shifts, dateFrom, 
         </p>
       </header>
 
-      {complete.length > 0 && hasSkipped && (
+      {hasResults && hasSkipped && (
         <p className="flex items-start gap-2 px-3 py-2 text-sm text-muted-foreground bg-muted/50 rounded-xl">
           <Info aria-hidden="true" className="shrink-0 mt-0.5 size-4" />
           <span>
@@ -37,7 +39,9 @@ export function TabResultados({ sales, productsMap, expenses, shifts, dateFrom, 
         </p>
       )}
 
-      {complete.length === 0 ? (
+      {inProgress && <MonthlyStatement month={inProgress} />}
+
+      {!hasResults ? (
         <section className="flex flex-col items-center gap-2 px-6 py-12 text-center rounded-2xl border border-dashed border-border">
           <Scale aria-hidden="true" className="size-9 text-muted-foreground/60" />
           <p className="font-heading text-base font-bold">

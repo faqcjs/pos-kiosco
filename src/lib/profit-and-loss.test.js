@@ -160,10 +160,11 @@ describe('selectCompleteMonths', () => {
       expenses: [expense({ period: '2026-10-01' })],
     })
 
-    const { complete, skipped } = selectCompleteMonths(months)
+    const { complete, inProgress, skipped } = selectCompleteMonths(months)
 
     expect(complete.map((m) => m.period)).toEqual(['2026-10-01', '2026-11-01'])
-    expect(skipped.map((m) => m.period)).toEqual(['2026-09-01', '2026-12-01'])
+    expect(inProgress.period).toBe('2026-12-01')
+    expect(skipped.map((m) => m.period)).toEqual(['2026-09-01'])
   })
 
   it('drops complete months without sales or expenses, and skipped months without activity', () => {
@@ -173,5 +174,38 @@ describe('selectCompleteMonths', () => {
 
     expect(complete.map((m) => m.period)).toEqual(['2026-11-01'])
     expect(skipped).toEqual([])
+  })
+})
+
+describe('month in progress', () => {
+  it('flags the current month with its day when the range covers it from day 1 to today', () => {
+    const results = build({ dateFrom: '2026-11-01', dateTo: '2026-12-15' })
+
+    expect(results.map((r) => [r.period, r.progress])).toEqual([
+      ['2026-11-01', null],
+      ['2026-12-01', { day: 15, daysInMonth: 31 }],
+    ])
+  })
+
+  it('does not flag the current month when the range starts after day 1 or ends before today', () => {
+    const [startsLate] = build({ dateFrom: '2026-12-05', dateTo: '2026-12-15' })
+    const [endsEarly] = build({ dateFrom: '2026-12-01', dateTo: '2026-12-10' })
+
+    expect(startsLate.progress).toBeNull()
+    expect(endsEarly.progress).toBeNull()
+  })
+
+  it('returns the month in progress apart, even without activity, and keeps it out of the skipped months', () => {
+    const months = build({ dateFrom: '2026-10-10', dateTo: '2026-12-15', sales: [costedSale('2026-10-15T10:00:00')] })
+
+    const { complete, inProgress, skipped } = selectCompleteMonths(months)
+
+    expect(complete).toEqual([])
+    expect(inProgress).toMatchObject({ period: '2026-12-01', netSales: 0 })
+    expect(skipped.map((m) => m.period)).toEqual(['2026-10-01'])
+  })
+
+  it('returns no month in progress when the range does not reach the current month', () => {
+    expect(selectCompleteMonths(build({ dateFrom: '2026-10-01', dateTo: '2026-11-30' })).inProgress).toBeNull()
   })
 })

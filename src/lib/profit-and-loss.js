@@ -36,6 +36,9 @@ const buildMonth = ({ monthStart, rangeStart, rangeEnd, now, sales, productsMap,
   const nextMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1)
   const isInMonth = (date) => date >= monthStart && date < nextMonthStart
   const period = toPeriod(monthStart)
+  // Current month covered from day 1 up to today: shown apart as a partial result
+  const isInProgress = now >= monthStart && now < nextMonthStart && rangeStart <= monthStart && rangeEnd >= now
+  const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate()
 
   const monthSales = sales.filter((s) => isInMonth(s.date)).map((s) => s.sale)
   const monthExpenses = expenses.filter((e) => toPeriod(String(e?.period ?? '')) === period)
@@ -46,6 +49,7 @@ const buildMonth = ({ monthStart, rangeStart, rangeEnd, now, sales, productsMap,
   return {
     period,
     label: `${MONTH_NAMES[monthStart.getMonth()]} ${monthStart.getFullYear()}`,
+    progress: isInProgress ? { day: now.getDate(), daysInMonth } : null,
     isPartial: rangeStart > monthStart || rangeEnd.getTime() < nextMonthStart.getTime() - 1 || now < nextMonthStart,
     netSales: sumBy(monthSales, (s) => toNumber(s?.total)),
     uncostedRevenue: sumBy(monthSales, (s) => getUncostedRevenue(s, productsMap)),
@@ -65,14 +69,17 @@ const hasActivity = (month) => month.netSales > 0 || month.totalExpenses > 0
 
 /**
  * Only months the range covers entirely and that are already over get a result: a cut month
- * would subtract the whole month's expenses from part of its sales.
- * @returns {{ complete: object[], skipped: object[] }} skipped = partial months that had activity
+ * would subtract the whole month's expenses from part of its sales. The current month, covered
+ * from day 1 up to today, comes apart as `inProgress` so it can be shown as a partial result.
+ * @returns {{ complete: object[], inProgress: object | null, skipped: object[] }}
+ *   skipped = other partial months that had activity
  */
 export function selectCompleteMonths(months = []) {
   const withActivity = months.filter(hasActivity)
   return {
     complete: withActivity.filter((m) => !m.isPartial),
-    skipped: withActivity.filter((m) => m.isPartial),
+    inProgress: months.find((m) => m.progress) ?? null,
+    skipped: withActivity.filter((m) => m.isPartial && !m.progress),
   }
 }
 
