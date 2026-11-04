@@ -1,10 +1,9 @@
 import { money } from '@/lib/format'
 import { ExpenseRow } from './expense-row'
-import { groupExpensesByDay } from './gastos-insights'
+import { UNKNOWN_DAY, groupExpensesByDay } from './gastos-insights'
 
 const DAY_FORMAT = { weekday: 'long', day: 'numeric', month: 'long' }
 const DAY_LOCALE = 'es-AR'
-const UNKNOWN_DAY = 'sin-fecha'
 
 const dayLabel = (day) =>
   day === UNKNOWN_DAY ? 'Sin fecha de pago' : new Date(`${day}T12:00:00`).toLocaleDateString(DAY_LOCALE, DAY_FORMAT)

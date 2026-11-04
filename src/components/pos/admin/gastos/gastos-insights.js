@@ -7,6 +7,8 @@ const MONTH_NAMES = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ]
 const MONTHS_PER_YEAR = 12
+// Day key for expenses without a valid payment date
+export const UNKNOWN_DAY = 'sin-fecha'
 
 const pad2 = (n) => String(n).padStart(2, '0')
 
@@ -42,7 +44,7 @@ export function compareWithPreviousMonth(total, previousTotal) {
   }
 }
 
-const paidDay = (expense) => toLocalDateStr(expense.paidAt) || 'sin-fecha'
+const paidDay = (expense) => toLocalDateStr(expense.paidAt) || UNKNOWN_DAY
 
 /** Expenses grouped by local payment day, newest day and newest payment first. */
 export function groupExpensesByDay(expenses = []) {
