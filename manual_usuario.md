@@ -421,72 +421,28 @@ Las dos tarjetas de resumen al tope muestran:
 
 ---
 
-### 6.3 Recibir mercadería (registrar una boleta de compra)
+### 6.3 Recibir mercadería (registrar una compra)
 
-Este es el flujo principal de la sección. Permite registrar cada entrega con el detalle de los productos y el importe de la boleta.
+Las compras se cargan desde la pestaña **Compras**, no desde el detalle del proveedor.
 
-1. Entrá al **detalle del proveedor** (tocá su tarjeta en la lista).
-2. Presioná el botón **"📦 Recibir"**.
-3. El sistema abre el asistente de recepción en **2 pasos**.
+1. Entrá a **Compras** y presioná **"Nueva compra"**.
+2. Elegí el **proveedor**, o dejá **"Sin proveedor (Compra directa)"**.
+3. Buscá o escaneá cada producto recibido y cargá la **cantidad** y el **costo unitario** que figura en la factura. El costo es obligatorio: con él se actualiza el costo promedio del producto.
+4. Elegí **¿Cómo se pagó?**:
 
----
+| Opción | Qué hace | Cuándo usarla |
+|---|---|---|
+| **Con plata de la caja** | La compra queda pagada y se registra un egreso en la caja abierta. | Pagaste la mercadería en el momento con plata del cajón. Necesita una caja abierta. |
+| **Pagada por transferencia u otro medio** | La compra queda pagada, sin tocar la caja. | Pagaste por transferencia, con tarjeta o con plata que no es de la caja. Solo administrador o cajero. |
+| **A cuenta** | La compra queda como deuda con el proveedor. | Se paga más adelante, o el cajero ya la pagó con un egreso **"Pago a proveedor"** (ese pago cancela la deuda). |
 
-#### Paso 1 — Datos de la boleta
+5. Presioná **"Guardar compra"**.
 
-| Campo | Descripción |
-|---|---|
-| **Número de Boleta** | Opcional. Ej: `0001-0004294`. Útil para cruzar con la factura física. |
-| **Monto Total de la Boleta** | **Obligatorio**. El importe total que figura en la factura. |
-| **Fecha de Emisión** | Fecha que figura en la boleta (se autocompleta con hoy). |
-| **Fecha de Vencimiento** | Fecha de vencimiento de la factura (opcional). |
-| **Notas / Observaciones** | Bonificaciones, fletes, comentarios de la entrega, etc. |
-| **Pago contado (efectivo)** | Tildá esta casilla si pagaste la mercadería en el momento. El sistema registrará un **egreso en la caja activa** por ese importe. Si no hay caja abierta, se te avisa que no impactará en caja. |
+El sistema suma el stock, actualiza el costo de los productos y registra la compra en la cuenta del proveedor según la forma de pago elegida.
 
-Presioná **"Siguiente"** para avanzar. El botón queda deshabilitado hasta que el monto de la boleta sea mayor a $0.
+> **Importante:** no registres la mercadería como **"Gasto"** en la caja. Si se pagó con plata del cajón, usá **"Con plata de la caja"** al cargar la compra. Así no se descuenta dos veces.
 
----
-
-#### Paso 2 — Carga de productos
-
-Tenés dos formas de cargar los artículos recibidos:
-
-**Tab "Del Catálogo":**
-
-1. Escribí el nombre o código del producto en el buscador. Aparece un desplegable con hasta 6 coincidencias mostrando nombre, categoría, código y costo actual.
-2. Hacé clic en el producto para agregarlo a la lista.
-3. Para cada ítem de la lista podés:
-   - Cambiar la **cantidad** (número de bultos o unidades).
-   - Cambiar el modo de conteo: **"Caja (x12) ⇄"** (cuenta por bulto) / **"Unidades ⇄"** (cuenta por unidad). El sistema calcula automáticamente las unidades totales según las "U. por bulto" del producto.
-   - Ver el **costo total** calculado para ese renglón.
-   - Eliminar el renglón con el ícono de papelera.
-
-> **Nota:** Si el producto tiene **control de lotes** activado, antes de agregarlo debés completar el **Código de lote** (ej: `L254`) y la **Fecha de vencimiento**. Ambos campos son obligatorios para ese tipo de producto.
-
-También podés usar el botón de cámara para escanear el código de barras de un producto del catálogo.
-
-**Tab "Fuera de Catálogo":**
-
-Para artículos que no están cargados en el sistema (gastos, fletes, artículos eventuales):
-1. Ingresá el **nombre** del artículo (ej: `Flete`).
-2. Ingresá el **costo**.
-3. Presioná **"Cargar"**.
-
-Los ítems fuera de catálogo no modifican el stock de ningún producto.
-
----
-
-**Resumen inferior:**
-
-Al pie de la lista de ítems se muestra:
-- **Total de la Boleta**: el importe ingresado en el Paso 1.
-- **Suma de Ítems**: la suma de los costos de todos los ítems cargados.
-- **Diferencia**: la resta entre ambos. Aparece en verde si es cero (sin diferencias) o en rojo si hay una discrepancia.
-
-No es obligatorio que los ítems sumen exactamente el total de la boleta — el sistema te permite confirmar igual. La diferencia queda visible para que puedas detectar errores de carga.
-
-Presioná **"Confirmar"** para finalizar.
-
-El sistema actualiza el stock de todos los productos del catálogo, registra la boleta en la cuenta corriente del proveedor (sumando el importe a la deuda) y, si marcaste "Pago contado", registra el egreso en la caja activa.
+Al editar una compra no se puede cambiar cómo se pagó.
 
 ---
 

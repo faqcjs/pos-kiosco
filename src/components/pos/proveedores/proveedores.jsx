@@ -1,19 +1,18 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
-import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet, Pencil, MessageCircle, Calendar, Trash2, Camera } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ArrowLeft, PackagePlus, Plus, Search, Truck, Wallet, Pencil, MessageCircle, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge, Card, EmptyState, Input, Label, Modal, Select, StatCard } from '@/components/ui/kit'
+import { Badge, Card, EmptyState, Input, Label, Modal, Select } from '@/components/ui/kit'
 import { PageHeader } from '@/components/pos/page-header'
 import { supplierBalance, useStore } from '@/lib/store'
-import { formatDateTime, money, uid } from '@/lib/format'
+import { formatDateTime, money } from '@/lib/format'
 import { useToast } from '@/components/ui/toast'
-import { cn, matchProduct } from '@/lib/utils'
-import { ScannerModal } from '@/components/pos/venta/scanner-modal'
-import { useBarcodeScanner } from '@/lib/use-barcode-scanner'
+import { cn } from '@/lib/utils'
 
 import { PurchasesList } from '@/components/pos/compras/purchases-list'
 import { NewPurchaseModal } from '@/components/pos/compras/new-purchase-modal'
+import { ROLES } from '@/lib/constants'
 import { ShoppingCart } from 'lucide-react'
 
 const SUPPLIER_CATEGORIES = [
@@ -48,8 +47,16 @@ function getWhatsAppLink(phone) {
   return `https://wa.me/${cleaned}`
 }
 
+const OPEN_SHIFT_STATUS = 'open'
+
 export function Proveedores() {
   const { state, addSupplier, updateSupplier, deleteSupplier, deleteSupplierEntry, receiveGoods, registerSupplierPayment } = useStore()
+  const role = state.currentUser?.role
+  const cashOpen = state.currentShift?.status === OPEN_SHIFT_STATUS
+  const canPay = role === ROLES.ADMIN || role === ROLES.CASHIER
+  const canReceive = canPay || role === ROLES.STOCKER
+  const canEdit = role === ROLES.ADMIN || role === ROLES.STOCKER
+  const canDelete = role === ROLES.ADMIN
   const toast = useToast()
   const [mainTab, setMainTab] = useState('compras') // 'compras' | 'proveedores'
   const [newPurchaseOpen, setNewPurchaseOpen] = useState(false)
@@ -76,11 +83,6 @@ export function Proveedores() {
   const todayDayName = useMemo(() => {
     return SPANISH_DAYS[new Date().getDay()]
   }, [])
-
-  const totalDebt = useMemo(
-    () => suppliers.reduce((sum, s) => sum + Math.max(0, supplierBalance(s)), 0),
-    [suppliers],
-  )
 
   const visitingTodayCount = useMemo(() => {
     return suppliers.filter((s) => s.delivery_days?.includes(todayDayName)).length
@@ -204,7 +206,6 @@ export function Proveedores() {
         <SupplierDetail
           supplier={selected}
           onBack={() => setSelectedId(null)}
-          onReceive={receiveGoods}
           onPay={registerSupplierPayment}
           onEdit={handleOpenEdit}
           onDelete={(id) => {
@@ -212,15 +213,10 @@ export function Proveedores() {
             setSelectedId(null)
             toast('Proveedor eliminado', 'info')
           }}
-          cashOpen={state.currentShift?.status === 'open'}
-          canReceive={
-            state.currentUser?.role === 'administrador' ||
-            state.currentUser?.role === 'repositor' ||
-            state.currentUser?.role === 'cajero'
-          }
-          canPay={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'cajero'}
-          canEdit={state.currentUser?.role === 'administrador' || state.currentUser?.role === 'repositor'}
-          canDelete={state.currentUser?.role === 'administrador'}
+          cashOpen={cashOpen}
+          canPay={canPay}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       ) : (
         <div className="mx-auto max-w-5xl p-1.5 lg:p-6 space-y-6">
@@ -412,7 +408,6 @@ export function Proveedores() {
               </div>
             ) : (
               filtered.map((s) => {
-                const balance = supplierBalance(s)
                 const isVisitingToday = s.delivery_days?.includes(todayDayName)
                 
                 return (
@@ -594,15 +589,14 @@ export function Proveedores() {
           setEditingPurchase(null)
         }}
         onReceive={receiveGoods}
+        onPay={registerSupplierPayment}
         onDeleteEntry={deleteSupplierEntry}
+        cashOpen={cashOpen}
+        canPay={canPay}
         editingPurchase={editingPurchase}
         suppliers={suppliers}
         products={state.products}
-        canReceive={
-          state.currentUser?.role === 'administrador' ||
-          state.currentUser?.role === 'repositor' ||
-          state.currentUser?.role === 'cajero'
-        }
+        canReceive={canReceive}
       />
     </>
   )
@@ -626,7 +620,7 @@ export function parseInvoiceDetail(detail) {
       notes = parsed.notes || ''
       isSimplified = parsed.isSimplified || false
     }
-  } catch (err) {
+  } catch {
     // Fallback for simple text entries
   }
 
@@ -636,376 +630,24 @@ export function parseInvoiceDetail(detail) {
 function SupplierDetail({
   supplier,
   onBack,
-  onReceive,
   onPay,
   onEdit,
   onDelete,
   cashOpen,
-  canReceive,
   canPay,
   canEdit,
   canDelete,
 }) {
-  const { state, deleteSupplierEntry } = useStore()
+  const { deleteSupplierEntry } = useStore()
   const toast = useToast()
   const balance = supplierBalance(supplier)
-  const [receiveOpen, setReceiveOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
-  const [scannerOpen, setScannerOpen] = useState(false)
-
-  // Wizard steps & Invoice details
-  const [step, setStep] = useState(1)
-  const [invoiceNumber, setInvoiceNumber] = useState('')
-  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [invoiceDueDate, setInvoiceDueDate] = useState('')
-  const [notes, setNotes] = useState('')
-  const [totalInvoiceAmount, setTotalInvoiceAmount] = useState('')
-  const [prodQuery, setProdQuery] = useState('')
-
-  const productSuggestions = useMemo(() => {
-    const q = prodQuery.trim().toLowerCase()
-    if (!q) return []
-    return state.products
-      .filter((p) => matchProduct(p, prodQuery))
-      .slice(0, 6)
-  }, [state.products, prodQuery])
-
-  // Items in the current receipt
-  const [items, setItems] = useState([])
-  const [selectedProdId, setSelectedProdId] = useState('')
-  const [batchCode, setBatchCode] = useState('')
-  const [expirationDate, setExpirationDate] = useState('')
-  const [customName, setCustomName] = useState('')
-  const [customCost, setCustomCost] = useState('')
-  const [addItemType, setAddItemType] = useState('catalog')
-
-  const [paidCash, setPaidCash] = useState(false)
 
   const [payAmount, setPayAmount] = useState('')
   const [fromCash, setFromCash] = useState(true)
 
-  const selectedProd = selectedProdId ? state.products.find((p) => p.id === selectedProdId) : null
-  const requiresBatch = false // selectedProd?.controlLotes — disabled while in development
-
   const entries = [...supplier.entries].reverse()
-
-  useEffect(() => {
-    if (!receiveOpen) {
-      setStep(1)
-      setInvoiceNumber('')
-      setInvoiceDate(new Date().toISOString().split('T')[0])
-      setInvoiceDueDate('')
-      setNotes('')
-      setTotalInvoiceAmount('')
-      setItems([])
-      setPaidCash(false)
-      setProdQuery('')
-    }
-  }, [receiveOpen])
-
-  function handleNextStep() {
-    const amt = Number(totalInvoiceAmount)
-    if (!totalInvoiceAmount || isNaN(amt) || amt <= 0) {
-      toast('Ingresá el monto total de la boleta para continuar al paso 2', 'error')
-      setTimeout(() => document.getElementById('inv-total')?.focus(), 50)
-      return
-    }
-    setStep(2)
-  }
-
-  useEffect(() => {
-    // When a product is selected in catalog mode, suggest the last cost
-    if (selectedProdId && addItemType === 'catalog') {
-      const prod = state.products.find((p) => p.id === selectedProdId)
-      if (prod && prod.controlLotes) {
-        // Find if batch details are needed
-      }
-    }
-  }, [selectedProdId, addItemType, state.products])
-
-  function handleAddCatalogItem() {
-    if (!selectedProdId) return
-    const prod = state.products.find((p) => p.id === selectedProdId)
-    if (!prod) return
-
-    if (prod.controlLotes) {
-      if (!batchCode.trim() || !expirationDate) {
-        toast('El producto seleccionado requiere código de lote y fecha de vencimiento.', 'error')
-        return
-      }
-    }
-
-    const existing = items.find((it) => 
-      it.productId === selectedProdId && 
-      (!prod.controlLotes || it.batchCode === batchCode.trim())
-    )
-
-    if (existing) {
-      setItems(items.map((it) => {
-        if (it.productId === selectedProdId && (!prod.controlLotes || it.batchCode === batchCode.trim())) {
-          const nextQty = it.qty + 1
-          const nextUnits = nextQty * it.unitSize
-          const nextCost = nextUnits * it.catalogCost
-          return { ...it, qty: nextQty, totalUnits: nextUnits, cost: nextCost }
-        }
-        return it
-      }))
-    } else {
-      const u = prod.unidad || 1
-      const initialCost = u * prod.cost
-      setItems([...items, {
-        id: uid(),
-        productId: prod.id,
-        name: prod.name + (prod.controlLotes ? ` (Lote: ${batchCode.trim()})` : ''),
-        qty: 1,
-        totalUnits: u,
-        cost: initialCost,
-        isCustom: false,
-        unitSize: u,
-        catalogCost: prod.cost,
-        batchCode: prod.controlLotes ? batchCode.trim() : null,
-        expirationDate: prod.controlLotes ? new Date(expirationDate).toISOString() : null,
-      }])
-    }
-    setSelectedProdId('')
-    setBatchCode('')
-    setExpirationDate('')
-  }
-
-  function handleAddCustomItem() {
-    const trimmed = customName.trim()
-    const costVal = Number(customCost)
-    if (!trimmed || !costVal || costVal <= 0) return
-
-    setItems([...items, {
-      id: uid(),
-      productId: null,
-      name: trimmed,
-      qty: 1,
-      totalUnits: 1,
-      cost: costVal,
-      isCustom: true,
-      unitSize: 1,
-      catalogCost: costVal
-    }])
-    setCustomName('')
-    setCustomCost('')
-  }
-
-  function handleRemoveItem(id) {
-    setItems(items.filter((it) => it.id !== id))
-  }
-
-  function handleUpdateItemQty(id, nextQty) {
-    setItems(items.map((it) => {
-      if (it.id === id) {
-        const q = Math.max(1, Number(nextQty) || 1)
-        const nextUnits = q * it.unitSize
-        const nextCost = nextUnits * it.catalogCost
-        return { ...it, qty: q, totalUnits: nextUnits, cost: nextCost }
-      }
-      return it
-    }))
-  }
-
-  function handleUpdateItemCost(id, nextCost) {
-    setItems(items.map((it) => {
-      if (it.id === id) {
-        const c = Math.max(0, Number(nextCost) || 0)
-        return { ...it, cost: c }
-      }
-      return it
-    }))
-  }
-
-  function handleToggleItemUnitType(id) {
-    setItems((prev) => prev.map((it) => {
-      if (it.id !== id) return it
-      if (it.isCustom) return it
-      const prod = state.products.find((p) => p.id === it.productId)
-      if (!prod) return it
-      const nextIsUnit = it.unitSize !== 1
-      const nextUnitSize = nextIsUnit ? 1 : (prod.unidad || 1)
-      const nextUnits = it.qty * nextUnitSize
-      const nextCost = nextUnits * prod.cost
-      return {
-        ...it,
-        unitSize: nextUnitSize,
-        totalUnits: nextUnits,
-        cost: nextCost
-      }
-    }))
-  }
-
-  function handleSelectSuggestion(p) {
-    const existing = items.find((it) => it.productId === p.id)
-    if (existing) {
-      setItems(items.map((it) => {
-        if (it.productId === p.id) {
-          const nextQty = it.qty + 1
-          const nextUnits = nextQty * it.unitSize
-          const nextCost = nextUnits * it.catalogCost
-          return { ...it, qty: nextQty, totalUnits: nextUnits, cost: nextCost }
-        }
-        return it
-      }))
-      toast(`+1 bulto a ${p.name}`, 'success')
-    } else {
-      const u = p.unidad || 1
-      const initialCost = u * p.cost
-      setItems([...items, {
-        id: uid(),
-        productId: p.id,
-        name: p.name,
-        qty: 1,
-        totalUnits: u,
-        cost: initialCost,
-        isCustom: false,
-        unitSize: u,
-        catalogCost: p.cost,
-        batchCode: null,
-        expirationDate: null,
-      }])
-      toast(`Agregado: ${p.name}`, 'success')
-    }
-    setSelectedProdId('')
-    setProdQuery('')
-  }
-
-  function handleScan(code) {
-    setScannerOpen(false)
-    const trimmed = (code || '').trim()
-    if (!trimmed) return
-    const prod = state.products.find(
-      (p) => p.barcode && p.barcode.trim().toLowerCase() === trimmed.toLowerCase()
-    )
-    if (prod) {
-      // Agregar directamente a la lista de recibo
-      const existing = items.find((it) => it.productId === prod.id)
-      if (existing) {
-        setItems(items.map((it) => {
-          if (it.productId === prod.id) {
-            const nextQty = it.qty + 1
-            const nextUnits = nextQty * it.unitSize
-            const nextCost = nextUnits * it.catalogCost
-            return { ...it, qty: nextQty, totalUnits: nextUnits, cost: nextCost }
-          }
-          return it
-        }))
-        toast(`+1 bulto a ${prod.name}`, 'success')
-      } else {
-        const u = prod.unidad || 1
-        const initialCost = u * prod.cost
-        setItems([...items, {
-          id: uid(),
-          productId: prod.id,
-          name: prod.name,
-          qty: 1,
-          totalUnits: u,
-          cost: initialCost,
-          isCustom: false,
-          unitSize: u,
-          catalogCost: prod.cost,
-          batchCode: null,
-          expirationDate: null,
-        }])
-        toast(`Agregado: ${prod.name}`, 'success')
-      }
-      setSelectedProdId('')
-      setProdQuery('')
-    } else {
-      toast('Producto no encontrado en el catálogo', 'error')
-    }
-  }
-
-  useBarcodeScanner({
-    onScan: handleScan,
-    enabled: receiveOpen && step === 2 && !scannerOpen,
-  })
-
-  function submitReceive() {
-    if (!canReceive) {
-      toast('No tenés permisos para realizar esta acción.', 'destructive')
-      return
-    }
-
-    const totalInvoiceVal = Number(totalInvoiceAmount) || 0
-    if (!totalInvoiceVal || totalInvoiceVal <= 0) {
-      toast('Ingresá el monto total de la boleta.', 'error')
-      return
-    }
-
-    if (items.length === 0 && step === 2) {
-      toast('Agregá al menos un ítem al recibo en el Paso 2 o completá la Carga Simplificada en el Paso 1.', 'error')
-      return
-    }
-
-    if (paidCash && !cashOpen) {
-      toast('No hay una caja abierta. Abrí la caja antes de registrar un pago al contado, o marcá la compra "a cuenta".', 'error')
-      return
-    }
-
-    const isSimplified = items.length === 0
-    const itemsTotal = items.reduce((sum, it) => sum + it.cost, 0)
-    
-    // El total a registrar es el monto de la boleta física
-    const totalAmount = totalInvoiceVal
-
-    const detailString = isSimplified 
-      ? `Carga Simplificada (Boleta Nro: ${invoiceNumber})` 
-      : items.map((it) => {
-          if (it.isCustom) {
-            return it.name
-          } else {
-            return `${it.name} (x${it.totalUnits} un.)`
-          }
-        }).join(', ')
-
-    const detailObj = {
-      text: detailString,
-      invoiceNumber: invoiceNumber.trim(),
-      invoiceDate: invoiceDate || null,
-      invoiceDueDate: invoiceDueDate || null,
-      notes: notes.trim(),
-      isSimplified
-    }
-    const finalDetailString = JSON.stringify(detailObj)
-
-    const cleanItems = items.map(it => ({
-      productId: it.productId || null,
-      name: it.name,
-      qty: it.qty,
-      totalUnits: it.totalUnits,
-      cost: it.cost,
-      isCustom: it.isCustom,
-      unitSize: it.unitSize,
-      batchCode: it.batchCode || null,
-      expirationDate: it.expirationDate || null
-    }))
-
-    const isOnline = typeof navigator !== 'undefined' && navigator.onLine
-    onReceive(supplier.id, totalAmount, finalDetailString, paidCash, cleanItems)
-
-    setItems([])
-    setReceiveOpen(false)
-
-    if (!isOnline) {
-      toast(
-        paidCash
-          ? 'Mercadería recibida, stock actualizado y pagada localmente (Modo Offline)'
-          : 'Mercadería recibida, stock actualizado a cuenta localmente (Modo Offline)',
-        'warning',
-      )
-    } else {
-      toast(
-        paidCash 
-          ? 'Mercadería recibida, stock cargado y pagado' 
-          : 'Mercadería recibida y stock cargado a cuenta', 
-        'success'
-      )
-    }
-  }
 
   function submitPay() {
     if (!canPay) {
@@ -1153,18 +795,11 @@ function SupplierDetail({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          {canReceive && (
-            <Button variant="outline" onClick={() => setReceiveOpen(true)} className="h-11">
-              <PackagePlus className="size-4" /> Recibir
-            </Button>
-          )}
-          {canPay && (
-            <Button onClick={() => setPayOpen(true)} disabled={balance <= 0} className="h-11">
-              <Wallet className="size-4" /> Pagar
-            </Button>
-          )}
-        </div>
+        {canPay && (
+          <Button onClick={() => setPayOpen(true)} disabled={balance <= 0} className="w-full h-11">
+            <Wallet className="size-4" /> Pagar
+          </Button>
+        )}
       </Card>
 
       <div className="space-y-2.5">
@@ -1235,389 +870,6 @@ function SupplierDetail({
           </div>
         )}
       </div>
-
-      <Modal 
-        open={receiveOpen} 
-        onClose={() => setReceiveOpen(false)} 
-        variant="large"
-        title={step === 1 ? "Recibir mercadería - Paso 1: Datos de Boleta" : "Recibir mercadería - Paso 2: Productos"}
-      >
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-          {step === 1 ? (
-            /* STEP 1: INVOICE DETAILS */
-            <div className="space-y-4">
-              <p className="text-xs text-muted-foreground">
-                Completá los datos generales de la boleta de compra para continuar a la carga de productos.
-              </p>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="inv-number">Número de Boleta</Label>
-                  <Input
-                    id="inv-number"
-                    value={invoiceNumber}
-                    onChange={(e) => setInvoiceNumber(e.target.value)}
-                    placeholder="Ej: 0001-0004294"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="inv-total">Monto Total de la Boleta</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-muted-foreground">$</span>
-                    <Input
-                      id="inv-total"
-                      type="number"
-                      inputMode="numeric"
-                      value={totalInvoiceAmount}
-                      onChange={(e) => setTotalInvoiceAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="pl-7 font-semibold"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="inv-date">Fecha de Emisión</Label>
-                  <Input
-                    id="inv-date"
-                    type="date"
-                    value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="inv-due-date">Fecha de Vencimiento</Label>
-                  <Input
-                    id="inv-due-date"
-                    type="date"
-                    value={invoiceDueDate}
-                    onChange={(e) => setInvoiceDueDate(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="inv-notes">Notas / Observaciones</Label>
-                <Input
-                  id="inv-notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ej: Bonificaciones, fletes o comentarios de entrega"
-                />
-              </div>
-
-              <label className="flex items-center gap-3 rounded-xl border border-border p-3.5">
-                <input
-                  type="checkbox"
-                  checked={paidCash}
-                  onChange={(e) => setPaidCash(e.target.checked)}
-                  className="size-5 accent-[var(--primary)]"
-                />
-                <div>
-                  <p className="text-sm font-medium">Pago contado (efectivo)</p>
-                  <p className="text-xs text-muted-foreground">
-                    {cashOpen
-                      ? 'Se registrará un egreso en la caja actual'
-                      : 'Sin caja abierta: no impactará en caja'}
-                  </p>
-                </div>
-              </label>
-
-              <div className="mt-6 flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/60">
-                <Button variant="outline" className="h-12 flex-1 text-sm font-semibold" onClick={() => setReceiveOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button 
-                  className="h-12 flex-1 font-bold text-base shadow-sm"
-                  onClick={handleNextStep}
-                >
-                  Siguiente →
-                </Button>
-              </div>
-            </div>
-          ) : (
-            /* STEP 2: LOAD PRODUCTS */
-            <div className="space-y-4">
-              <div className="flex border-b border-border mb-3">
-                <button
-                  type="button"
-                  onClick={() => setAddItemType('catalog')}
-                  className={cn(
-                    "flex-1 py-2 text-center text-sm font-semibold border-b-2 transition-all cursor-pointer",
-                    addItemType === 'catalog' ? "border-primary text-primary" : "border-transparent text-muted-foreground"
-                  )}
-                >
-                  Del Catálogo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAddItemType('custom')}
-                  className={cn(
-                    "flex-1 py-2 text-center text-sm font-semibold border-b-2 transition-all cursor-pointer",
-                    addItemType === 'custom' ? "border-primary text-primary" : "border-transparent text-muted-foreground"
-                  )}
-                >
-                  Fuera de Catálogo
-                </button>
-              </div>
-
-              {addItemType === 'catalog' ? (
-                <div className="space-y-3">
-                  <div className="flex gap-2 items-end">
-                    <div className="relative flex-1">
-                      <Label htmlFor="search-prod-input" className="text-xs">Buscar Producto (Nombre o Código)</Label>
-                      <div className="relative mt-1 flex gap-2">
-                        <div className="relative flex-1">
-                          <Input
-                            id="search-prod-input"
-                            value={prodQuery}
-                            onChange={(e) => {
-                              setProdQuery(e.target.value)
-                              if (selectedProdId) setSelectedProdId('')
-                            }}
-                            placeholder="Escribí para buscar..."
-                            className="h-11"
-                            autoComplete="off"
-                          />
-                          {productSuggestions.length > 0 && (
-                          <div className="absolute left-0 right-0 w-[calc(100vw-5rem)] sm:w-full max-w-[400px] z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
-                            {productSuggestions.map((p) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => handleSelectSuggestion(p)}
-                                className="flex w-full items-start justify-between rounded-lg px-3 py-2 text-left hover:bg-muted transition-colors cursor-pointer gap-2"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-semibold text-foreground text-xs leading-tight whitespace-normal sm:truncate">
-                                    {p.name}
-                                  </p>
-                                  <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                                    {p.category} {p.barcode && `· Código: ${p.barcode}`}
-                                  </p>
-                                </div>
-                                <span className="text-[11px] font-bold text-primary shrink-0 ml-2 font-mono bg-primary/5 dark:bg-primary/10 px-2 py-0.5 rounded">
-                                  Costo: {money(p.cost)}/un
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        </div>
-                        <Button
-                          variant="outline"
-                          type="button"
-                          className="h-11 w-11 shrink-0 p-0"
-                          onClick={() => setScannerOpen(true)}
-                          aria-label="Escanear código"
-                        >
-                          <Camera className="size-5" />
-                        </Button>
-                      </div>
-                    </div>
-                    <Button 
-                      type="button" 
-                      onClick={() => {
-                        handleAddCatalogItem()
-                        setProdQuery('')
-                      }} 
-                      disabled={!selectedProdId}
-                      className="h-11 shrink-0 hidden sm:inline-flex"
-                    >
-                      <Plus className="size-4 mr-1" /> Cargar
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-end w-full">
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="custom-name" className="text-xs font-semibold">Nombre del Producto</Label>
-                    <Input
-                      id="custom-name"
-                      value={customName}
-                      onChange={(e) => setCustomName(e.target.value)}
-                      placeholder="Ej: Artículos varios"
-                      className="h-11 w-full"
-                    />
-                  </div>
-                  <div className="flex gap-2 items-end w-full sm:w-auto">
-                    <div className="flex-1 sm:w-32 space-y-1">
-                      <Label htmlFor="custom-cost" className="text-xs font-semibold">Costo Total</Label>
-                      <Input
-                        id="custom-cost"
-                        type="number"
-                        inputMode="numeric"
-                        value={customCost}
-                        onChange={(e) => setCustomCost(e.target.value)}
-                        placeholder="0"
-                        className="h-11 w-full"
-                      />
-                    </div>
-                    <Button 
-                      type="button" 
-                      onClick={handleAddCustomItem} 
-                      disabled={!customName.trim() || !Number(customCost)}
-                      className="h-11 shrink-0 px-4"
-                    >
-                      <Plus className="size-4 mr-1.5" /> Cargar
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Loaded items list */}
-              <div className="border border-border rounded-2xl overflow-hidden bg-card/50">
-                {items.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center text-muted-foreground">
-                    <PackagePlus className="size-8 opacity-30 mb-2 text-muted-foreground" />
-                    <p className="text-xs font-semibold">No cargaste ningún producto todavía</p>
-                    <p className="text-[10px] opacity-80 mt-0.5">Buscá y cargá productos de catálogo o personalizados arriba</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="hidden sm:grid bg-muted/40 px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider grid-cols-[1fr_70px_85px_100px_40px] gap-2 border-b border-border">
-                      <span>Detalle / Producto</span>
-                      <span className="text-center">Cant.</span>
-                      <span className="text-right">Costo/Un.</span>
-                      <span className="text-right">Costo Total</span>
-                      <span></span>
-                    </div>
-                    <div className="divide-y divide-border/60 max-h-[40vh] overflow-y-auto pr-1">
-                      {items.map((item) => (
-                        <div key={item.id} className="p-3 sm:px-3 sm:py-2 text-sm flex flex-col sm:grid sm:grid-cols-[1fr_70px_85px_100px_40px] gap-3 sm:gap-2 items-stretch sm:items-center">
-                          <div className="min-w-0 flex-1 flex justify-between items-start gap-2 sm:block">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-foreground text-xs leading-tight truncate sm:whitespace-normal">{item.name}</p>
-                              {!item.isCustom ? (
-                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                  <p className="text-[10px] text-muted-foreground leading-none">
-                                    Equivale a <span className="font-bold text-foreground">{item.totalUnits}</span> un.
-                                  </p>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleItemUnitType(item.id)}
-                                    className="rounded bg-primary/10 hover:bg-primary/20 text-primary px-1.5 py-0.5 text-[9px] font-bold uppercase transition-colors shrink-0 cursor-pointer"
-                                    title="Cambiar entre caja o unidad suelta"
-                                  >
-                                    {item.unitSize === 1 ? 'Unidades' : `Caja (x${item.unitSize})`} ⇄
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground uppercase mt-1 inline-block shrink-0">
-                                  Custom (Unidad)
-                                </span>
-                              )}
-                            </div>
-                            <div className="sm:hidden">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItem(item.id)}
-                                className="text-destructive hover:bg-destructive/10 p-2 rounded-lg transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="size-4.5" />
-                              </button>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-3 sm:contents gap-2 items-end">
-                            <div className="space-y-1 sm:contents">
-                              <label className="text-[10px] text-muted-foreground font-semibold sm:hidden">Cant.</label>
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                min="1"
-                                value={item.qty}
-                                onChange={(e) => handleUpdateItemQty(item.id, e.target.value)}
-                                className="h-8 text-center px-1 py-0.5 rounded-lg border-border"
-                              />
-                            </div>
-                            <div className="space-y-1 sm:contents text-center sm:text-right">
-                              <span className="text-[10px] text-muted-foreground font-semibold sm:hidden mb-1 block">Costo/Un</span>
-                              <span className="text-xs font-mono text-muted-foreground tabular-nums leading-none mb-1.5 sm:mb-0 sm:text-right sm:w-full sm:block sm:py-2">
-                                {item.totalUnits > 0 ? money(item.cost / item.totalUnits) : '—'}
-                              </span>
-                            </div>
-                            <div className="space-y-1 sm:contents">
-                              <label className="text-[10px] text-muted-foreground font-semibold sm:hidden">Costo Total</label>
-                              {item.isCustom ? (
-                                <Input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={item.cost}
-                                  onChange={(e) => handleUpdateItemCost(item.id, e.target.value)}
-                                  className="h-8 text-right font-mono font-semibold text-foreground border-border"
-                                />
-                              ) : (
-                                <div className="h-8 flex items-center justify-end font-mono font-semibold text-foreground pr-2 text-right w-full sm:pr-0 sm:py-2">
-                                  {money(item.cost)}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="hidden sm:flex justify-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(item.id)}
-                              className="text-destructive hover:bg-destructive/10 p-1.5 rounded-lg transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* Difference calculations */}
-                    <div className="bg-muted/20 px-3 py-2 border-t border-border flex flex-col gap-1 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Total de la Boleta:</span>
-                        <span className="font-semibold text-foreground tabular-nums">{money(Number(totalInvoiceAmount) || 0)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Suma de Items:</span>
-                        <span className="font-semibold text-foreground tabular-nums">{money(items.reduce((s, it) => s + it.cost, 0))}</span>
-                      </div>
-                      <div className="flex items-center justify-between border-t border-border/50 pt-1 font-bold">
-                        <span>Diferencia:</span>
-                        <span className={cn(
-                          "tabular-nums font-black",
-                          (Number(totalInvoiceAmount) || 0) - items.reduce((s, it) => s + it.cost, 0) === 0 ? "text-success" : "text-destructive"
-                        )}>
-                          {(Number(totalInvoiceAmount) || 0) - items.reduce((s, it) => s + it.cost, 0) === 0 
-                            ? "Sin diferencias" 
-                            : money((Number(totalInvoiceAmount) || 0) - items.reduce((s, it) => s + it.cost, 0))}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="mt-6 flex flex-col sm:flex-row gap-2 pt-2 border-t border-border/60">
-                <Button variant="outline" onClick={() => setStep(1)} className="h-12 sm:flex-none text-sm font-semibold">
-                  ← Volver al Paso 1
-                </Button>
-                <Button variant="ghost" onClick={() => setReceiveOpen(false)} className="h-12 sm:flex-none text-sm font-semibold text-muted-foreground hover:text-foreground">
-                  Cancelar
-                </Button>
-                <Button className="h-12 flex-1 font-bold text-base shadow-sm" onClick={submitReceive} disabled={items.length === 0}>
-                  Confirmar Recepción
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      <ScannerModal
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onDetect={handleScan}
-      />
 
       {/* Pagar */}
       <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Registrar pago" variant="center">
