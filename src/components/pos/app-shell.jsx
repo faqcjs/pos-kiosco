@@ -518,7 +518,8 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 h-full min-h-0 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</main>
+        {/* relative: absolute descendants (e.g. sr-only labels) stay inside this scroll area instead of growing the document */}
+        <main className="relative min-w-0 flex-1 h-full min-h-0 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</main>
 
         {/* Mobile bottom nav */}
         <nav className={cn(
