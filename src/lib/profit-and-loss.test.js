@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildMonthlyResults } from './profit-and-loss'
+import { buildMonthlyResults, selectCompleteMonths } from './profit-and-loss'
 import { buildProductsMap, getSaleProfit } from './sale-cost'
 
 const PRODUCTS = [
@@ -148,5 +148,30 @@ describe('buildMonthlyResults', () => {
     expect(october.netSales).toBe(240)
     expect(october.uncostedRevenue).toBe(140)
     expect(october.grossProfit).toBe(40)
+  })
+})
+
+describe('selectCompleteMonths', () => {
+  it('keeps only fully covered, finished months and lists the skipped ones that had activity', () => {
+    const months = build({
+      dateFrom: '2026-09-10',
+      dateTo: '2026-12-31',
+      sales: [costedSale('2026-09-15T10:00:00'), costedSale('2026-11-15T10:00:00'), costedSale('2026-12-02T10:00:00')],
+      expenses: [expense({ period: '2026-10-01' })],
+    })
+
+    const { complete, skipped } = selectCompleteMonths(months)
+
+    expect(complete.map((m) => m.period)).toEqual(['2026-10-01', '2026-11-01'])
+    expect(skipped.map((m) => m.period)).toEqual(['2026-09-01', '2026-12-01'])
+  })
+
+  it('drops complete months without sales or expenses, and skipped months without activity', () => {
+    const months = build({ dateFrom: '2026-10-01', dateTo: '2026-12-31', sales: [costedSale('2026-11-15T10:00:00')] })
+
+    const { complete, skipped } = selectCompleteMonths(months)
+
+    expect(complete.map((m) => m.period)).toEqual(['2026-11-01'])
+    expect(skipped).toEqual([])
   })
 })

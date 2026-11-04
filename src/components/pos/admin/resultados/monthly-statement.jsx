@@ -79,11 +79,6 @@ export function MonthlyStatement({ month }) {
             </p>
           )}
         </div>
-        {month.isPartial && (
-          <span className="px-2 py-1 text-xs font-medium text-warning-foreground bg-warning/25 rounded-md dark:text-warning">
-            Mes incompleto
-          </span>
-        )}
       </header>
 
       <ResultFlowBar flow={flow} />

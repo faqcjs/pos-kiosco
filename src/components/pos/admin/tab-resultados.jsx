@@ -1,21 +1,22 @@
 import { useMemo } from 'react'
-import { Scale } from 'lucide-react'
-import { buildMonthlyResults } from '@/lib/profit-and-loss'
+import { Info, Scale } from 'lucide-react'
+import { buildMonthlyResults, selectCompleteMonths } from '@/lib/profit-and-loss'
 import { MonthlyStatement } from './resultados/monthly-statement'
 import { MonthsOverview } from './resultados/months-overview'
 
-const hasActivity = (month) => month.netSales > 0 || month.totalExpenses > 0
+const listLabels = (months) => months.map((m) => m.label).join(', ')
 
 /**
  * Monthly net result: gross profit (same as the KPI) minus operating expenses.
- * Purchases only reach it as cost of goods sold.
+ * Purchases only reach it as cost of goods sold. Only complete, finished months are shown.
  */
 export function TabResultados({ sales, productsMap, expenses, shifts, dateFrom, dateTo }) {
-  const months = useMemo(
-    () => buildMonthlyResults({ sales, productsMap, expenses, shifts, dateFrom, dateTo }).filter(hasActivity),
+  const { complete, skipped } = useMemo(
+    () => selectCompleteMonths(buildMonthlyResults({ sales, productsMap, expenses, shifts, dateFrom, dateTo })),
     [sales, productsMap, expenses, shifts, dateFrom, dateTo],
   )
-  const newestFirst = useMemo(() => [...months].reverse(), [months])
+  const newestFirst = useMemo(() => [...complete].reverse(), [complete])
+  const hasSkipped = skipped.length > 0
 
   return (
     <section className="flex flex-col gap-4">
@@ -26,17 +27,31 @@ export function TabResultados({ sales, productsMap, expenses, shifts, dateFrom, 
         </p>
       </header>
 
-      {months.length === 0 ? (
+      {complete.length > 0 && hasSkipped && (
+        <p className="flex items-start gap-2 px-3 py-2 text-sm text-muted-foreground bg-muted/50 rounded-xl">
+          <Info aria-hidden="true" className="shrink-0 mt-0.5 size-4" />
+          <span>
+            No se muestra <span className="font-medium text-foreground capitalize">{listLabels(skipped)}</span>: el mes
+            todavía no terminó o las fechas elegidas no lo cubren entero.
+          </span>
+        </p>
+      )}
+
+      {complete.length === 0 ? (
         <section className="flex flex-col items-center gap-2 px-6 py-12 text-center rounded-2xl border border-dashed border-border">
           <Scale aria-hidden="true" className="size-9 text-muted-foreground/60" />
-          <p className="font-heading text-base font-bold">No hay ventas ni gastos en estas fechas</p>
+          <p className="font-heading text-base font-bold">
+            {hasSkipped ? 'No hay meses completos en estas fechas' : 'No hay ventas ni gastos en estas fechas'}
+          </p>
           <p className="max-w-sm text-sm text-muted-foreground text-pretty">
-            Elegí otro período arriba, o cargá los gastos del mes en Admin → Gastos.
+            {hasSkipped
+              ? 'El resultado se calcula con meses enteros y ya terminados. Elegí fechas del primer al último día de uno o más meses pasados.'
+              : 'Elegí otro período arriba, o cargá los gastos del mes en Admin → Gastos.'}
           </p>
         </section>
       ) : (
         <>
-          {months.length > 1 && <MonthsOverview months={months} />}
+          {complete.length > 1 && <MonthsOverview months={complete} />}
           {newestFirst.map((month) => (
             <MonthlyStatement key={month.period} month={month} />
           ))}

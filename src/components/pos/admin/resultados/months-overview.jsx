@@ -23,7 +23,6 @@ export function MonthsOverview({ months }) {
               <tr key={month.period}>
                 <th scope="row" className="py-2 font-medium text-left capitalize">
                   {month.label}
-                  {month.isPartial && <span className="ml-1.5 text-xs font-normal text-muted-foreground">(incompleto)</span>}
                 </th>
                 <td className="py-2 text-right tabular-nums">{money(month.netSales)}</td>
                 <td className="hidden py-2 text-right text-muted-foreground tabular-nums sm:table-cell">{money(month.totalExpenses)}</td>

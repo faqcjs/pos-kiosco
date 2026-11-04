@@ -61,6 +61,21 @@ const buildMonth = ({ monthStart, rangeStart, rangeEnd, now, sales, productsMap,
   }
 }
 
+const hasActivity = (month) => month.netSales > 0 || month.totalExpenses > 0
+
+/**
+ * Only months the range covers entirely and that are already over get a result: a cut month
+ * would subtract the whole month's expenses from part of its sales.
+ * @returns {{ complete: object[], skipped: object[] }} skipped = partial months that had activity
+ */
+export function selectCompleteMonths(months = []) {
+  const withActivity = months.filter(hasActivity)
+  return {
+    complete: withActivity.filter((m) => !m.isPartial),
+    skipped: withActivity.filter((m) => m.isPartial),
+  }
+}
+
 /**
  * One profit and loss statement per calendar month touched by the date range, in order.
  * @param {{ sales?: object[], productsMap: Map, expenses?: object[], shifts?: object[],
