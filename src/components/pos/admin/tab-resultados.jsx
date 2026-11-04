@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Scale } from 'lucide-react'
 import { buildMonthlyResults } from '@/lib/profit-and-loss'
 import { MonthlyStatement } from './resultados/monthly-statement'
+import { MonthsOverview } from './resultados/months-overview'
 
 const hasActivity = (month) => month.netSales > 0 || month.totalExpenses > 0
 
@@ -11,29 +12,35 @@ const hasActivity = (month) => month.netSales > 0 || month.totalExpenses > 0
  */
 export function TabResultados({ sales, productsMap, expenses, shifts, dateFrom, dateTo }) {
   const months = useMemo(
-    () => buildMonthlyResults({ sales, productsMap, expenses, shifts, dateFrom, dateTo }),
-    [sales, productsMap, expenses, shifts, dateFrom, dateTo]
+    () => buildMonthlyResults({ sales, productsMap, expenses, shifts, dateFrom, dateTo }).filter(hasActivity),
+    [sales, productsMap, expenses, shifts, dateFrom, dateTo],
   )
-  const isEmpty = !months.some(hasActivity)
+  const newestFirst = useMemo(() => [...months].reverse(), [months])
 
   return (
-    <section className="space-y-4">
+    <section className="flex flex-col gap-4">
       <header>
-        <div className="flex items-center gap-2">
-          <Scale className="size-5 text-primary" />
-          <h3 className="font-heading text-base font-bold text-foreground">Resultados</h3>
-        </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Ganancia bruta menos gastos operativos, mes por mes. Las compras entran solo como costo de lo vendido.
+        <h3 className="font-heading text-base font-bold">Resultados</h3>
+        <p className="mt-0.5 max-w-prose text-sm text-muted-foreground">
+          Lo que te queda de las ventas después de pagar la mercadería y los gastos del negocio, mes por mes.
         </p>
       </header>
 
-      {isEmpty ? (
-        <p className="p-4 text-center text-xs text-muted-foreground bg-muted/30 rounded-xl border border-border/60">
-          No hay ventas ni gastos en el período seleccionado.
-        </p>
+      {months.length === 0 ? (
+        <section className="flex flex-col items-center gap-2 px-6 py-12 text-center rounded-2xl border border-dashed border-border">
+          <Scale aria-hidden="true" className="size-9 text-muted-foreground/60" />
+          <p className="font-heading text-base font-bold">No hay ventas ni gastos en estas fechas</p>
+          <p className="max-w-sm text-sm text-muted-foreground text-pretty">
+            Elegí otro período arriba, o cargá los gastos del mes en Admin → Gastos.
+          </p>
+        </section>
       ) : (
-        months.map((month) => <MonthlyStatement key={month.period} month={month} />)
+        <>
+          {months.length > 1 && <MonthsOverview months={months} />}
+          {newestFirst.map((month) => (
+            <MonthlyStatement key={month.period} month={month} />
+          ))}
+        </>
       )}
     </section>
   )
