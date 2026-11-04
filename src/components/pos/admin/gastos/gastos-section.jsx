@@ -1,26 +1,40 @@
-import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
-import { EmptyState, Input, Label } from '@/components/ui/kit'
+import { useState } from 'react'
+import { Plus, Receipt, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
 import { useStore } from '@/lib/store'
-import { summarizeExpensesByCategory } from '@/lib/expenses'
-import { getExpensesTotal, selectMonthExpenses, toMonthValue } from './gastos-view-model'
+import { getExpenseCategoryLabel } from '@/lib/expenses'
+import { ExpenseBreakdown } from './expense-breakdown'
+import { ExpenseDayList } from './expense-day-list'
 import { ExpenseFormModal } from './expense-form-modal'
-import { ExpenseRow } from './expense-row'
-import { ExpenseSummary } from './expense-summary'
+import { MonthNavigator } from './month-navigator'
+import { useGastosMonth } from './use-gastos-month'
 
-// Admin-only section: list, create, edit and delete operating expenses by month
+function EmptyMonth({ onCreate }) {
+  return (
+    <section className="flex flex-col items-center gap-3 px-6 py-12 text-center rounded-2xl border border-dashed border-border">
+      <Receipt aria-hidden="true" className="size-9 text-muted-foreground/60" />
+      <div>
+        <h3 className="font-heading text-base font-bold">Todavía no hay gastos en este mes</h3>
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground text-pretty">
+          Cargá sueldos, alquiler, servicios e impuestos para ver cuánto te queda en Reportes → Resultados.
+        </p>
+      </div>
+      <Button type="button" onClick={onCreate}>
+        <Plus /> Cargar gasto
+      </Button>
+    </section>
+  )
+}
+
+// Admin-only section: operating expenses of a month, by category and by payment day
 export function GastosSection() {
   const { state, registerExpense, updateExpense, deleteExpense } = useStore()
   const toast = useToast()
-  const [month, setMonth] = useState(() => toMonthValue(new Date()))
+  const view = useGastosMonth(state.expenses)
   // null = closed, { expense: null } = new, { expense } = editing
   const [form, setForm] = useState(null)
-
-  const monthExpenses = useMemo(() => selectMonthExpenses(state.expenses, month), [state.expenses, month])
-  const categories = useMemo(() => summarizeExpensesByCategory(monthExpenses), [monthExpenses])
-  const total = useMemo(() => getExpensesTotal(monthExpenses), [monthExpenses])
+  const openNew = () => setForm({ expense: null })
 
   const handleDelete = async (id) => {
     try {
@@ -34,46 +48,42 @@ export function GastosSection() {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:w-[200px]">
-          <Label htmlFor="expenses-month">Mes</Label>
-          <Input
-            id="expenses-month"
-            type="month"
-            value={month}
-            onChange={(event) => setMonth(event.target.value || toMonthValue(new Date()))}
-          />
-        </div>
-        <Button type="button" className="h-11 w-full sm:w-auto" onClick={() => setForm({ expense: null })}>
+    <section className="flex flex-col gap-5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <MonthNavigator month={view.month} currentMonth={view.currentMonth} onChange={view.setMonth} />
+        <Button type="button" className="h-11 w-full sm:w-auto" onClick={openNew}>
           <Plus /> Cargar gasto
         </Button>
       </header>
 
-      <ExpenseSummary categories={categories} total={total} />
-
-      {monthExpenses.length === 0 ? (
-        <EmptyState
-          title="Sin gastos en este mes"
-          description="Cargá sueldos, alquiler o servicios para ver el resultado del mes."
-        />
+      {view.monthExpenses.length === 0 ? (
+        <EmptyMonth onCreate={openNew} />
       ) : (
-        <ul className="flex flex-col gap-2">
-          {monthExpenses.map((expense) => (
-            <ExpenseRow
-              key={expense.id}
-              expense={expense}
-              onEdit={(selected) => setForm({ expense: selected })}
-              onDelete={handleDelete}
-            />
-          ))}
-        </ul>
+        <>
+          <ExpenseBreakdown
+            total={view.total}
+            breakdown={view.breakdown}
+            comparison={view.comparison}
+            previousMonth={view.previousMonth}
+            activeCategory={view.activeCategory}
+            onToggleCategory={view.toggleCategory}
+          />
+          {view.activeCategory && (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              Mostrando solo {getExpenseCategoryLabel(view.activeCategory).toLowerCase()}
+              <Button type="button" variant="ghost" size="sm" onClick={view.clearCategory}>
+                <X /> Ver todos
+              </Button>
+            </p>
+          )}
+          <ExpenseDayList expenses={view.visibleExpenses} onEdit={(expense) => setForm({ expense })} onDelete={handleDelete} />
+        </>
       )}
 
       {form && (
         <ExpenseFormModal
           expense={form.expense}
-          month={month}
+          month={view.month}
           hasOpenShift={Boolean(state.currentShift)}
           onSave={form.expense ? updateExpense : registerExpense}
           onClose={() => setForm(null)}

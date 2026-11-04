@@ -1,7 +1,8 @@
-import { Input, Label, Modal, Select } from '@/components/ui/kit'
+import { Input, Label, Modal } from '@/components/ui/kit'
 import { Button } from '@/components/ui/button'
-import { EXPENSE_CATEGORIES, SHIFT_ORIGIN } from '@/lib/expenses'
+import { SHIFT_ORIGIN } from '@/lib/expenses'
 import { getOriginOptions } from './gastos-view-model'
+import { ExpenseCategoryField } from './expense-category-field'
 import { ExpenseOriginField } from './expense-origin-field'
 import { useExpenseForm } from './use-expense-form'
 
@@ -17,29 +18,25 @@ export function ExpenseFormModal({ expense, month, hasOpenShift, onSave, onClose
     <Modal
       open
       onClose={onClose}
-      title={expense ? 'Editar gasto' : 'Nuevo gasto'}
-      subtitle="Sueldos, alquiler, servicios y otros gastos del negocio"
+      title={expense ? 'Editar gasto' : 'Cargar gasto'}
       footer={
         <footer className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+            Cancelar
+          </Button>
           <Button type="submit" form={FORM_ID} disabled={isSaving}>
-            {isSaving ? 'Guardando...' : 'Guardar'}
+            {isSaving ? 'Guardando…' : expense ? 'Guardar cambios' : 'Cargar gasto'}
           </Button>
         </footer>
       }
     >
-      <form id={FORM_ID} onSubmit={submit} className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="expense-category">Categoría</Label>
-            <Select id="expense-category" value={values.category} onChange={setField('category')}>
-              {EXPENSE_CATEGORIES.map((category) => (
-                <option key={category.id} value={category.id}>{category.label}</option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="expense-amount">Monto</Label>
+      <form id={FORM_ID} onSubmit={submit} className="flex flex-col gap-5">
+        <div>
+          <Label htmlFor="expense-amount">Monto</Label>
+          <div className="relative">
+            <span aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 font-heading text-xl font-bold text-muted-foreground">
+              $
+            </span>
             <Input
               id="expense-amount"
               type="number"
@@ -48,20 +45,27 @@ export function ExpenseFormModal({ expense, month, hasOpenShift, onSave, onClose
               step="0.01"
               placeholder="0"
               required
+              autoFocus
               value={values.amount}
               onChange={setField('amount')}
+              className="pl-9 h-14 font-heading text-2xl font-bold tabular-nums"
             />
           </div>
         </div>
+
+        <ExpenseCategoryField value={values.category} onChange={setField('category')} />
+
         <div>
-          <Label htmlFor="expense-description">Descripción</Label>
+          <Label htmlFor="expense-description">Detalle (opcional)</Label>
           <Input
             id="expense-description"
             placeholder="Ej: sueldo de Juan, luz de octubre"
+            autoComplete="off"
             value={values.description}
             onChange={setField('description')}
           />
         </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="expense-month">Mes al que corresponde</Label>
@@ -74,6 +78,7 @@ export function ExpenseFormModal({ expense, month, hasOpenShift, onSave, onClose
             </div>
           )}
         </div>
+
         <ExpenseOriginField options={originOptions} value={values.origin} onChange={setField('origin')} />
       </form>
     </Modal>
