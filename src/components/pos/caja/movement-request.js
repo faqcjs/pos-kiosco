@@ -17,8 +17,16 @@ export const ACTION_KIND = Object.freeze({
 })
 
 export const EGRESO_KINDS = [
-  { id: EGRESO_KIND.GASTO, label: 'Gasto', hint: 'Sueldos, servicios, alquiler: resta en el arqueo y en el resultado del mes.' },
-  { id: EGRESO_KIND.PROVEEDOR, label: 'Pago a proveedor', hint: 'Se anota en la cuenta del proveedor: resta en el arqueo.' },
+  {
+    id: EGRESO_KIND.GASTO,
+    label: 'Gasto',
+    hint: 'Servicios, limpieza, fletes: resta en el arqueo y en el resultado del mes. No lo uses para mercadería que se vende: eso es una compra en Proveedores.',
+  },
+  {
+    id: EGRESO_KIND.PROVEEDOR,
+    label: 'Pago a proveedor',
+    hint: 'Para pagar una deuda con el proveedor: resta en el arqueo. Si llegó mercadería, cargá la compra en Proveedores con Pago contado.',
+  },
   { id: EGRESO_KIND.RETIRO, label: 'Retiro', hint: 'Plata que sale del cajón: resta solo en el arqueo.' },
 ]
 
