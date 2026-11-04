@@ -10,8 +10,10 @@ import { PageHeader } from '@/components/pos/page-header'
 import { useToast } from '@/components/ui/toast'
 import { ReportsModule } from './reports-module'
 import { ReportsHeader } from './reports-header'
+import { GastosSection } from './gastos/gastos-section'
 import { useStore, useSalesQuery } from '@/lib/store'
 import { money, formatDate, formatTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 function toLocalDateStr(d = new Date()) {
   const date = new Date(d)
@@ -76,7 +78,7 @@ export function Admin() {
 
       {/* Barra de control: Pestañas a la izquierda, Filtros a la derecha */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div className="flex h-10 items-center rounded-xl border border-border p-1 bg-muted/50 w-full sm:w-[240px] shrink-0 box-border shadow-2xs">
+        <div className="flex h-10 items-center rounded-xl border border-border p-1 bg-muted/50 w-full sm:w-[340px] shrink-0 box-border shadow-2xs">
           <button
             onClick={() => setAdminTab('stats')}
             className={`flex-1 h-full flex items-center justify-center rounded-lg text-xs font-semibold transition-all duration-200 ease-out cursor-pointer ${
@@ -97,6 +99,15 @@ export function Admin() {
           >
             Empleados
           </button>
+          <button
+            onClick={() => setAdminTab('gastos')}
+            className={cn(
+              'flex-1 h-full flex items-center justify-center rounded-lg text-xs font-semibold transition-all duration-200 ease-out cursor-pointer',
+              adminTab === 'gastos' ? 'bg-card text-foreground shadow-xs font-bold' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Gastos
+          </button>
         </div>
 
         {adminTab === 'stats' && (
@@ -116,11 +127,16 @@ export function Admin() {
         )}
       </div>
 
-      {adminTab === 'empleados' ? (
+      {adminTab === 'gastos' && <GastosSection />}
+
+      {adminTab === 'empleados' && (
         <UsersTab state={state} sales={sales} isLoading={isReportsLoading} createUser={createUser} deleteUser={deleteUser} />
-      ) : (
+      )}
+
+      {adminTab === 'stats' && (
         <ReportsModule
           sales={sales}
+          expenses={state.expenses}
           products={state.products}
           shifts={shifts}
           isLoading={isReportsLoading}
